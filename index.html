@@ -17,13 +17,13 @@
     color-scheme: light dark;
     --bar: 60px;
     --bg: #f6f5f1; --fg: #1c1b19; --muted: #6b6860; --card: #ffffff;
-    --line: #dddad2; --accent: #14532d; --accent-fg: #ffffff; --warn: #9a3412;
+    --line: #dddad2; --accent: var(--accent-light, #14532d); --accent-fg: var(--accent-fg-light, #ffffff); --warn: #9a3412;
     --mark: #fde68a; --soft: #eceae3;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151614; --fg: #ecebe6; --muted: #9c998f; --card: #1f201d;
-      --line: #34352f; --accent: #4ade80; --accent-fg: #0b2212; --warn: #fdba74;
+      --line: #34352f; --accent: var(--accent-dark, #4ade80); --accent-fg: var(--accent-fg-dark, #0b2212); --warn: #fdba74;
       --mark: #854d0e; --soft: #292a26;
     }
   }
@@ -220,7 +220,14 @@
   .select.compact select { padding: 8px 34px 8px 12px; background: transparent; }
   .select.compact::after { right: 13px; }
   input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 32px; margin: 0; background: transparent; accent-color: var(--accent); }
-  input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--line); }
+  /* --f is how far along the slider is (0 to 1), set from script; the part
+     already passed is filled with the accent color up to the thumb's centre. */
+  input[type=range] { --fill: calc(13px + var(--f, 0) * (100% - 26px)); }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 3px;
+    background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill));
+  }
+  input[type=range]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--accent); }
   input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%;
@@ -254,7 +261,15 @@
   .sheet h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 -4px; }
   .field { display: grid; gap: 8px; min-width: 0; }
   .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  .fieldhead label, .switchrow span { font-weight: 600; }
+  .fieldhead label, .fieldname, .switchrow span { font-weight: 600; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
+  .swatch {
+    width: 40px; height: 40px; border-radius: 50%; padding: 0; border: 3px solid var(--bg); cursor: pointer;
+    background: var(--c); box-shadow: 0 0 0 1.5px var(--line); position: relative; overflow: hidden;
+  }
+  .swatch[aria-pressed=true], .swatch.custom.on { box-shadow: 0 0 0 2.5px var(--fg); }
+  .swatch.custom { background: conic-gradient(#e11d48, #ea580c, #eab308, #16a34a, #0d9488, #2563eb, #7c3aed, #e11d48); display: block; }
+  .swatch.custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
   .fieldhead output { color: var(--muted); font-variant-numeric: tabular-nums; }
   .switchrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .sheet section > button { justify-self: start; }
@@ -407,6 +422,17 @@
       <div class="field">
         <label class="switchrow" for="bgQuotes"><span>Find quotes while locked</span><input id="bgQuotes" type="checkbox" class="switch"></label>
         <p class="muted">Experimental. Only works while audio is playing, and if iOS runs short of memory it may close the app and stop playback.</p>
+      </div>
+    </section>
+
+    <section>
+      <h3>Appearance</h3>
+      <div class="field">
+        <div class="fieldhead"><span id="accentLabel" class="fieldname">Accent color</span><output id="accentOut"></output></div>
+        <div id="swatches" class="swatches" role="group" aria-labelledby="accentLabel">
+          <label class="swatch custom" aria-label="Choose any color"><input id="accentPick" type="color" value="#16a34a"></label>
+        </div>
+        <p class="muted">Used for the progress bar, buttons and highlights. Very light or dark picks are adjusted so they stay readable in both themes.</p>
       </div>
     </section>
 
