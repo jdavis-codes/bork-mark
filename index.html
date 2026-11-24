@@ -70,7 +70,8 @@
   #library .iconbtn { margin-right: -8px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
   #modelNote:empty { display: none; }
-  #addBtn { width: 100%; padding: 14px; }
+  /* the two main buttons, Add a book and Bookmark, are the same size */
+  #addBtn, #markBtn { width: 100%; height: 58px; padding: 0 16px; font-size: 1.1rem; }
   /* library: the title bar stays at the top, Add a book and the mini player at the bottom */
   /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
      down past its top, and the page is told not to bounce at all. */
@@ -80,7 +81,7 @@
     padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 10px;
   }
   #library { padding-top: 48px; }
-  #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); view-transition-name: mini; }
+  #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); }
   /* whichever is lowest fills the strip under the home indicator with its own color */
   body:not(.has-mini) #addBar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   #addBar { max-width: 592px; margin: 0 auto; padding: 10px 16px; }
@@ -109,9 +110,9 @@
   /* The player is one fixed screen: everything below the cover keeps its
      place, and the cover takes whatever height is left. */
   #player {
+    position: fixed; inset: 0; z-index: 1; background: var(--bg);
     display: flex; flex-direction: column;
-    height: calc(100dvh - 14px - env(safe-area-inset-top) - var(--bar) - env(safe-area-inset-bottom));
-    padding-bottom: 14px;
+    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) calc(4px + env(safe-area-inset-bottom));
   }
   .coverwrap {
     flex: 1 1 0; min-height: 72px; margin: 4px 0 12px; container-type: size;
@@ -146,7 +147,7 @@
   .transport text { font: 600 7.5px -apple-system, sans-serif; fill: currentColor; stroke: none; }
   #playBtn { background: var(--fg); color: var(--bg); padding: 16px; }
   #playBtn svg { width: 36px; height: 36px; fill: currentColor; stroke: none; }
-  #markBtn { width: 100%; margin-top: 14px; padding: 20px; font-size: 1.15rem; }
+  #markBtn { margin-top: 14px; flex: none; }
   #markBtn.flash { opacity: 0.55; }
   #queueStatus { margin-top: 8px; }
   #queueStatus:empty { display: none; }
@@ -177,10 +178,7 @@
   h2[tabindex] { outline: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* bottom bar in the player: speed, sleep, settings within thumb reach */
-  #tabbar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--card); border-top: 1px solid var(--line);
-    padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
-  }
+  #tabbar { margin-top: 6px; }   /* no bar behind them: the buttons sit directly on the player */
   .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: var(--bar); max-width: 560px; margin: 0 auto; }
   .tabs button {
     display: grid; justify-items: center; gap: 3px; border: none; border-radius: 0; padding: 9px 4px 8px;
@@ -245,10 +243,15 @@
   /* moving between library and player: the cover and the bottom bar glide
      between their two positions while the rest cross-fades */
   #cover, #miniCover { view-transition-name: cover; }
-  #tabbar { view-transition-name: tabbar; }
-  /* each bar slides in from the bottom edge and back out, in step with the cover */
-  ::view-transition-new(tabbar):only-child, ::view-transition-new(mini):only-child { animation: 0.36s cubic-bezier(0.2, 0.85, 0.25, 1) both sheet-up; }
-  ::view-transition-old(tabbar):only-child, ::view-transition-old(mini):only-child { animation: 0.26s ease-in both sheet-down; }
+  /* The mini player and the player are one surface: opening a book, the mini
+     player's box grows to fill the screen; going back, the player shrinks into
+     it. Their contents keep their own size and cross-fade, pinned to the top
+     of the moving box, so nothing is stretched. */
+  #mini, #player { view-transition-name: playerbox; }
+  ::view-transition-old(playerbox), ::view-transition-new(playerbox) { width: 100%; height: 100%; object-fit: none; object-position: top center; }
+  /* with no mini player to grow from, the player rises from the bottom edge */
+  ::view-transition-new(playerbox):only-child { animation: 0.36s cubic-bezier(0.2, 0.85, 0.25, 1) both sheet-up; }
+  ::view-transition-old(playerbox):only-child { animation: 0.26s ease-in both sheet-down; }
   ::view-transition-group(*) { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.2, 0.85, 0.25, 1); }
   ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
   @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
@@ -468,6 +471,30 @@
   </div>
 
   <button id="markBtn" class="primary">Bookmark</button>
+<nav id="tabbar" aria-label="Player options">
+    <div class="tabs">
+      <button id="marksBtn" aria-label="Bookmarks">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-4-5 4z"/></svg>
+        <span id="marksLabel">Bookmarks</span>
+      </button>
+      <button id="figsBtn" aria-label="Figures" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5"/><circle cx="15.5" cy="9.5" r="1.3"/></svg>
+        <span id="figsLabel">Figures</span>
+      </button>
+      <button id="speedBtn" aria-label="Playback speed">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17a8.5 8.5 0 1 1 14.8 0"/><path d="M12 14.5l4-5.5"/><circle cx="12" cy="14.5" r="1.2" fill="currentColor"/></svg>
+        <span id="speedLabel">1×</span>
+      </button>
+      <button id="sleepBtn" aria-label="Sleep timer">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        <span id="sleepLabel"></span>
+      </button>
+      <button id="settingsBtn2" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>
+        <span>Settings</span>
+      </button>
+    </div>
+  </nav>
 </main>
 
 <dialog id="addDlg" class="bottom">
@@ -642,30 +669,7 @@
   </div>
 </dialog>
 
-<nav id="tabbar" hidden aria-label="Player options">
-  <div class="tabs">
-    <button id="marksBtn" aria-label="Bookmarks">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-4-5 4z"/></svg>
-      <span id="marksLabel">Bookmarks</span>
-    </button>
-    <button id="figsBtn" aria-label="Figures" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5"/><circle cx="15.5" cy="9.5" r="1.3"/></svg>
-      <span id="figsLabel">Figures</span>
-    </button>
-    <button id="speedBtn" aria-label="Playback speed">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17a8.5 8.5 0 1 1 14.8 0"/><path d="M12 14.5l4-5.5"/><circle cx="12" cy="14.5" r="1.2" fill="currentColor"/></svg>
-      <span id="speedLabel">1×</span>
-    </button>
-    <button id="sleepBtn" aria-label="Sleep timer">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
-      <span id="sleepLabel"></span>
-    </button>
-    <button id="settingsBtn2" aria-label="Settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>
-      <span>Settings</span>
-    </button>
-  </div>
-</nav>
+
 
 <dialog id="figsDlg" class="bottom tall">
   <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="small">Close</button></div>
