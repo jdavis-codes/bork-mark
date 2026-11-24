@@ -1268,8 +1268,8 @@ function trimEditor() {
   box.append(el('p', 'muted small', settings.trimSnap ? 'Tap a sentence, drag a handle, or press and hold anywhere to drag from there. The ends settle on whole sentences.' : 'Tap a word, drag a handle, or press and hold anywhere to drag from there.'), presets);
 
   const widen = (label, grow) => {
-    const btn = el('button', 'more', label);
-    btn.type = 'button';
+    const btn = el('button', 'more');
+    btn.type = 'button'; btn.setAttribute('aria-label', label); btn.append(icon('M12 5v14M5 12h14'));
     btn.addEventListener('click', () => { grow(); layoutTrim(); renderMarks(); });
     return btn;
   };

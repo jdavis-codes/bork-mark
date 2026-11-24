@@ -170,10 +170,11 @@
   .markshead h2 { flex: 1; min-width: 0; white-space: nowrap; }
   .markshead .iconbtn { margin: -8px -8px -8px 0; }
   /* a bookmark that was just edited glows briefly */
-  .mark.flash { animation: justEdited 1.6s ease-out; border-radius: 8px; }
+  /* fills the bookmark's own strip, from the divider above it to the one below */
+  .mark.flash { animation: justEdited 1.6s ease-out; }
   @keyframes justEdited {
-    0%, 25% { background: color-mix(in srgb, var(--fg) 9%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--fg) 9%, transparent); }   /* a gentle lightening, not a colour */
-    100% { background: transparent; box-shadow: 0 0 0 8px transparent; }
+    0%, 25% { background: color-mix(in srgb, var(--fg) 9%, transparent); }
+    100% { background: transparent; }
   }
   @media (prefers-reduced-motion: reduce) { .mark.flash { animation-duration: 0.01s; } }
   .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
@@ -235,7 +236,9 @@
   .presets { display: flex; gap: 6px; flex-wrap: wrap; }
   .presets button { padding: 7px 12px; border-radius: 999px; font-size: 0.85rem; }
   .presets button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
-  .trimmer .more { justify-self: start; padding: 6px 10px; border-style: dashed; font-size: 0.82rem; color: var(--muted); }
+  /* a plain "+" above and below the text brings in more of the book */
+  .trimmer .more { justify-self: center; padding: 7px; border-radius: 50%; line-height: 0; color: var(--muted); }
+  .trimmer .more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   .passage { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }   /* a held press drags an edge instead of selecting text */
   .passage { position: relative; font-family: Georgia, "Iowan Old Style", serif; font-size: 1.04rem; line-height: 1.62; }
   .passage p { margin: 0 0 0.7em; }
@@ -254,7 +257,7 @@
   /* Cancel and Save float over the text as their own rounded bar, clear of the sheet's bottom edge */
   .trimbar {
     position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    margin-top: 4px; padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--soft); border: 1px solid var(--line);
+    margin: 4px -9px 0; padding: 8px 8px 8px 14px; border-radius: 16px;   /* a little wider than the text it floats over */ background: var(--soft); border: 1px solid var(--line);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   }
   .trimbar button { padding: 9px 14px; }
