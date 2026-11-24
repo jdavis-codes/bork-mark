@@ -501,13 +501,30 @@ function closeBook() {
 }
 $('backBtn').addEventListener('click', () => morph(showLibrary));
 
-// Swipe down on the player to return to the library. The player follows the
-// finger a little; past a third of the screen, or with a quick flick, it goes
-// back, otherwise it settles. The scrubber and other sliders are left alone.
+// Swipe down on the player to return to the library. The player stays solid
+// and slides down with the finger, uncovering the library, which fades in
+// underneath. Past a third of the screen, or with a quick flick, it goes
+// back; otherwise it settles. The scrubber and other sliders are left alone.
 {
-  const player = $('player');
+  const player = $('player'), under = [$('library'), $('libFoot')];
   let g = null;
-  const settle = () => { player.style.transition = 'transform 0.2s, opacity 0.2s'; player.style.transform = ''; player.style.opacity = ''; setTimeout(() => { player.style.transition = ''; }, 220); };
+  // Put the library behind the player (or take it away again) for the drag.
+  const uncover = (on) => {
+    for (const n of under) { n.hidden = !on; n.style.opacity = on ? '0' : ''; }
+    if (on) renderLibrary();
+    renderMini();
+  };
+  const clear = () => { player.style.transition = ''; player.style.transform = ''; player.classList.remove('lifted'); };
+  const settle = () => {
+    player.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.85, 0.25, 1)';
+    player.style.transform = '';
+    for (const n of under) { n.style.transition = 'opacity 0.2s'; n.style.opacity = '0'; }
+    setTimeout(() => {
+      clear();
+      for (const n of under) n.style.transition = '';
+      if (!player.hidden) uncover(false);     // still on the player: hide the library again
+    }, 240);
+  };
   player.addEventListener('touchstart', (e) => {
     g = null;
     if (e.touches.length !== 1 || window.scrollY > 0 || e.target.closest('input, select, textarea')) return;
@@ -521,11 +538,14 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }
       g.dragging = true;
       player.style.transition = 'none';
+      player.classList.add('lifted');
+      uncover(true);
     }
     if (e.cancelable) e.preventDefault();
     g.dy = Math.max(0, dy);
-    player.style.transform = 'translateY(' + g.dy * 0.6 + 'px)';
-    player.style.opacity = String(Math.max(0.4, 1 - g.dy / 500));
+    player.style.transform = 'translateY(' + g.dy + 'px)';
+    const shown = String(Math.min(1, g.dy / (window.innerHeight * 0.45)));
+    for (const n of under) n.style.opacity = shown;
   }, { passive: false });
   const release = (e) => {
     const was = g;
@@ -533,8 +553,8 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     if (!was || !was.dragging) return;
     const speed = was.dy / Math.max(1, e.timeStamp - was.at);
     if (e.type === 'touchend' && (was.dy > window.innerHeight / 3 || (speed > 0.5 && was.dy > 40))) {
-      player.style.transition = '';
-      morph(() => { player.style.transform = ''; player.style.opacity = ''; showLibrary(); });
+      // From where it was let go, the player shrinks into the mini player.
+      morph(() => { clear(); for (const n of under) n.style.opacity = ''; showLibrary(); });
     } else settle();
   };
   player.addEventListener('touchend', release);
@@ -661,8 +681,8 @@ document.addEventListener('visibilitychange', () => {
 function renderOverall(t) {
   const b = cur.book, frac = Math.max(0, Math.min(1, t / (b.duration || 1)));
   const left = Math.max(0, b.duration - t) / (b.speed || 1);
-  const h = Math.floor(left / 3600), m = Math.round((left % 3600) / 60);
-  const leftText = left < 30 ? 'finished' : (h ? h + 'h ' : '') + (h || m ? m + 'm' : '<1m') + ' left';
+  const mins = Math.round(left / 60), h = Math.floor(mins / 60), m = mins % 60;   // whole minutes first, so 59.6 min is 1h 0m, not 0h 60m
+  const leftText = left < 30 ? 'finished' : (h ? h + 'h ' : '') + (mins ? m + 'm' : '<1m') + ' left';
   $('pie').style.setProperty('--p', (frac * 100).toFixed(1));
   $('overallText').textContent = Math.floor(frac * 100) + '% · ' + leftText;
   $('overall').setAttribute('aria-label', Math.floor(frac * 100) + ' percent of the book, ' + leftText);
@@ -1834,7 +1854,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795511763';
+const BUILD = '1795512047';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

@@ -110,7 +110,7 @@
   /* The player is one fixed screen: everything below the cover keeps its
      place, and the cover takes whatever height is left. */
   #player {
-    position: fixed; inset: 0; z-index: 1; background: var(--bg);
+    position: fixed; inset: 0; z-index: 5; background: var(--bg);   /* above the library's fixed bars */
     display: flex; flex-direction: column;
     padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) calc(4px + env(safe-area-inset-bottom));
   }
@@ -178,6 +178,7 @@
   h2[tabindex] { outline: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* bottom bar in the player: speed, sleep, settings within thumb reach */
+  #player.lifted { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); }   /* while being dragged down */
   #tabbar { margin-top: 6px; }   /* no bar behind them: the buttons sit directly on the player */
   .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: var(--bar); max-width: 560px; margin: 0 auto; }
   /* Icon only, with its number (count, speed, time left) sitting above it.
