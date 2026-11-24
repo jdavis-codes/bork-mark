@@ -239,6 +239,16 @@
     } catch (e) {}
   }
 
+  // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
+  // without one, so label the blob from its first bytes.
+  async function playable(f) {
+    const h = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+    const tag = String.fromCharCode(...h.subarray(4, 8));
+    if (tag === 'ftyp') return f.slice(0, f.size, 'audio/mp4');
+    if ((h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0)) return f.slice(0, f.size, 'audio/mpeg');
+    return f;
+  }
+
   // ---- Audio sources ----
   let currentUrl = null;
   function load(url, name) {
@@ -272,9 +282,9 @@
     return new Blob([buf], { type: 'audio/wav' });
   }
 
-  $('file').addEventListener('change', (e) => {
+  $('file').addEventListener('change', async (e) => {
     const f = e.target.files[0];
-    if (f) load(URL.createObjectURL(f), f.name);
+    if (f) load(URL.createObjectURL(await playable(f)), f.name);
   });
   $('tone').addEventListener('click', () => {
     load(URL.createObjectURL(makeTone(300)), '5-minute test tone');

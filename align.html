@@ -43,9 +43,11 @@
   button, .filebtn { cursor: pointer; }
   button:disabled { opacity: 0.45; cursor: default; }
   input[type=number] { width: 5.5em; padding: 8px 10px; }
+  select { width: 100%; min-width: 0; }
+  #audioStatus, #bookStatus { overflow-wrap: anywhere; }
   input[type=file] { display: none; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; }
+  .grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
   #go {
     width: 100%; margin-top: 12px; padding: 18px; font-size: 1.1rem; font-weight: 600;
     background: var(--accent); color: var(--accent-fg); border: none;
@@ -146,6 +148,16 @@ if (!navigator.gpu) {
   opt.disabled = true; opt.textContent = 'WebGPU (not available here)';
 }
 
+// iOS gives .m4b files no usable MIME type, and Safari won't play a blob
+// without one, so label the blob from its first bytes.
+async function playable(f) {
+  const h = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  const tag = String.fromCharCode(...h.subarray(4, 8));
+  if (tag === 'ftyp') return f.slice(0, f.size, 'audio/mp4');
+  if ((h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0)) return f.slice(0, f.size, 'audio/mpeg');
+  return f;
+}
+
 const refresh = () => { $('go').disabled = busy || !audioFile; };
 
 $('audioFile').addEventListener('change', async (e) => {
@@ -153,7 +165,7 @@ $('audioFile').addEventListener('change', async (e) => {
   if (!f) return;
   audioFile = null; source = null; refresh();
   if (audioUrl) URL.revokeObjectURL(audioUrl);
-  audioUrl = URL.createObjectURL(f);
+  audioUrl = URL.createObjectURL(await playable(f));
   audio.src = audioUrl;
   const mb = (f.size / 1048576).toFixed(1) + ' MB';
   const status = $('audioStatus');
