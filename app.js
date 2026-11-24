@@ -8,7 +8,14 @@ import { formatCitation, STYLES } from './cite.js';
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
 
-const KEY = 'borkmark.v1';
+// Written by stamp.sh when a version is published. A copy run straight from
+// the source files stays "local".
+const VERSION = 'local';
+const CHANNEL = 'local';   // release | dev | local
+// The development copy lives at the same web address as the released one, so
+// it keeps its books and settings under different names.
+const NS = CHANNEL === 'dev' ? 'dev.' : '';
+const KEY = 'borkmark.' + NS + 'v1';
 const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
 const LOCATE_BEFORE = 45, LOCATE_AFTER = 15;   // seconds of audio used to find the place when capturing by paragraph
 const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
@@ -76,7 +83,7 @@ function save(now) {
 // ---------- diagnostics log ----------
 // A short rolling record of button presses and player events, kept on the
 // device and copyable from Settings, for working out problems after the fact.
-const LOGKEY = 'borkmark.log';
+const LOGKEY = 'borkmark.' + NS + 'log';
 let logLines = [];
 try { logLines = JSON.parse(localStorage.getItem(LOGKEY)) || []; } catch (e) {}
 function log(msg) {
@@ -92,7 +99,7 @@ log('--- app opened' + ((window.matchMedia('(display-mode: standalone)').matches
 // iOS kills a page that uses too much memory without any error we can catch.
 // Noting the current heavy step lets the next launch say what was going on,
 // and stops it from walking straight back into the same crash.
-const CRUMB = 'borkmark.crumb';
+const CRUMB = 'borkmark.' + NS + 'crumb';
 let lastCrash = null;
 try { lastCrash = JSON.parse(localStorage.getItem(CRUMB)); } catch (e) {}
 function crumb(stage) {
@@ -262,13 +269,13 @@ function store(op, dir, name, blob, onProgress) {
   return new Promise((resolve, reject) => {
     const id = ++storeSeq;
     storeJobs.set(id, { resolve, reject, onProgress });
-    storeWorker.postMessage({ id, op, dir, name, blob });
+    storeWorker.postMessage({ id, op, dir: NS + dir, name, blob });
   });
 }
 async function stored(dir, name) {
   try {
     const root = await navigator.storage.getDirectory();
-    const d = await root.getDirectoryHandle(dir);
+    const d = await root.getDirectoryHandle(NS + dir);
     return await (await d.getFileHandle(name)).getFile();
   } catch (e) { return null; }
 }
@@ -2344,7 +2351,8 @@ async function latestBuild() {
   return String((await res.json()).build);
 }
 async function showVersion() {
-  const mine = 'This version: ' + buildDate(BUILD) + '.';
+  const name = CHANNEL === 'local' ? 'Local copy' : 'Version ' + VERSION + (CHANNEL === 'dev' ? ' (development)' : '');
+  const mine = name + ', published ' + buildDate(BUILD) + '.';
   $('appVersion').textContent = mine;
   try {
     const latest = await latestBuild();
@@ -2395,9 +2403,23 @@ const INTRO = [
   { art: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12', title: 'Trim, cite and share',
     body: 'The app listens to a few seconds around each bookmark and finds them in the text. Open Bookmarks to trim a quote to the sentences you want, then copy or share it with a citation.' },
   { art: 'M12 15V3M8 7l4-4 4 4M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', title: 'Add it to your Home Screen', home: true,
-    body: 'Safari clears a website’s saved files after about a week without a visit. An app on the Home Screen is exempt, so your books and bookmarks stay.' },
+    body: 'Safari clears a website’s saved files after about a week without a visit. An app on the Home Screen is exempt, so your books and bookmarks stay.',
+    other: 'Installed, Bork Mark opens in its own window, works without a connection, and the browser is less likely to clear your books to save space.' },
 ];
 let introAt = 0;
+// Chrome, Edge and other Chromium browsers let a page offer its own install
+// button: they hand over an event to keep, and the button replays it. Safari
+// has nothing like it, so there the guide shows the steps instead.
+let installOffer = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installOffer = e; if ($('introDlg').open) renderIntro(); });
+window.addEventListener('appinstalled', () => { installOffer = null; toast('Installed'); if ($('introDlg').open) renderIntro(); });
+$('introInstall').addEventListener('click', async () => {
+  if (!installOffer) return;
+  const offer = installOffer; installOffer = null;
+  offer.prompt();
+  await offer.userChoice.catch(() => {});
+  renderIntro();
+});
 const installed = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
 const onIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 function renderIntro() {
@@ -2405,9 +2427,12 @@ function renderIntro() {
   // The Home Screen step shows how to get there, unless that is where we are.
   const done = step.home && installed();
   $('introArt').replaceChildren(icon(done ? 'M5 12.5l4.5 4.500L19 7.500' : step.art));
-  $('introTitle').textContent = done ? 'You’re on the Home Screen' : step.title;
-  $('introBody').textContent = done ? 'Opened from here, iOS keeps your books and bookmarks. In Safari itself, a website’s saved files are cleared after about a week without a visit.' : step.body;
-  $('introHow').hidden = !step.home || done;
+  $('introTitle').textContent = done ? 'You’re all set' : step.home && !onIOS ? 'Install it to keep your books' : step.title;
+  $('introBody').textContent = done ? 'Opened from here, your books and bookmarks are kept. In a browser tab, a website’s saved files can be cleared to save space.' : step.home && !onIOS ? step.other : step.body;
+  const offer = !!step.home && !done && !!installOffer;
+  $('introInstall').hidden = !offer;
+  $('introHow').hidden = !step.home || done || offer || !onIOS;
+  $('introNote').hidden = !step.home || done || offer || onIOS;
   $('introStep').classList.toggle('compact', !!step.home && !done);
   $('introArrow').hidden = !step.home || done || !onIOS;
   $('introDots').replaceChildren(...INTRO.map((_, k) => el('span', k === introAt ? 'on' : '')));

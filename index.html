@@ -436,6 +436,8 @@
   #introStep.compact #introBody { min-height: 0; }
   #introHow { list-style: none; counter-reset: how; margin: 14px auto 0; padding: 0; max-width: 34ch; text-align: left; display: grid; gap: 10px; }
   #introHow[hidden], #introArrow[hidden] { display: none; }
+  #introInstall { margin: 16px auto 0; padding: 12px 22px; }
+  #introNote { margin: 12px auto 0; max-width: 34ch; }
   #introHow li { counter-increment: how; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 8px; align-items: start; }
   #introHow li::before { content: counter(how); width: 22px; height: 22px; border-radius: 50%; background: var(--tint); color: var(--accent); font-size: 0.8rem; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
   #introHow .dots, #introArrow .dots { letter-spacing: 1px; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
@@ -837,6 +839,8 @@
       <li><span>Tap <b>View More</b>, then:</span>
         <div class="sheetrow" aria-label="Add to Home Screen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>Add to Home Screen</div></li>
     </ol>
+    <p id="introNote" class="muted" hidden>Look for Install or Add to Home Screen in your browser’s menu.</p>
+    <button id="introInstall" class="primary" hidden>Install Bork Mark</button>
   </div>
   <div id="introDots" aria-hidden="true"></div>
   <div class="introrow"><button id="introSkip">Skip</button><button id="introNext" class="primary">Next</button></div>

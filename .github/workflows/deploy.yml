@@ -1,0 +1,90 @@
+# Publishes the app to GitHub Pages.
+#
+#   main     -> https://<owner>.github.io/<repo>/       plus a git tag and a release
+#   develop  -> https://<owner>.github.io/<repo>/dev/
+#
+# The version number starts from the VERSION file (for example 1.0). Each
+# release adds the next free last number: v1.0.0, v1.0.1, … To start a new
+# series, change VERSION to 1.1 or 2.0.
+#
+# The gh-pages branch is what Pages serves. Only this workflow writes to it.
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One at a time: two runs must not write to gh-pages at once.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Work out the version
+        id: v
+        run: |
+          base=$(tr -d ' \n' < VERSION)
+          if [ "$GITHUB_REF_NAME" = main ]; then
+            last=-1
+            for t in $(git tag -l "v$base.*"); do
+              n=${t#"v$base."}
+              case "$n" in ''|*[!0-9]*) continue ;; esac
+              [ "$n" -gt "$last" ] && last=$n
+            done
+            echo "version=$base.$((last + 1))" >> "$GITHUB_OUTPUT"
+            echo "channel=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$base-dev.$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            echo "channel=dev" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stamp the build
+        run: ./stamp.sh "${{ steps.v.outputs.version }}" "${{ steps.v.outputs.channel }}"
+
+      - name: Collect the files the site needs
+        run: |
+          mkdir "$RUNNER_TEMP/app"
+          cp *.html *.js *.json manifest.webmanifest "$RUNNER_TEMP/app/"
+
+      - name: Publish to gh-pages
+        run: |
+          site="$RUNNER_TEMP/site"
+          if git fetch origin gh-pages; then
+            git worktree add "$site" FETCH_HEAD --detach
+          else
+            git worktree add --detach "$site"
+            git -C "$site" rm -rqf .
+          fi
+          cd "$site"
+          if [ "${{ steps.v.outputs.channel }}" = release ]; then
+            # Replace everything at the top level, leaving the development copy alone.
+            find . -mindepth 1 -maxdepth 1 ! -name .git ! -name dev -exec rm -rf {} +
+            cp "$RUNNER_TEMP/app/"* .
+          else
+            rm -rf dev && mkdir dev
+            cp "$RUNNER_TEMP/app/"* dev/
+          fi
+          touch .nojekyll
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Deploy ${{ steps.v.outputs.version }} from ${GITHUB_SHA::7}"
+          git push origin HEAD:gh-pages
+
+      - name: Tag and publish the release
+        if: steps.v.outputs.channel == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.v.outputs.version }}" --target "$GITHUB_SHA" \
+            --title "v${{ steps.v.outputs.version }}" --generate-notes

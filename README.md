@@ -84,6 +84,17 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `sw.js` | Service worker, so the app opens without signal |
 | `buttons.html`, `align.html` | Test pages for media buttons and for alignment |
 
-### Deploying
+### Versions and deploying
 
-The app is served by GitHub Pages from the `gh-pages` branch. Before pushing a new version, run `./stamp.sh`: it writes a build number into `app.js` and `version.json`, which is how an installed copy notices that a newer version is available.
+Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`:
+
+| Branch | Goes to | Also |
+|---|---|---|
+| `main` | https://jdavis-codes.github.io/bork-mark/ | a git tag and a GitHub release |
+| `develop` | https://jdavis-codes.github.io/bork-mark/dev/ | |
+
+The `VERSION` file holds the first two numbers, such as `1.0`. Every merge into `main` gets the next free third number (`v1.0.0`, `v1.0.1`, …) as its tag and release. To start a new series, change `VERSION` to `1.1` or `2.0`. Development builds are named after their commit, such as `1.0-dev.4989d40`. Settings, App shows which version is running.
+
+The development copy keeps its own books and settings, separate from the released app, and installs as "Bork Mark (dev)".
+
+The workflow runs `./stamp.sh`, which writes the version and a build number into `app.js` and `version.json`; an installed copy compares build numbers to notice a newer version. The result is committed to the `gh-pages` branch, which is what GitHub Pages serves. Nothing else should push to that branch.
