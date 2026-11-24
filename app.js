@@ -241,8 +241,9 @@ async function openBook(id) {
   $('title').textContent = book.title;
   $('author').textContent = book.author;
   $('playerError').hidden = true;
+  renderInfo();
   renderSpeed();
-  $('cover').hidden = true;
+  $('cover').removeAttribute('src');
   cur.audioUrl = URL.createObjectURL(await playable(file));
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
@@ -253,7 +254,7 @@ async function openBook(id) {
   if (book.hasCover) stored(id, 'cover').then((f) => {
     if (!f || cur !== mine) return;
     mine.coverUrl = URL.createObjectURL(f);
-    $('cover').src = mine.coverUrl; $('cover').hidden = false;
+    $('cover').src = mine.coverUrl;
     setMediaSession(); renderMini();
   });
   openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
@@ -380,6 +381,7 @@ audio.addEventListener('error', () => {
   const e = audio.error;
   $('playerError').hidden = false;
   $('playerError').textContent = 'This file cannot be played here (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '') + ').';
+  toast('This file cannot be played here');
 });
 const PLAY = 'M8 5v14l11-7z', PAUSE = 'M7 5h4v14H7zM13 5h4v14h-4z';
 function syncPlayState() {
@@ -630,7 +632,10 @@ function renderMarks() {
   if (!cur) return;
   const b = cur.book, ol = $('marks');
   ol.textContent = '';
-  $('markCount').textContent = b.marks.length ? '(' + b.marks.length + ')' : '';
+  const n = b.marks.length, waiting = b.marks.filter((m) => m.status === 'pending' || m.status === 'working').length;
+  $('markCount').textContent = n ? '(' + n + ')' : '';
+  $('marksLabel').textContent = n ? n + (waiting ? ' · ' + waiting + ' pending' : n === 1 ? ' bookmark' : ' bookmarks') : 'Bookmarks';
+  $('marksBtn').classList.toggle('on', waiting > 0);
   if (!b.marks.length) {
     ol.append(el('li', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
     return;
@@ -666,7 +671,7 @@ function renderMarks() {
     const actions = el('div', 'row');
     if (extra) actions.append(extra);
     const play = el('button', 'small', 'Play');
-    play.addEventListener('click', () => { seek(m.t - 30); play(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    play.addEventListener('click', () => { seek(m.t - 30); play(); $('marksDlg').close(); });
     actions.append(play);
     if (m.status === 'done' || m.transcript) {
       const copy = el('button', 'small', 'Copy');
@@ -819,6 +824,21 @@ async function runQueue() {
   }
 }
 
+// ---------- sheets: bookmarks and book info ----------
+$('marksBtn').addEventListener('click', () => { renderMarks(); $('marksDlg').showModal(); $('marksDlg').scrollTop = 0; });
+$('marksClose').addEventListener('click', () => $('marksDlg').close());
+function renderInfo() {
+  if (!cur) return;
+  const b = cur.book, dl = $('infoList');
+  dl.textContent = '';
+  const rows = [['Title', b.title], ['Author', b.author], ['Length', fmt(b.duration)],
+    ['Chapters', b.chapters && b.chapters.length > 1 ? String(b.chapters.length) : 'none in this file'],
+    ['Audio file', b.audioName + ' (' + b.kind + ')'], ['Added', new Date(b.added).toLocaleDateString()]];
+  for (const [k, v] of rows) if (v) dl.append(el('dt', '', k), el('dd', '', v));
+}
+$('infoBtn').addEventListener('click', () => { renderInfo(); renderTextStatus(); $('infoDlg').showModal(); });
+$('infoClose').addEventListener('click', () => $('infoDlg').close());
+
 // ---------- book text and removal ----------
 function renderTextStatus() {
   const b = cur.book;
@@ -850,6 +870,7 @@ $('removeBtn').addEventListener('click', async () => {
   if (!cur) return;
   const b = cur.book, n = b.marks.length;
   if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return;
+  $('infoDlg').close();
   closeBook();
   state.books = state.books.filter((x) => x !== b);
   save(true);
