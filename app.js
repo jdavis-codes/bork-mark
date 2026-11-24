@@ -52,7 +52,7 @@ function log(msg) {
   if (logLines.length > 300) logLines = logLines.slice(-300);
   try { localStorage.setItem(LOGKEY, JSON.stringify(logLines)); } catch (e) {}
 }
-log('--- app opened');
+log('--- app opened' + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) ? ' (home screen)' : ' (browser)'));
 
 // ---------- crash breadcrumbs ----------
 // iOS kills a page that uses too much memory without any error we can catch.
@@ -264,7 +264,9 @@ async function openBook(id) {
 
 function closeBook(silent) {
   if (!cur) return;
+  wantPlaying = false; clearTimeout(playCheck);
   audio.pause();
+  keepAlive(false);
   cur.book.position = audio.currentTime || cur.book.position || 0;
   save(true);
   audio.removeAttribute('src'); audio.load();
@@ -307,6 +309,10 @@ audio.addEventListener('ratechange', updatePositionState);
 audio.addEventListener('seeked', updatePositionState);
 document.addEventListener('visibilitychange', () => {
   log('page ' + document.visibilityState);
+  if (document.visibilityState === 'visible' && wantPlaying && cur) {
+    const from = audio.currentTime;
+    setTimeout(() => { if (wantPlaying && cur && (audio.paused || audio.currentTime === from)) unstick(); }, 700);
+  }
   if (document.visibilityState === 'hidden') { if (cur) save(true); }
   runQueue();
 });
@@ -337,13 +343,47 @@ $('scrub').addEventListener('input', () => {
   $('overall').textContent = fmt(t) + ' of ' + fmt(cur.book.duration);
 });
 $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('scrub').value)); });
-// Starts playback, and checks a few seconds later that it really started.
-// If Safari accepted the request but nothing is playing, it has usually let
-// go of the file while paused, so the file is reopened and tried once more.
+// ---------- keeping the audio session alive ----------
+// Installed to the home screen, iOS will not let the app restart audio from
+// the lock screen once it has fully paused: the player reports "playing" but
+// stays silent until the app is opened. Playing a silent loop alongside keeps
+// the audio session open across a pause, so play works again from the lock
+// screen. It stops itself after a while so a forgotten pause costs no battery.
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const KEEP_ALIVE_MS = 15 * 60 * 1000;
+let keep = null, keepTimer = null, keepOn = false;
+function silentWav(seconds) {
+  const rate = 8000, n = rate * seconds, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const str = (o, t) => { for (let k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, 'data'); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).fill(128);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+function keepAlive(on) {
+  clearTimeout(keepTimer);
+  if (!standalone) return;
+  if (on) {
+    if (!keep) { keep = new Audio(URL.createObjectURL(silentWav(10))); keep.loop = true; }
+    if (keepOn && !keep.paused) return;
+    keepOn = true;
+    keep.play().then(() => log('keep-alive: on'), (e) => { keepOn = false; log('keep-alive failed: ' + e.name); });
+  } else if (keepOn) {
+    keepOn = false;
+    keep.pause();
+    log('keep-alive: off');
+  }
+}
+
+// Starts playback, and checks a few seconds later that audio is really
+// moving. Safari can report "playing" while nothing comes out.
 let wantPlaying = false, playCheck = null;
 function play(isRetry) {
   if (!cur) return;
   wantPlaying = true;
+  keepAlive(true);
   const from = audio.currentTime;
   const p = audio.play();
   if (p) p.catch((e) => { log('play() refused: ' + e.name + ': ' + e.message); if (!isRetry) toast('Cannot play: ' + e.message); });
@@ -351,17 +391,26 @@ function play(isRetry) {
   playCheck = setTimeout(() => {
     if (!cur || !wantPlaying) return;
     if (!audio.paused && audio.currentTime !== from) return;   // playing normally
-    log('playback did not start (paused=' + audio.paused + ', readyState=' + audio.readyState + ', networkState=' + audio.networkState
-      + ', error=' + (audio.error ? audio.error.code : 'none') + ')' + (isRetry ? '; giving up' : '; reopening the file'));
-    if (isRetry) { toast('Playback would not restart. Go back to the library and reopen the book.'); return; }
-    const t = cur.book.position;
-    audio.addEventListener('loadedmetadata', () => { cur.book.position = t; play(true); }, { once: true });
-    audio.src = cur.audioUrl;
-    audio.load();
-    cur.book.position = t;
+    log('playback is not moving (paused=' + audio.paused + ', readyState=' + audio.readyState + ', networkState=' + audio.networkState
+      + ', error=' + (audio.error ? audio.error.code : 'none') + ')');
+    // Locked, there is nothing more to try; unstick() runs when the app is next on screen.
+    if (document.visibilityState === 'hidden' || isRetry) return;
+    unstick();
   }, 2500);
 }
-function pause() { wantPlaying = false; clearTimeout(playCheck); audio.pause(); }
+// What works by hand when audio is stuck: pause, then play again.
+function unstick() {
+  if (!cur || !wantPlaying) return;
+  log('restarting stuck playback');
+  audio.pause();
+  play(true);
+}
+function pause() {
+  wantPlaying = false;
+  clearTimeout(playCheck);
+  audio.pause();
+  if (keepOn) keepTimer = setTimeout(() => keepAlive(false), KEEP_ALIVE_MS);
+}
 $('playBtn').addEventListener('click', () => {
   log('screen: ' + (audio.paused ? 'play' : 'pause'));
   if (audio.paused) play(); else pause();
@@ -421,7 +470,12 @@ function setMediaSession() {
   }
   const on = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) {} };
   on('play', () => { log('button: play'); play(); });
-  on('pause', () => { log('button: pause'); pause(); });
+  on('pause', () => {
+    // With the silent loop running, iOS can show "pause" while the book is
+    // already paused; pressing it then means play.
+    if (audio.paused && keepOn) { log('button: pause (book already paused, so play)'); play(); return; }
+    log('button: pause'); pause();
+  });
   // With seek handlers set, the lock screen shows skip buttons, while a watch
   // or headset still sends next / previous.
   on('seekbackward', settings.lockSeek ? () => log('button: skip back') || seek(audio.currentTime - settings.skipBack) : null);
