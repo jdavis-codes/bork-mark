@@ -1,11 +1,11 @@
-import { openAudio, readBook, buildBook, transcribeAround, quoteFor } from './align.js';
+import { openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt } from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
 
 const KEY = 'borkmark.v1';
 const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
-const CLIP_BEFORE = 45, CLIP_AFTER = 15;   // seconds of audio transcribed around a bookmark
+const LOCATE_BEFORE = 45, LOCATE_AFTER = 15;   // seconds of audio used to find the place when capturing by paragraph
 const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
 
 // ---------- saved state ----------
@@ -23,11 +23,14 @@ const DEFAULTS = {
   skipBack: 30, skipFwd: 30,     // on-screen and lock-screen skip buttons
   lockSeek: true,                // lock screen shows skip buttons rather than track buttons
   bgQuotes: false,               // find quotes while the phone is locked
+  // What a bookmark captures: seconds of audio either side, or whole paragraphs.
+  capture: { mode: 'time', before: 45, after: 15, parasBefore: 1, parasAfter: 1 },
 };
 const settings = state.settings = {
   ...DEFAULTS, ...(state.settings || {}),
   next: { ...DEFAULTS.next, ...((state.settings || {}).next || {}) },
   prev: { ...DEFAULTS.prev, ...((state.settings || {}).prev || {}) },
+  capture: { ...DEFAULTS.capture, ...((state.settings || {}).capture || {}) },
 };
 const canWork = () => document.visibilityState !== 'hidden' || settings.bgQuotes;
 let saveTimer = null;
@@ -651,10 +654,21 @@ function setQueueStatus(msg) {
 function renderModelNote() { setQueueStatus($('queueStatus').textContent); }
 
 function applyQuote(m, text) {
-  const q = quoteFor(text, m.words, m.split);
-  if (!q) { m.status = 'nomatch'; return; }
-  m.status = 'done'; m.before = q.before; m.after = q.after; m.confidence = q.confidence;
+  const loc = findInBook(text, m.words, m.split);
+  if (!loc) { m.status = 'nomatch'; return; }
+  // The place in the book is kept, so the quote can be re-cut if the capture setting changes.
+  m.status = 'done'; m.loc = [loc.start, loc.split, loc.end]; m.confidence = loc.confidence;
+  requote(m, text);
   delete m.words; delete m.split; delete m.transcript;
+}
+function requote(m, text) {
+  const q = quoteAt(text, { start: m.loc[0], split: m.loc[1], end: m.loc[2] }, settings.capture);
+  m.before = q.before; m.after = q.after;
+}
+function requoteAll() {
+  if (!cur || !cur.text) return;
+  for (const m of cur.book.marks) if (m.status === 'done' && m.loc) requote(m, cur.text);
+  save(true); renderMarks();
 }
 
 // Bookmarks transcribed before the book text was available can be matched
@@ -684,7 +698,9 @@ async function runQueue() {
       try {
         await warmModel();
         setQueueStatus('Finding quotes…');
-        const r = await transcribeAround(mine.source, m.t, CLIP_BEFORE, CLIP_AFTER, transcribe, crumb);
+        const r = await transcribeAround(mine.source, m.t,
+          settings.capture.mode === 'time' ? settings.capture.before : LOCATE_BEFORE,
+          settings.capture.mode === 'time' ? settings.capture.after : LOCATE_AFTER, transcribe, crumb);
         m.words = r.words; m.split = r.split; m.transcript = r.transcript;
         if (mine.text) applyQuote(m, mine.text); else m.status = 'transcribed';
       } catch (err) {
@@ -741,14 +757,28 @@ $('removeBtn').addEventListener('click', async () => {
 });
 
 // ---------- settings ----------
-const clampSecs = (v, fallback) => { const n = Math.round(Number(v)); return n >= 1 && n <= 600 ? n : fallback; };
+// Each slider: element id, where its value lives, and how to show it.
+const secs = (v) => v + ' s';
+const paras = (v) => '+' + v;
+const SLIDERS = [
+  ['nextSecs', settings.next, 'secs', secs], ['prevSecs', settings.prev, 'secs', secs],
+  ['skipBack', settings, 'skipBack', secs], ['skipFwd', settings, 'skipFwd', secs],
+  ['capBefore', settings.capture, 'before', secs], ['capAfter', settings.capture, 'after', secs],
+  ['parasBefore', settings.capture, 'parasBefore', paras], ['parasAfter', settings.capture, 'parasAfter', paras],
+];
+const isSkip = (a) => a === 'fwd' || a === 'back';
 function renderSettings() {
-  for (const k of ['next', 'prev']) {
-    $(k + 'Action').value = settings[k].action;
-    $(k + 'Secs').value = settings[k].secs;
-    $(k + 'SecsRow').hidden = settings[k].action !== 'fwd' && settings[k].action !== 'back';
+  for (const [id, obj, key, show] of SLIDERS) {
+    const input = $(id);
+    input.value = Math.max(Number(input.min), Math.min(Number(input.max), obj[key]));
+    $(id + 'Out').textContent = show(Number(input.value));
   }
-  $('skipBack').value = settings.skipBack; $('skipFwd').value = settings.skipFwd;
+  $('nextAction').value = settings.next.action; $('prevAction').value = settings.prev.action;
+  $('nextSecsField').hidden = !isSkip(settings.next.action);
+  $('prevSecsField').hidden = !isSkip(settings.prev.action);
+  $('capMode').value = settings.capture.mode;
+  $('capTime').hidden = settings.capture.mode !== 'time';
+  $('capParas').hidden = settings.capture.mode !== 'paras';
   $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
   $('bgQuotes').checked = settings.bgQuotes;
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
@@ -756,19 +786,23 @@ function renderSettings() {
   $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
 }
 function readSettings() {
-  for (const k of ['next', 'prev']) {
-    settings[k].action = $(k + 'Action').value;
-    settings[k].secs = clampSecs($(k + 'Secs').value, settings[k].secs);
-  }
-  settings.skipBack = clampSecs($('skipBack').value, settings.skipBack);
-  settings.skipFwd = clampSecs($('skipFwd').value, settings.skipFwd);
+  const was = JSON.stringify(settings.capture);
+  for (const [id, obj, key] of SLIDERS) obj[key] = Number($(id).value);
+  settings.next.action = $('nextAction').value; settings.prev.action = $('prevAction').value;
+  settings.capture.mode = $('capMode').value;
   settings.lockSeek = $('lockSeek').value === 'skip';
   settings.bgQuotes = $('bgQuotes').checked;
   save(true);
   renderSettings(); setMediaSession(); runQueue();
+  if (JSON.stringify(settings.capture) !== was) requoteAll();
 }
 $('settingsDlg').addEventListener('change', readSettings);
-for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); });
+// Show the number while a slider is being dragged; it is saved on release.
+$('settingsDlg').addEventListener('input', (e) => {
+  const row = SLIDERS.find((r) => r[0] === e.target.id);
+  if (row) $(row[0] + 'Out').textContent = row[3](Number(e.target.value));
+});
+for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); $('settingsDlg').scrollTop = 0; });
 $('settingsClose').addEventListener('click', () => $('settingsDlg').close());
 $('logCopy').addEventListener('click', async () => {
   const text = logLines.join('\n') + '\n' + navigator.userAgent;

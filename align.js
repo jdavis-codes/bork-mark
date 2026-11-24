@@ -487,9 +487,59 @@ export async function transcribeAround(source, T, before, after, transcribe, onS
   return { words, split, transcript: out.text.trim() };
 }
 
-// Book wording around a transcribed bookmark, or null when it isn't in the book.
-export function quoteFor(book, words, split) {
+// Where a transcribed bookmark sits in the book, as word indexes, or null
+// when it isn't there.
+export function findInBook(book, words, split) {
   const loc = locate(book, words, split);
   if (!loc || !loc.found) return null;
-  return { ...passage(book, loc), confidence: loc.confidence };
+  return { start: loc.start, split: loc.split, end: loc.end, confidence: loc.confidence };
+}
+
+const PARA_MAX = 2500;   // most characters taken on either side of the bookmark
+const PARA_MIN = 120;    // widen past the requested count until at least this long
+
+// The bookmarked paragraph plus nBefore / nAfter neighbours. Bounded both
+// ways, because some books put every line in its own paragraph and others
+// have no paragraph breaks at all.
+export function paragraphs(book, at, nBefore, nAfter) {
+  const { text, starts } = book;
+  const mid = at >= starts.length ? text.length : starts[at];
+  const prevStart = (p) => {          // start of the paragraph before the one starting at p
+    let e = p;
+    while (e > 0 && /\s/.test(text[e - 1])) e--;
+    return e === 0 ? null : text.lastIndexOf('\n', e - 1) + 1;
+  };
+  const nextEnd = (p) => {            // end of the paragraph after the one ending at p
+    let b = p;
+    while (b < text.length && /\s/.test(text[b])) b++;
+    if (b >= text.length) return null;
+    const e = text.indexOf('\n', b);
+    return e < 0 ? text.length : e;
+  };
+  let a = text.lastIndexOf('\n', mid - 1) + 1;
+  let z = text.indexOf('\n', mid);
+  if (z < 0) z = text.length;
+  const back = () => { const q = prevStart(a); if (q === null || mid - q > PARA_MAX) return false; a = q; return true; };
+  const fwd = () => { const q = nextEnd(z); if (q === null || q - mid > PARA_MAX) return false; z = q; return true; };
+  for (let i = 0; i < nBefore && back(); i++);
+  for (let i = 0; i < nAfter && fwd(); i++);
+  for (let i = 0; i < 40 && z - a < PARA_MIN; i++) { const b = back(), f = fwd(); if (!b && !f) break; }
+
+  let before = text.slice(a, mid), after = text.slice(mid, z);
+  if (before.length > PARA_MAX) {     // one enormous paragraph: keep whole sentences near the bookmark
+    const cut = before.slice(before.length - PARA_MAX), m = cut.match(/[.!?…]["”’)]*\s+/);
+    before = '…' + (m ? cut.slice(m.index + m[0].length) : cut.slice(cut.indexOf(' ') + 1));
+  }
+  if (after.length > PARA_MAX) {
+    const cut = after.slice(0, PARA_MAX), m = cut.match(/[\s\S]*[.!?…]["”’)]*(?=\s)/);
+    after = (m ? m[0] : cut.slice(0, cut.lastIndexOf(' '))) + '…';
+  }
+  return { before, after };
+}
+
+// The quote for a located bookmark: either the stretch that was heard
+// (capture.mode "time") or whole paragraphs around the bookmark ("paras").
+export function quoteAt(book, loc, capture) {
+  if (capture && capture.mode === 'paras') return paragraphs(book, loc.split, capture.parasBefore, capture.parasAfter);
+  return passage(book, loc);
 }
