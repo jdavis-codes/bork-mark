@@ -842,6 +842,7 @@ const SPEEDS = [0.8, 1, 1.1, 1.25, 1.5, 1.75, 2];
 function renderSpeed() {
   const v = (cur && cur.book.speed) || 1;
   $('speedLabel').textContent = v + '×';
+  $('speedBtn').setAttribute('aria-label', 'Playback speed, ' + v + ' times');
   $('speedBtn').classList.toggle('on', v !== 1);
 }
 $('speedBtn').addEventListener('click', () => {
@@ -949,7 +950,8 @@ function renderMarks() {
   ol.textContent = '';
   const n = b.marks.length, waiting = b.marks.filter((m) => m.status === 'pending' || m.status === 'working').length;
   $('markCount').textContent = n ? '(' + n + ')' : '';
-  $('marksLabel').textContent = n ? n + (waiting ? ' · ' + waiting + ' pending' : n === 1 ? ' bookmark' : ' bookmarks') : 'Bookmarks';
+  $('marksLabel').textContent = n ? String(n) : '';
+  $('marksBtn').setAttribute('aria-label', 'Bookmarks' + (n ? ', ' + n : '') + (waiting ? ', ' + waiting + ' still being processed' : ''));
   $('marksBtn').classList.toggle('on', waiting > 0);
   if (!b.marks.length) {
     ol.append(el('li', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
@@ -1380,7 +1382,8 @@ async function jumpToFigure(i) {
 function renderFigTab() {
   const n = cur ? cur.meta.figures.length : 0;
   $('figsBtn').hidden = !n;
-  $('figsLabel').textContent = n === 1 ? '1 figure' : n + ' figures';
+  $('figsLabel').textContent = String(n);
+  $('figsBtn').setAttribute('aria-label', 'Figures, ' + n);
 }
 $('figsBtn').addEventListener('click', () => {
   const ol = $('figList'), figs = cur.meta.figures;
@@ -1831,7 +1834,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795511550';
+const BUILD = '1795511763';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
