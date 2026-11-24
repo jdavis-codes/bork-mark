@@ -91,9 +91,19 @@
   /* long text slides back and forth instead of being cut off */
   .scroller { overflow: hidden; white-space: nowrap; min-width: 0; }
   .scroller .mq { display: block; overflow: hidden; text-overflow: ellipsis; }
-  .scroller.scrolls { text-align: left; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
+  /* The text travels a little past each faded edge (--pad), so its first and
+     last letters come to rest fully clear of the fade. */
+  .scroller.scrolls {
+    --fade: 12px; --pad: 16px; text-align: left;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+  }
   .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; }
-  @keyframes marquee { 0%, 16% { transform: translateX(0); } 50%, 66% { transform: translateX(var(--shift, 0)); } 100% { transform: translateX(0); } }
+  @keyframes marquee {
+    0%, 16% { transform: translateX(var(--pad)); }
+    50%, 66% { transform: translateX(calc(var(--shift, 0px) - var(--pad))); }
+    100% { transform: translateX(var(--pad)); }
+  }
 
   /* player */
   /* The player is one fixed screen: everything below the cover keeps its
