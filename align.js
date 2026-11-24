@@ -513,7 +513,7 @@ export async function readBook(file) {
     }
     figures.push({ at: text.length, kind: 'image', cap: fig.cap, img: imageAt.get(fig.src) });
   }
-  text += raw.slice(last);
+  text = unwrapLines(text + raw.slice(last));
   figures.push(...findTextTables(text));
   figures.sort((a, b) => a.at - b.at);
   const dedupe = (list) => list.filter((x, k) => k === 0 || x.label !== list[k - 1].label);
@@ -898,6 +898,27 @@ export function sentencesIn(text, from, to) {
       p++;
     }
     start = end + 1;
+  }
+  return out;
+}
+
+// ---------- hard-wrapped text ----------
+// Some books break every line at about the same width, inside paragraphs. If
+// the text looks like that, the line breaks that are only wrapping are turned
+// into spaces: a break is wrapping when the next line's first word would not
+// have fitted on the line before it. Each break becomes exactly one space, so
+// every character keeps its position and saved places in the text stay valid.
+export function unwrapLines(text) {
+  const lines = text.split('\n');
+  const lengths = lines.map((l) => l.length).filter((n) => n > 20).sort((a, b) => a - b);
+  if (lengths.length < 200) return text;
+  const typical = lengths[Math.floor(lengths.length * 0.9)], width = lengths[Math.floor(lengths.length * 0.99)];
+  // Real paragraphs vary widely in length and run long; wrapped lines bunch up just under one width.
+  if (typical > 110 || lengths.filter((n) => n >= typical - 12).length / lengths.length < 0.3) return text;
+  let out = lines[0];
+  for (let i = 1; i < lines.length; i++) {
+    const before = lines[i - 1], line = lines[i], firstWord = (/^\S+/.exec(line) || [''])[0];
+    out += (before && line && before.length + 1 + firstWord.length > width ? ' ' : '\n') + line;
   }
   return out;
 }

@@ -1,7 +1,7 @@
 import {
   openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt,
   readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage, findTextTables,
-  tokenize, sentencesIn,
+  tokenize, sentencesIn, unwrapLines,
 } from './align.js';
 
 const $ = (id) => document.getElementById(id);
@@ -270,7 +270,7 @@ async function stored(dir, name) {
 // The book text, plus where its contents entries and print pages fall in it.
 async function storeText(id, doc) {
   await store('write', id, 'text', new Blob([doc.text], { type: 'text/plain' }));
-  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true })], { type: 'application/json' }));
+  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true })], { type: 'application/json' }));
   for (let i = 0; i < doc.images.length; i++) await store('write', id, 'img-' + i, doc.images[i]);
 }
 
@@ -434,7 +434,32 @@ async function openBook(id, coverNow) {
     if (!f || cur !== mine) return;
     const meta = await stored(id, 'meta');
     if (meta) try { mine.meta = { toc: [], pages: [], figures: [], ...JSON.parse(await meta.text()) }; } catch (e) {}
-    mine.text = buildBook(await f.text());
+    let bookText = await f.text();
+    if (!mine.meta.unwrapped) {
+      // Books added earlier may hold text with a line break at the end of every
+      // printed line. Join those lines once, and keep the result.
+      const joined = unwrapLines(bookText);
+      mine.meta.unwrapped = true;
+      if (joined !== bookText) {
+        bookText = joined;
+        store('write', id, 'text', new Blob([bookText], { type: 'text/plain' })).catch(() => {});
+        mine.rewrap = true;
+      }
+      store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
+    }
+    mine.text = buildBook(bookText);
+    if (mine.rewrap) {
+      // Quotes saved from the old text carry its line breaks: cut them again from the joined text.
+      for (const m of book.marks) {
+        if (m.status !== 'done') continue;
+        if (!m.loc) {
+          const before = tokenize(m.before).words, loc = findInBook(mine.text, before.concat(tokenize(m.after).words), before.length);
+          if (loc) m.loc = [loc.start, loc.split, loc.end];
+        }
+        if (m.loc) requote(m, mine.text);
+      }
+      save(true); renderMarks();
+    }
     if (!mine.meta.tablesDone) {
       // Books added before tables written as plain lines were recognised: look for them now.
       mine.meta.figures = mine.meta.figures.filter((x) => !x.plain).concat(findTextTables(mine.text.text)).sort((x, y) => x.at - y.at);
@@ -2101,7 +2126,7 @@ $('textFile').addEventListener('change', async (e) => {
     delete b.anchors;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
-    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true };
+    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true };
     renderFigTab();
     mine.text = buildBook(doc.text);
     metaChanged(); renderTextStatus(); rematch(); runQueue();
@@ -2267,7 +2292,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795536126';
+const BUILD = '1795537690';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
