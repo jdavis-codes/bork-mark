@@ -73,6 +73,8 @@ function crumb(stage) {
 }
 crumb(null);
 
+let adding = false;   // true while a book is being copied in
+
 // ---------- small helpers ----------
 const fmt = (s) => {
   s = Math.max(0, Math.floor(s));
@@ -85,6 +87,25 @@ const el = (tag, cls, text) => {
   if (text != null) n.textContent = text;
   return n;
 };
+// Sheets animate out before they close. Tapping the dimmed area behind one,
+// or pressing Escape, closes it the same way.
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+function closeSheet(d) {
+  if (!d.open || d.classList.contains('closing')) return;
+  if (calm.matches) { d.close(); return; }
+  d.classList.add('closing');
+  setTimeout(() => { d.classList.remove('closing'); d.close(); }, 200);
+}
+for (const d of document.querySelectorAll('dialog')) {
+  const locked = () => d.id === 'addDlg' && adding;
+  d.addEventListener('cancel', (e) => { e.preventDefault(); if (!locked()) closeSheet(d); });
+  d.addEventListener('click', (e) => {
+    if (e.target !== d || locked()) return;
+    const r = d.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeSheet(d);
+  });
+}
+
 let toastTimer = null;
 function toast(msg) {
   $('toast').textContent = msg;
@@ -163,7 +184,6 @@ async function renderLibrary() {
 }
 
 // ---------- adding a book ----------
-let adding = false;
 const addReset = () => {
   $('addAudio').value = ''; $('addText').value = '';
   $('addAudioName').textContent = 'Required.';
@@ -172,8 +192,7 @@ const addReset = () => {
   $('addGo').disabled = true;
 };
 $('addBtn').addEventListener('click', () => { addReset(); $('addDlg').showModal(); });
-$('addCancel').addEventListener('click', () => { if (!adding) $('addDlg').close(); });
-$('addDlg').addEventListener('cancel', (e) => { if (adding) e.preventDefault(); });
+$('addCancel').addEventListener('click', () => { if (!adding) closeSheet($('addDlg')); });
 $('addAudio').addEventListener('change', (e) => {
   const f = e.target.files[0];
   $('addAudioName').textContent = f ? f.name + ' · ' + (f.size / 1048576).toFixed(0) + ' MB' : 'Required.';
@@ -205,7 +224,7 @@ $('addGo').addEventListener('click', async () => {
       position: 0, speed: 1, added: Date.now(), marks: [],
     });
     save(true);
-    $('addDlg').close();
+    closeSheet($('addDlg'));
     await openBook(id);
     warmModel().catch(() => {});
   } catch (err) {
@@ -350,7 +369,7 @@ $('sleepBtn').addEventListener('click', () => {
     btn.addEventListener('click', () => {
       setSleep(value);
       if (value) log('sleep timer: ' + text);
-      $('sleepDlg').close();
+      closeSheet($('sleepDlg'));
     });
     const li = el('li'); li.append(btn); ol.append(li);
   };
@@ -360,7 +379,7 @@ $('sleepBtn').addEventListener('click', () => {
   add(c.count > 1 ? 'End of chapter' : 'End of book', { end: c.end }, !!sleep && sleep.end != null);
   $('sleepDlg').showModal();
 });
-$('sleepClose').addEventListener('click', () => $('sleepDlg').close());
+$('sleepClose').addEventListener('click', () => closeSheet($('sleepDlg')));
 
 audio.addEventListener('loadedmetadata', () => {
   if (!cur) return;
@@ -407,6 +426,18 @@ document.addEventListener('visibilitychange', () => {
   runQueue();
 });
 
+// Whole-book progress: a pie, the percentage, and the listening time left at
+// the current speed.
+function renderOverall(t) {
+  const b = cur.book, frac = Math.max(0, Math.min(1, t / (b.duration || 1)));
+  const left = Math.max(0, b.duration - t) / (b.speed || 1);
+  const h = Math.floor(left / 3600), m = Math.round((left % 3600) / 60);
+  const leftText = left < 30 ? 'finished' : (h ? h + 'h ' : '') + (h || m ? m + 'm' : '<1m') + ' left';
+  $('pie').style.setProperty('--p', (frac * 100).toFixed(1));
+  $('overallText').textContent = Math.floor(frac * 100) + '% · ' + leftText;
+  $('overall').setAttribute('aria-label', Math.floor(frac * 100) + ' percent of the book, ' + leftText);
+}
+
 function renderTime(t) {
   const b = cur.book, c = chapterAt(b, t);
   const label = c.count > 1 ? c.title : 'Whole book';
@@ -416,7 +447,7 @@ function renderTime(t) {
   s.min = Math.floor(c.start); s.max = Math.max(Math.floor(c.start) + 1, Math.ceil(c.end)); s.value = t;
   $('elapsed').textContent = fmt(t - c.start);
   $('remaining').textContent = '−' + fmt(c.end - t);
-  $('overall').textContent = fmt(t) + ' of ' + fmt(b.duration);
+  renderOverall(t);
 }
 function seek(t) {
   if (!cur) return;
@@ -430,7 +461,7 @@ $('scrub').addEventListener('input', () => {
   const t = Number($('scrub').value), c = chapterAt(cur.book, audio.currentTime);
   $('elapsed').textContent = fmt(t - c.start);
   $('remaining').textContent = '−' + fmt(c.end - t);
-  $('overall').textContent = fmt(t) + ' of ' + fmt(cur.book.duration);
+  renderOverall(t);
 });
 $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('scrub').value)); });
 // ---------- keeping the audio session alive ----------
@@ -539,14 +570,14 @@ $('speedBtn').addEventListener('click', () => {
     if (v === now) btn.setAttribute('aria-current', 'true');
     btn.addEventListener('click', () => {
       cur.book.speed = v; audio.playbackRate = v;
-      save(true); renderSpeed();
-      $('speedDlg').close();
+      save(true); renderSpeed(); renderOverall(audio.currentTime || cur.book.position || 0);
+      closeSheet($('speedDlg'));
     });
     const li = el('li'); li.append(btn); ol.append(li);
   }
   $('speedDlg').showModal();
 });
-$('speedClose').addEventListener('click', () => $('speedDlg').close());
+$('speedClose').addEventListener('click', () => closeSheet($('speedDlg')));
 
 // chapters
 $('chapterBtn').addEventListener('click', () => {
@@ -557,13 +588,13 @@ $('chapterBtn').addEventListener('click', () => {
     const btn = el('button');
     btn.append(el('span', '', ch.title), el('span', '', fmt(ch.start)));
     if (i === now) { btn.setAttribute('aria-current', 'true'); current = btn; }
-    btn.addEventListener('click', () => { seek(ch.start); $('chapDlg').close(); });
+    btn.addEventListener('click', () => { seek(ch.start); closeSheet($('chapDlg')); });
     const li = el('li'); li.append(btn); ol.append(li);
   });
   $('chapDlg').showModal();
   if (current) current.scrollIntoView({ block: 'center' });
 });
-$('chapClose').addEventListener('click', () => $('chapDlg').close());
+$('chapClose').addEventListener('click', () => closeSheet($('chapDlg')));
 
 // ---------- lock screen, headphone and watch buttons ----------
 function setMediaSession() {
@@ -671,7 +702,7 @@ function renderMarks() {
     const actions = el('div', 'row');
     if (extra) actions.append(extra);
     const play = el('button', 'small', 'Play');
-    play.addEventListener('click', () => { seek(m.t - 30); play(); $('marksDlg').close(); });
+    play.addEventListener('click', () => { seek(m.t - 30); play(); closeSheet($('marksDlg')); });
     actions.append(play);
     if (m.status === 'done' || m.transcript) {
       const copy = el('button', 'small', 'Copy');
@@ -826,7 +857,7 @@ async function runQueue() {
 
 // ---------- sheets: bookmarks and book info ----------
 $('marksBtn').addEventListener('click', () => { renderMarks(); $('marksDlg').showModal(); $('marksDlg').scrollTop = 0; });
-$('marksClose').addEventListener('click', () => $('marksDlg').close());
+$('marksClose').addEventListener('click', () => closeSheet($('marksDlg')));
 function renderInfo() {
   if (!cur) return;
   const b = cur.book, dl = $('infoList');
@@ -837,7 +868,7 @@ function renderInfo() {
   for (const [k, v] of rows) if (v) dl.append(el('dt', '', k), el('dd', '', v));
 }
 $('infoBtn').addEventListener('click', () => { renderInfo(); renderTextStatus(); $('infoDlg').showModal(); });
-$('infoClose').addEventListener('click', () => $('infoDlg').close());
+$('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 
 // ---------- book text and removal ----------
 function renderTextStatus() {
@@ -870,7 +901,7 @@ $('removeBtn').addEventListener('click', async () => {
   if (!cur) return;
   const b = cur.book, n = b.marks.length;
   if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return;
-  $('infoDlg').close();
+  closeSheet($('infoDlg'));
   closeBook();
   state.books = state.books.filter((x) => x !== b);
   save(true);
@@ -925,7 +956,7 @@ $('settingsDlg').addEventListener('input', (e) => {
   if (row) $(row[0] + 'Out').textContent = row[3](Number(e.target.value));
 });
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); $('settingsDlg').scrollTop = 0; });
-$('settingsClose').addEventListener('click', () => $('settingsDlg').close());
+$('settingsClose').addEventListener('click', () => closeSheet($('settingsDlg')));
 $('logCopy').addEventListener('click', async () => {
   const text = logLines.join('\n') + '\n' + navigator.userAgent;
   try { await navigator.clipboard.writeText(text); toast('Log copied'); } catch (e) { toast('Copy failed'); }
