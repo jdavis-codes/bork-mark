@@ -232,12 +232,12 @@ function chapterAt(b, t) {
 async function openBook(id) {
   const book = state.books.find((b) => b.id === id);
   if (!book) return;
+  if (cur && cur.book === book) { showPlayer(); return; }   // already loaded, maybe playing
   const file = await stored(id, 'audio');
   if (!file) { toast('The audio for this book is missing from this device'); return; }
-  closeBook(true);
+  closeBook();
   cur = { book, source: null, text: null, audioUrl: null, coverUrl: null };
-  $('library').hidden = true; $('player').hidden = false;
-  window.scrollTo(0, 0);
+  showPlayer();
   $('title').textContent = book.title;
   $('author').textContent = book.author;
   $('playerError').hidden = true;
@@ -254,7 +254,7 @@ async function openBook(id) {
     if (!f || cur !== mine) return;
     mine.coverUrl = URL.createObjectURL(f);
     $('cover').src = mine.coverUrl; $('cover').hidden = false;
-    setMediaSession();
+    setMediaSession(); renderMini();
   });
   openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
     .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
@@ -265,8 +265,22 @@ async function openBook(id) {
   });
 }
 
-function closeBook(silent) {
+// The two screens. Going to the library leaves the book loaded and playing,
+// with a mini player along the bottom.
+function showPlayer() {
+  $('library').hidden = true; $('player').hidden = false;
+  renderMini();
+  window.scrollTo(0, 0);
+}
+function showLibrary() {
+  $('player').hidden = true; $('library').hidden = false;
+  renderLibrary(); renderMini();
+  window.scrollTo(0, 0);
+}
+
+function closeBook() {
   if (!cur) return;
+  setSleep(null);
   wantPlaying = false; clearTimeout(playCheck);
   audio.pause();
   keepAlive(false);
@@ -276,9 +290,74 @@ function closeBook(silent) {
   if (cur.audioUrl) URL.revokeObjectURL(cur.audioUrl);
   if (cur.coverUrl) URL.revokeObjectURL(cur.coverUrl);
   cur = null;
-  if (!silent) { $('player').hidden = true; $('library').hidden = false; renderLibrary(); }
+  renderMini();
 }
-$('backBtn').addEventListener('click', () => closeBook());
+$('backBtn').addEventListener('click', showLibrary);
+
+// ---------- mini player (library screen) ----------
+function renderMini() {
+  const show = !!cur && !$('library').hidden;
+  $('mini').hidden = !show;
+  document.body.classList.toggle('has-mini', show);
+  if (!show) return;
+  const b = cur.book, t = audio.currentTime || b.position || 0, c = chapterAt(b, t);
+  $('miniTitle').textContent = b.title;
+  $('miniSub').textContent = fmt(t) + (c.count > 1 ? ' · ' + c.title : '');
+  $('miniCover').hidden = !cur.coverUrl;
+  if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
+  $('miniFill').style.width = (100 * t / (b.duration || 1)) + '%';
+}
+$('miniOpen').addEventListener('click', showPlayer);
+$('miniMark').addEventListener('click', () => addMark());
+$('miniPlay').addEventListener('click', () => {
+  log('screen: ' + (audio.paused ? 'play' : 'pause') + ' (mini player)');
+  if (audio.paused) play(); else pause();
+});
+
+// ---------- sleep timer ----------
+// Either a clock time to stop at, or a position in the book (end of chapter).
+let sleep = null, sleepTick = null;
+function setSleep(next) {
+  sleep = next;
+  clearInterval(sleepTick);
+  if (sleep) sleepTick = setInterval(checkSleep, 1000);
+  renderSleep();
+}
+function checkSleep() {
+  if (!sleep || !cur) return;
+  const due = sleep.at ? Date.now() >= sleep.at : audio.currentTime >= sleep.end - 0.4;
+  if (!due) { renderSleep(); return; }
+  log('sleep timer: pausing');
+  setSleep(null);
+  if (!audio.paused) { pause(); toast('Sleep timer: paused'); }
+}
+function renderSleep() {
+  const label = !sleep ? '' : sleep.at ? fmt(Math.max(0, (sleep.at - Date.now()) / 1000)) : 'chapter';
+  $('sleepLabel').textContent = label;
+  $('sleepBtn').classList.toggle('on', !!sleep);
+  $('sleepBtn').setAttribute('aria-label', sleep ? 'Sleep timer, ' + (sleep.at ? label + ' left' : 'end of chapter') : 'Sleep timer');
+}
+$('sleepBtn').addEventListener('click', () => {
+  const ol = $('sleepList');
+  ol.textContent = '';
+  const add = (text, value, current) => {
+    const btn = el('button');
+    btn.append(el('span', '', text));
+    if (current) btn.setAttribute('aria-current', 'true');
+    btn.addEventListener('click', () => {
+      setSleep(value);
+      if (value) log('sleep timer: ' + text);
+      $('sleepDlg').close();
+    });
+    const li = el('li'); li.append(btn); ol.append(li);
+  };
+  add('Off', null, !sleep);
+  for (const m of [5, 10, 15, 30, 45, 60]) add(m + ' minutes', { at: Date.now() + m * 60000, mins: m }, !!sleep && sleep.mins === m);
+  const c = chapterAt(cur.book, audio.currentTime);
+  add(c.count > 1 ? 'End of chapter' : 'End of book', { end: c.end }, !!sleep && sleep.end != null);
+  $('sleepDlg').showModal();
+});
+$('sleepClose').addEventListener('click', () => $('sleepDlg').close());
 
 audio.addEventListener('loadedmetadata', () => {
   if (!cur) return;
@@ -291,6 +370,8 @@ audio.addEventListener('timeupdate', () => {
   cur.book.position = audio.currentTime;
   save();
   if (!scrubbing) renderTime(audio.currentTime);
+  if (!$('mini').hidden) renderMini();
+  if (sleep && sleep.end != null) checkSleep();
 });
 audio.addEventListener('error', () => {
   if (!cur || !audio.getAttribute('src')) return;
@@ -303,6 +384,8 @@ function syncPlayState() {
   const playing = !audio.paused;
   $('playIcon').setAttribute('d', playing ? PAUSE : PLAY);
   $('playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  $('miniPlayIcon').setAttribute('d', playing ? PAUSE : PLAY);
+  $('miniPlay').setAttribute('aria-label', playing ? 'Pause' : 'Play');
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
   if (!playing && cur) save(true);
 }
@@ -535,10 +618,10 @@ function renderMarks() {
   }
   for (const m of b.marks) {
     const li = el('li', 'mark');
-    const top = el('div');
+    const top = el('div', 'markhead');
     top.append(el('span', 'when', fmt(m.t)));
     const c = chapterAt(b, m.t);
-    if (c.count > 1) top.append(el('span', 'muted', '  ' + c.title));
+    if (c.count > 1) top.append(el('span', 'muted', c.title));
     if (STATUS[m.status]) top.append(el('span', 'chip', STATUS[m.status]));
     li.append(top);
     let extra = null;
@@ -748,12 +831,11 @@ $('removeBtn').addEventListener('click', async () => {
   if (!cur) return;
   const b = cur.book, n = b.marks.length;
   if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return;
-  closeBook(true);
+  closeBook();
   state.books = state.books.filter((x) => x !== b);
   save(true);
   await store('remove', b.id).catch(() => {});
-  $('player').hidden = true; $('library').hidden = false;
-  renderLibrary();
+  showLibrary();
 });
 
 // ---------- settings ----------
