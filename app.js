@@ -553,8 +553,15 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     if (!was || !was.dragging) return;
     const speed = was.dy / Math.max(1, e.timeStamp - was.at);
     if (e.type === 'touchend' && (was.dy > window.innerHeight / 3 || (speed > 0.5 && was.dy > 40))) {
-      // From where it was let go, the player shrinks into the mini player.
-      morph(() => { clear(); for (const n of under) n.style.opacity = ''; showLibrary(); });
+      // From where it was let go, the player carries on gliding down and
+      // fades away, while the library finishes fading in.
+      const finish = () => { clear(); player.style.opacity = ''; for (const n of under) { n.style.transition = ''; n.style.opacity = ''; } showLibrary(); };
+      if (calm.matches) { finish(); return; }
+      player.style.transition = 'transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1), opacity 0.3s ease-in';
+      player.style.transform = 'translateY(' + Math.max(was.dy + 160, window.innerHeight * 0.75) + 'px)';
+      player.style.opacity = '0';
+      for (const n of under) { n.style.transition = 'opacity 0.25s'; n.style.opacity = '1'; }
+      setTimeout(finish, 310);
     } else settle();
   };
   player.addEventListener('touchend', release);
@@ -1854,7 +1861,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795512133';
+const BUILD = '1795512240';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
