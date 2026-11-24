@@ -1218,7 +1218,7 @@ function trimEditor() {
   preset('Sentence', 'trimSentence', () => trim.sentence);
   preset('Paragraph', 'trimPara', () => trim.para);
   preset('As captured', 'trimBase', () => trim.base);
-  box.append(el('p', 'muted small', settings.trimSnap ? 'Drag a handle or tap a sentence. The ends settle on whole sentences.' : 'Drag a handle or tap a word to set where the quote starts and ends.'), presets);
+  box.append(el('p', 'muted small', settings.trimSnap ? 'Tap a sentence, drag a handle, or press and hold anywhere to drag from there. The ends settle on whole sentences.' : 'Tap a word, drag a handle, or press and hold anywhere to drag from there.'), presets);
 
   const widen = (label, grow) => {
     const btn = el('button', 'more', label);
@@ -1243,8 +1243,10 @@ function trimEditor() {
     }
     p.append(sent, document.createTextNode(' '));
   });
+  holdToDrag(passage);
   passage.addEventListener('click', (e) => {
     const w = e.target.closest('.w');
+    if (passage.dataset.justDragged) { delete passage.dataset.justDragged; return; }
     if (!w) return;
     tapWord(Number(w.dataset.a), Number(w.dataset.b), Number(w.parentNode.dataset.i));
     paintTrim();
@@ -1327,15 +1329,13 @@ function paintTrim() {
   $('trimBase').setAttribute('aria-pressed', String(is(trim.base) && !is(trim.sentence) && !is(trim.para)));
 }
 window.addEventListener('resize', () => { if (trim) paintTrim(); });
-// Dragging a handle: the edge follows the word under the finger, and settles
-// on a sentence boundary when let go.
-function dragHandle(e, edge, handle, passage) {
-  e.preventDefault();
-  handle.setPointerCapture(e.pointerId);
-  handle.classList.add('dragging');
-  const rect = handle.getBoundingClientRect(), offsetY = rect.top + rect.height / 2 - e.clientY;   // finger to the middle of the line
+// Moving an edge by dragging. Used by the handles, and by pressing and
+// holding anywhere in the text. The edge follows the word under the finger;
+// held near the top or bottom of the sheet the list keeps scrolling; on
+// letting go the edge settles on a sentence boundary (if snapping is on).
+function beginDrag(edge, passage, x, y, offsetY) {
   const sheet = $('marksDlg');
-  let at = { x: e.clientX, y: e.clientY };
+  let at = { x, y };
   const follow = () => {
     const w = document.elementsFromPoint(at.x, at.y + offsetY).find((n) => n.classList && n.classList.contains('w') && passage.contains(n));
     if (!w) return;
@@ -1345,21 +1345,64 @@ function dragHandle(e, edge, handle, passage) {
     else setTrim(a, pastMiddle ? Number(w.dataset.b) : Number(w.dataset.a) - 1);
     if (trim.a !== a || trim.b !== b) paintTrim();
   };
-  const move = (ev) => { at = { x: ev.clientX, y: ev.clientY }; follow(); };
-  // Held near the top or bottom of the sheet, it keeps scrolling so the edge
-  // can be taken further than what is on screen.
   const creep = setInterval(() => {
     const frame = sheet.getBoundingClientRect();
     const step = at.y < frame.top + 90 ? -10 : at.y > frame.bottom - 110 ? 10 : 0;
     if (step) { sheet.scrollTop += step; follow(); }
   }, 16);
+  passage.querySelector('.handle.' + edge).classList.add('dragging');
+  follow();
+  return {
+    move(nx, ny) { at = { x: nx, y: ny }; follow(); },
+    end() {
+      clearInterval(creep);
+      const handle = passage.querySelector('.handle.' + edge);
+      if (handle) handle.classList.remove('dragging');
+      if (settings.trimSnap && trim) { passage.classList.add('settling'); snapEdge(edge); paintTrim(); setTimeout(() => passage.classList.remove('settling'), 220); }
+    },
+  };
+}
+function dragHandle(e, edge, handle, passage) {
+  e.preventDefault();
+  handle.setPointerCapture(e.pointerId);
+  const rect = handle.getBoundingClientRect();
+  const drag = beginDrag(edge, passage, e.clientX, e.clientY, rect.top + rect.height / 2 - e.clientY);   // offset: finger to the middle of the line
+  const move = (ev) => drag.move(ev.clientX, ev.clientY);
   const stop = () => {
-    clearInterval(creep);
-    handle.classList.remove('dragging');
     handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', stop); handle.removeEventListener('pointercancel', stop);
-    if (settings.trimSnap) { passage.classList.add('settling'); snapEdge(edge); paintTrim(); setTimeout(() => passage.classList.remove('settling'), 220); }
+    drag.end();
   };
   handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
+}
+// Press and hold on the text to pick up the nearer edge from anywhere: the
+// start if the finger is before the bookmark point, the end if after. A touch
+// that moves straight away is a scroll and is left alone, so the two don't clash.
+const HOLD_MS = 280;
+function holdToDrag(passage) {
+  let hold = null;
+  const cancel = () => { if (hold) { clearTimeout(hold.timer); if (hold.drag) hold.drag.end(); hold = null; } };
+  passage.addEventListener('touchstart', (e) => {
+    cancel();
+    const w = e.target.closest && e.target.closest('.w');
+    if (!w || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    hold = { x: t.clientX, y: t.clientY, drag: null };
+    hold.timer = setTimeout(() => {
+      if (!hold || !trim) return;
+      const edge = Number(w.dataset.a) < trim.point ? 'start' : 'end';
+      hold.drag = beginDrag(edge, passage, hold.x, hold.y, 0);
+      passage.dataset.justDragged = '1';      // the tap that ends this press must not also count as a tap
+    }, HOLD_MS);
+  }, { passive: true });
+  passage.addEventListener('touchmove', (e) => {
+    if (!hold) return;
+    const t = e.touches[0];
+    if (hold.drag) { if (e.cancelable) e.preventDefault(); hold.drag.move(t.clientX, t.clientY); return; }
+    if (Math.abs(t.clientX - hold.x) > 8 || Math.abs(t.clientY - hold.y) > 8) cancel();   // moved before the hold took: scrolling
+    else { hold.x = t.clientX; hold.y = t.clientY; }
+  }, { passive: false });
+  passage.addEventListener('touchend', cancel);
+  passage.addEventListener('touchcancel', cancel);
 }
 function saveTrim() {
   const m = trim.m;
