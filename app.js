@@ -1188,6 +1188,29 @@ $('logCopy').addEventListener('click', async () => {
   const text = logLines.join('\n') + '\n' + navigator.userAgent;
   try { await navigator.clipboard.writeText(text); toast('Log copied'); } catch (e) { toast('Copy failed'); }
 });
+// A home-screen app has no reload button, so Settings provides one. It asks
+// the service worker to look for new files first, then reloads the page.
+$('appReload').addEventListener('click', async () => {
+  $('appReload').disabled = true;
+  if (cur) { cur.book.position = audio.currentTime || cur.book.position; save(true); }
+  try {
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.update();
+  } catch (e) { /* offline: reload with what we have */ }
+  location.reload();
+});
+// When the published app files last changed, so it's clear what is running.
+async function showVersion() {
+  try {
+    const res = await fetch('app.js', { method: 'HEAD', cache: 'no-cache' });
+    const when = new Date(res.headers.get('last-modified'));
+    if (isNaN(when)) throw new Error('no date');
+    $('appVersion').textContent = 'Latest version published ' + when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) + '. Reload to make sure you are running it.';
+  } catch (e) {
+    $('appVersion').textContent = 'Could not check for a newer version (offline?).';
+  }
+}
+for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showVersion);
 renderSettings();
 
 // A bookmark that was mid-transcription when the app closed is not retried
