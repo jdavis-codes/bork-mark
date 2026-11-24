@@ -1,6 +1,6 @@
 import {
   openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt,
-  readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage,
+  readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage, findTextTables,
 } from './align.js';
 
 const $ = (id) => document.getElementById(id);
@@ -261,7 +261,7 @@ async function stored(dir, name) {
 // The book text, plus where its contents entries and print pages fall in it.
 async function storeText(id, doc) {
   await store('write', id, 'text', new Blob([doc.text], { type: 'text/plain' }));
-  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures })], { type: 'application/json' }));
+  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true })], { type: 'application/json' }));
   for (let i = 0; i < doc.images.length; i++) await store('write', id, 'img-' + i, doc.images[i]);
 }
 
@@ -410,7 +410,7 @@ async function openBook(id, coverNow) {
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
-  renderMarks(); renderTextStatus(); setMediaSession();
+  renderMarks(); renderTextStatus(); setMediaSession(); renderFigTab();
 
   const mine = cur;
   if (book.hasCover) stored(id, 'cover').then((f) => {
@@ -426,6 +426,14 @@ async function openBook(id, coverNow) {
     const meta = await stored(id, 'meta');
     if (meta) try { mine.meta = { toc: [], pages: [], figures: [], ...JSON.parse(await meta.text()) }; } catch (e) {}
     mine.text = buildBook(await f.text());
+    if (!mine.meta.tablesDone) {
+      // Books added before tables written as plain lines were recognised: look for them now.
+      mine.meta.figures = mine.meta.figures.filter((x) => !x.plain).concat(findTextTables(mine.text.text)).sort((x, y) => x.at - y.at);
+      mine.meta.tablesDone = true;
+      for (const m of book.marks) delete m.figs;   // figure numbers have shifted
+      store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
+    }
+    renderFigTab();
     rematch(); runQueue(); renderInfo();
   });
   if (book.pageSrcName) stored(id, 'pagesrc').then(async (f) => {
@@ -1002,7 +1010,7 @@ function renderMarks() {
     if (m.status === 'done' && m.pdfPage != null && b.hasPagePdf) {
       const page = el('button', 'small', 'Page');
       page.setAttribute('aria-label', 'Show the scanned page');
-      page.addEventListener('click', () => openPdfPage(m));
+      page.addEventListener('click', () => { if (cur.pageSrc) showPdfPage(m.pdfPage); else toast('The page scan is still loading'); });
       actions.append(page);
     }
     if (m.status === 'error') {
@@ -1192,13 +1200,32 @@ async function runQueue() {
 
 // ---------- looking at a picture, table or scanned page ----------
 let viewUrl = null;
-function showViewer(title, node) {
+function showViewer(title, node, figure) {
   if (viewUrl) { URL.revokeObjectURL(viewUrl); viewUrl = null; }
   $('viewTitle').textContent = title;
   $('viewBody').replaceChildren(node);
+  // For a figure from the book text: jump the audio to it, or see it on the scanned page.
+  const tools = $('viewTools');
+  tools.textContent = '';
+  if (figure != null) {
+    const go = el('button', 'small', 'Go to this in the audio');
+    go.addEventListener('click', () => jumpToFigure(figure));
+    tools.append(go);
+    if (cur.pageSrc && cur.book.hasPagePdf) {
+      const scan = el('button', 'small', 'Scanned page');
+      scan.addEventListener('click', () => {
+        const f = cur.meta.figures[figure], t = cur.text.text;
+        const i = pageOf(cur.pageSrc.index, t.slice(Math.max(0, f.at - 500), f.at), t.slice(f.at, f.at + 400));
+        if (i == null) toast('Could not find this in the page scan'); else showPdfPage(i);
+      });
+      tools.append(scan);
+    }
+  }
+  $('viewStatus').textContent = '';
   if (!$('viewDlg').open) $('viewDlg').showModal();
   $('viewDlg').scrollTop = 0;
 }
+const figureName = (f, i) => f.cap || (f.kind === 'table' ? 'Table' : 'Picture') + ' ' + (i + 1);
 async function openFigure(i) {
   if (!cur) return;
   const f = cur.meta.figures[i];
@@ -1207,27 +1234,33 @@ async function openFigure(i) {
     const table = el('table', 'figtable');
     f.rows.forEach((cells, r) => {
       const tr = el('tr');
-      for (const c of cells) tr.append(el(r === 0 ? 'th' : 'td', '', c));
+      for (const c of cells) {
+        const cell = el(r === 0 ? 'th' : 'td', '', c);
+        if (cells.length === 1) cell.colSpan = 12;   // a note that runs across the table
+        tr.append(cell);
+      }
       table.append(tr);
     });
     const wrap = el('div', 'figscroll'); wrap.append(table);
-    showViewer(f.cap || 'Table', wrap);
+    showViewer(f.plain ? 'Table' : figureName(f, i), wrap, i);
     return;
   }
   const file = await stored(cur.book.id, 'img-' + f.img);
   if (!file) { toast('That picture is not stored on this device'); return; }
   const img = el('img', 'figimg');
   img.alt = f.cap || '';
-  showViewer(f.cap || 'Picture', img);
+  showViewer(figureName(f, i), img, i);
   viewUrl = URL.createObjectURL(file);
   img.src = viewUrl;
 }
-async function openPdfPage(m) {
+// Shows one page of the scan (counting from 0).
+async function showPdfPage(index) {
   const mine = cur, file = await stored(mine.book.id, 'pagepdf');
   if (!file) { toast('The page scan is not stored on this device'); return; }
-  showViewer((m.page ? 'Page ' + m.page : 'Scanned page') + ' · ' + mine.book.pageSrcName, el('p', 'muted', 'Drawing the page…'));
+  const label = pageLabel(mine.book, mine.pageSrc, index);
+  showViewer((label ? 'Page ' + label : 'Scanned page') + ' · ' + mine.book.pageSrcName, el('p', 'muted', 'Drawing the page…'));
   try {
-    const canvas = await renderPdfPage(file, m.pdfPage + 1);
+    const canvas = await renderPdfPage(file, index + 1);
     canvas.className = 'figimg';
     if (cur === mine && $('viewDlg').open) $('viewBody').replaceChildren(canvas);
   } catch (err) {
@@ -1278,6 +1311,97 @@ function textAt(t, list) {
 const PROBE_EVERY = 300;      // seconds of audio allowed between anchors in normal listening
 const PROBE_NEAR = 40;        // …and when a figure is coming up within the next 90 seconds
 let probing = false, probeRest = 0;
+
+// The audio time at which a place in the text is read, judged from the anchors.
+function timeAt(at, list) {
+  if (!list.length) return null;
+  const byText = [...list].sort((x, y) => x.at - y.at);
+  let lo = null, hi = null;
+  for (const a of byText) { if (a.at <= at) lo = a; else { hi = a; break; } }
+  if (lo && hi && hi.t > lo.t) return lo.t + (hi.t - lo.t) * (at - lo.at) / (hi.at - lo.at);
+  const a = !hi || (lo && at - lo.at <= hi.at - at) ? lo : hi;
+  return a.t + (at - a.at) / pace(list, a.t);
+}
+// Finds where in the audio a place in the text is read, by listening: guess a
+// time, hear what is being read there, see how far off that is in the text,
+// correct the guess, and repeat until it is within a few seconds.
+async function findInAudio(at, say) {
+  const mine = cur, b = mine.book, starts = mine.text.starts;
+  let list = anchorList();
+  let t = list.length ? timeAt(at, list) : b.duration * at / mine.text.text.length;
+  for (let round = 1; round <= 5 && cur === mine; round++) {
+    t = Math.max(0, Math.min(b.duration - 20, t));
+    say('Finding the place in the audio… (' + round + ')');
+    const r = await transcribeAround(mine.source, t + 8, 8, 8, transcribe, crumb);
+    crumb(null);
+    const loc = findInBook(mine.text, r.words, r.split);
+    if (!loc) { t += 40; continue; }                    // nothing recognisable (music, credits): look a little later
+    const here = starts[Math.min(loc.split, starts.length - 1)];
+    (b.anchors = b.anchors || []).push([Math.round(t + 8), here]);
+    if (b.anchors.length > 400) b.anchors.shift();
+    save();
+    list = anchorList();
+    const next = timeAt(at, list);
+    if (Math.abs(at - here) < 250) return Math.max(0, next - 3);   // within a few seconds: land just before it
+    t = next - 8;
+  }
+  return null;
+}
+async function jumpToFigure(i) {
+  if (!cur || !cur.text || !cur.source || probing || queueBusy || naming) { toast('Busy with something else; try again in a moment'); return; }
+  const mine = cur, f = mine.meta.figures[i];
+  const say = (msg) => { $('viewStatus').textContent = msg; $('figStatus').textContent = msg; };
+  probing = true;
+  try {
+    await warmModel();
+    const t = await findInAudio(f.at, say);
+    if (cur !== mine) return;
+    if (t == null) { say('Could not find this place in the audio.'); return; }
+    say('');
+    reached.set(i, t);          // arriving here is not "reaching" it
+    seek(t);
+    for (const id of ['viewDlg', 'figsDlg']) closeSheet($(id));
+    toast('Moved to ' + fmt(t));
+  } catch (err) {
+    say('Stopped: ' + ((err && err.message) || err));
+  } finally {
+    probing = false; crumb(null);
+    runQueue();
+  }
+}
+
+// ---------- figures tab ----------
+function renderFigTab() {
+  const n = cur ? cur.meta.figures.length : 0;
+  $('figsBtn').hidden = !n;
+  $('figsLabel').textContent = n === 1 ? '1 figure' : n + ' figures';
+}
+$('figsBtn').addEventListener('click', () => {
+  const ol = $('figList'), figs = cur.meta.figures;
+  ol.textContent = '';
+  $('figStatus').textContent = '';
+  $('figCount').textContent = '(' + figs.length + ')';
+  const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
+  let nextOne = null;
+  figs.forEach((f, i) => {
+    const li = el('li'), view = el('button', 'figrow'), text = el('span', 'figtext');
+    const sec = entryAt(cur.meta.toc, f.at);
+    text.append(el('span', 'figcap', figureName(f, i)), el('span', 'muted', (f.kind === 'table' ? 'Table' : 'Picture') + (sec ? ' · ' + sec.label : '')));
+    view.append(text);
+    view.addEventListener('click', () => openFigure(i));
+    const go = el('button', 'round');
+    go.setAttribute('aria-label', 'Go to this in the audio');
+    go.append(icon('M7 5v14l11-7z'));
+    go.addEventListener('click', () => jumpToFigure(i));
+    li.append(view, go);
+    if (est != null && nextOne == null && f.at > est) { nextOne = li; li.classList.add('upnext'); }
+    ol.append(li);
+  });
+  $('figsDlg').showModal();
+  $('figsDlg').scrollTop = 0;
+  if (nextOne) nextOne.scrollIntoView({ block: 'center' });
+});
+$('figsClose').addEventListener('click', () => closeSheet($('figsDlg')));
 async function probe(t) {
   if (probing || queueBusy || naming || !canWork() || !cur.source || modelState === 'failed' || Date.now() < probeRest) return;
   probing = true;
@@ -1375,7 +1499,7 @@ function editable(value, label, onSave, shown) {
   return wrap;
 }
 
-let chaptersOpen = false, figuresOpen = false, chapStatusText = '';
+let chaptersOpen = false, chapStatusText = '';
 function renderInfo() {
   if (!cur) return;
   const b = cur.book, dl = $('infoList');
@@ -1440,28 +1564,6 @@ function renderInfo() {
     }
   }
 
-  const figs = cur.meta.figures || [];
-  if (figs.length) {
-    const toggle = el('button', 'disclose', String(figs.length));
-    toggle.setAttribute('aria-expanded', String(figuresOpen));
-    toggle.setAttribute('aria-label', figs.length + ' pictures and tables, ' + (figuresOpen ? 'hide' : 'show') + ' list');
-    toggle.append(icon('M6 9l6 6 6-6'));
-    toggle.addEventListener('click', () => { figuresOpen = !figuresOpen; renderInfo(); });
-    row('Figures', toggle);
-    if (figuresOpen) {
-      const box = el('div', 'chapbox'), ol = el('ol', 'figlist');
-      figs.forEach((f, i) => {
-        const li = el('li'), btn = el('button', 'linkbtn', f.cap || (f.kind === 'table' ? 'Table' : 'Picture') + ' ' + (i + 1));
-        btn.addEventListener('click', () => openFigure(i));
-        const sec = entryAt(cur.meta.toc, f.at);
-        li.append(el('span', 'muted', f.kind === 'table' ? 'Table' : 'Picture'), btn);
-        if (sec) btn.title = sec.label;
-        ol.append(li);
-      });
-      box.append(ol);
-      dl.append(box);
-    }
-  }
   if (b.pageSrcName) {
     row('Page PDF', b.pageSrcName + (cur.pageSrc ? ' (' + cur.pageSrc.count + ' pages)' : ''));
     // Scans start with unnumbered front matter; this says where page 1 is.
@@ -1488,7 +1590,7 @@ function metaChanged() {
   setScroll($('title'), b.title); $('author').textContent = b.author;
   setMediaSession(); renderInfo();
 }
-$('infoBtn').addEventListener('click', () => { chaptersOpen = false; figuresOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
+$('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 
 // ---------- chapter names ----------
@@ -1557,7 +1659,8 @@ $('textFile').addEventListener('change', async (e) => {
     delete b.anchors;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
-    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures };
+    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true };
+    renderFigTab();
     mine.text = buildBook(doc.text);
     metaChanged(); renderTextStatus(); rematch(); runQueue();
     toast('Book text added');
@@ -1722,7 +1825,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795510490';
+const BUILD = '1795510922';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

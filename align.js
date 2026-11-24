@@ -357,6 +357,12 @@ function htmlToText(markup, anchors = [], ctx = null) {
   if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(markup, 'text/html');
   const body = doc.querySelector('body') || doc.documentElement;
   body.querySelectorAll('script,style').forEach((n) => n.remove());
+  // Line breaks typed inside a paragraph in the file are only spacing, not
+  // lines of the book, so flatten them (except in preformatted text).
+  const walker = doc.createTreeWalker(body, 4 /* text nodes */);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  for (const n of textNodes) if (!n.parentNode.closest || !n.parentNode.closest('pre')) n.nodeValue = n.nodeValue.replace(/\s+/g, ' ');
   const listed = new Set(anchors.filter((a) => a.kind === 'P').map((a) => a.id));
   // Print page breaks marked in the text itself.
   for (const n of body.querySelectorAll('*')) {
@@ -427,7 +433,7 @@ export async function readBook(file) {
   if (!/\.epub$/i.test(file.name)) {
     // Plain text is often hard-wrapped; join lines within a paragraph.
     const text = (await file.text()).replace(/\r/g, '').replace(/([^\n])\n(?!\n)/g, '$1 ');
-    return { text, title: '', author: '', toc: [], pages: [], figures: [], images: [] };
+    return { text, title: '', author: '', toc: [], pages: [], figures: findTextTables(text), images: [] };
   }
   const { unzipSync, strFromU8 } = await import('https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js');
   const zip = unzipSync(new Uint8Array(await file.arrayBuffer()));
@@ -489,6 +495,7 @@ export async function readBook(file) {
   const re = new RegExp(MARK_OPEN + '([PTF])([^' + MARK_CLOSE + ']*)' + MARK_CLOSE, 'g');
   for (let m; (m = re.exec(raw));) {
     text += raw.slice(last, m.index); last = re.lastIndex;
+    if (raw[last] === ' ' && (!text || text.endsWith('\n'))) last++;   // no stray space at the start of a line
     if (m[1] !== 'F') { (m[1] === 'T' ? toc : pages).push({ label: m[2], at: text.length }); continue; }
     const fig = figs[Number(m[2])];
     if (!fig) continue;
@@ -507,8 +514,22 @@ export async function readBook(file) {
     figures.push({ at: text.length, kind: 'image', cap: fig.cap, img: imageAt.get(fig.src) });
   }
   text += raw.slice(last);
+  figures.push(...findTextTables(text));
+  figures.sort((a, b) => a.at - b.at);
   const dedupe = (list) => list.filter((x, k) => k === 0 || x.label !== list[k - 1].label);
   toc.sort((a, b) => a.at - b.at); pages.sort((a, b) => a.at - b.at);
+  // Drop pictures that are publisher furniture rather than part of the book:
+  // anything on the cover, title, copyright or sign-up pages, and logos.
+  const FURNITURE = /^(cover|title ?page|half ?title|copyright|imprint|colophon|contents|about( the)? (author|publisher)|also by|newsletter|sign ?up)/i;
+  const BADGE = /logo|sign ?up|newsletter|instagram|facebook|twitter|pinterest/i;
+  const sorted = dedupe(toc);
+  const kept = figures.filter((f) => {
+    if (f.kind !== 'image') return true;
+    const section = entryAt(sorted, f.at);
+    return !(section && FURNITURE.test(section.label)) && !BADGE.test(f.cap || '');
+  });
+  for (const f of kept) if (/^image$|\.(jpe?g|png|gif|svg|webp)$/i.test(f.cap || '')) f.cap = '';   // a file name is not a caption
+  figures.length = 0; figures.push(...kept);
   const meta = byTag(opf, 'metadata')[0] || opf;
   return {
     text, toc: dedupe(toc), pages: dedupe(pages), figures, images,
@@ -781,4 +802,65 @@ export function pageOf(index, before, after) {
   let i = 0;
   while (i + 1 < index.starts.length && index.starts[i + 1] <= at) i++;
   return i;
+}
+
+// ---------- tables written as plain lines ----------
+// Many EPUBs don't mark tables up as tables: each row is just a short line
+// of text. This finds runs of at least three such lines and returns them as
+// table figures {at, kind, cap, rows}.
+export function findTextTables(text) {
+  const NUMBER = /[$£€]?\d[\d,.]*(?:[-–/]\d+)?%?/g;
+  const lines = [];
+  let pos = 0;
+  for (const raw of text.split('\n')) { lines.push({ s: raw.trim(), at: pos }); pos += raw.length + 1; }
+  // A row is a short line with at least two numbers that is either mostly
+  // numbers ("1909-10 $950 18,664 cars") or a label ending in one ("Repairs
+  // per acre .026"). Ordinary sentences that mention two numbers are neither.
+  const isRow = (l) => {
+    if (!l || !l.s || l.s.length > 90 || (l.s.match(NUMBER) || []).length < 2) return false;
+    const words = l.s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+    const numeric = words.filter((w) => /\d/.test(w)).length;
+    return numeric / words.length >= 0.4 || /\d[%.)"”]*$/.test(l.s);
+  };
+  // Split a row into cells: on dot leaders, tabs or wide gaps if it has them,
+  // otherwise start a new cell at each number.
+  const cells = (s) => {
+    const parts = s.split(/\s*(?:\.\s){2,}\.?\s*|\t+|\s{2,}/).filter(Boolean);
+    if (parts.length > 1) return parts;
+    const out = [];
+    for (const word of s.split(' ')) {
+      const prev = out[out.length - 1];
+      if (!out.length || (/\d/.test(word) && !/\bto$/.test(prev))) out.push(word); else out[out.length - 1] = prev + ' ' + word;
+    }
+    return out;
+  };
+  const tables = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!isRow(lines[i])) continue;
+    // Extend over following rows, allowing blank lines and a one-line note between rows.
+    let last = i, j = i + 1, count = 1;
+    while (j < lines.length && j - last <= 3) {
+      if (isRow(lines[j])) { count++; last = j; }
+      else if (lines[j].s.length > 90) break;
+      j++;
+    }
+    let notes = 0;
+    for (let k = i; k <= last; k++) if (lines[k].s && !isRow(lines[k])) notes++;
+    if (count >= 3 && notes * 3 <= count) {   // mostly rows, with at most the odd note between them
+      let h = i - 1;
+      while (h >= 0 && !lines[h].s) h--;
+      const header = h >= 0 && i - h <= 2 && lines[h].s.length <= 60 && !/\d/.test(lines[h].s) && !/[.!?;,:]$/.test(lines[h].s) ? lines[h] : null;
+      const rows = [];
+      for (let k = i; k <= last; k++) if (lines[k].s) rows.push(isRow(lines[k]) ? cells(lines[k].s) : [lines[k].s]);
+      const width = rows.map((r) => r.length).sort((a, b) => a - b)[rows.length >> 1];
+      if (header) {
+        let head = cells(header.s);
+        if (head.length === 1 && header.s.split(' ').length === width) head = header.s.split(' ');
+        rows.unshift(head);
+      }
+      tables.push({ at: (header || lines[i]).at, kind: 'table', cap: header ? header.s.replace(/\s*(?:\.\s){2,}\.?\s*/g, ', ') : rows[0].join(', '), rows, plain: true });
+    }
+    i = last;
+  }
+  return tables;
 }
