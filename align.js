@@ -864,3 +864,40 @@ export function findTextTables(text) {
   }
   return tables;
 }
+
+// ---------- sentences, for trimming a quote ----------
+const ABBREVIATION = /\b(?:Mr|Mrs|Ms|Dr|St|Jr|Sr|Co|No|vs|etc|Inc|Ltd|Vol|pp?|[A-Z])\.$/;
+// Sentences of the paragraphs that overlap the characters [from, to) of the
+// text, in order, as {a, b, p}: character range and paragraph number.
+export function sentencesIn(text, from, to) {
+  let start = text.lastIndexOf('\n', Math.max(0, from) - 1) + 1;
+  let stop = text.indexOf('\n', Math.min(text.length, to));
+  if (stop < 0) stop = text.length;
+  const out = [];
+  let p = 0;
+  while (start < stop) {
+    let end = text.indexOf('\n', start);
+    if (end < 0 || end > stop) end = stop;
+    if (/\S/.test(text.slice(start, end))) {
+      // one paragraph: break after . ! ? … (and any closing quotes) when a new sentence clearly begins
+      let s = start;
+      const stopper = /[.!?…]+["”’)\]]*\s+/g;
+      stopper.lastIndex = start;
+      for (let m; (m = stopper.exec(text)) && m.index < end;) {
+        const next = m.index + m[0].length;
+        if (next >= end) break;
+        const lead = text.slice(Math.max(s, m.index - 5), m.index + 1);
+        if (ABBREVIATION.test(lead) || /[\p{Ll}]/u.test(text[next])) continue;   // "Mr. Ford", "U. S.", or the sentence carries on in lower case
+        out.push({ a: s, b: m.index + m[0].trimEnd().length, p });
+        s = next;
+      }
+      while (s < end && /\s/.test(text[s])) s++;
+      let b = end;
+      while (b > s && /\s/.test(text[b - 1])) b--;
+      if (b > s) out.push({ a: s, b, p });
+      p++;
+    }
+    start = end + 1;
+  }
+  return out;
+}

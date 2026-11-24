@@ -1,6 +1,7 @@
 import {
   openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt,
   readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage, findTextTables,
+  tokenize, sentencesIn,
 } from './align.js';
 
 const $ = (id) => document.getElementById(id);
@@ -46,6 +47,7 @@ const DEFAULTS = {
   figPause: false,               // …and pause there
   // What a bookmark captures: seconds of audio either side, or whole paragraphs.
   capture: { mode: 'time', before: 45, after: 15, parasBefore: 1, parasAfter: 1 },
+  markOrder: 'book',             // bookmarks list: 'book' (by chapter) or 'new' (latest first)
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
 };
 const settings = state.settings = {
@@ -148,7 +150,7 @@ for (const d of document.querySelectorAll('dialog.bottom, #settingsDlg')) {
   d.addEventListener('touchstart', (e) => {
     g = null;
     if (e.touches.length !== 1 || d.classList.contains('closing')) return;
-    if (e.target.closest('input, select, textarea')) return;
+    if (e.target.closest('input, select, textarea, .handle')) return;
     const header = d.firstElementChild;
     const inHeader = (header && header.contains(e.target)) || e.touches[0].clientY - d.getBoundingClientRect().top < 48;
     if (!inHeader && d.scrollTop > 0) return;
@@ -961,109 +963,358 @@ function addMark() {
 }
 $('markBtn').addEventListener('click', addMark);
 
+// ---------- bookmarks list ----------
 const expanded = new Set();
-// Shorten text to roughly n characters without cutting a word.
-const tail = (str, n) => (str.length <= n ? str : '…' + str.slice(str.indexOf(' ', str.length - n) + 1));
-const head = (str, n) => (str.length <= n ? str : str.slice(0, str.lastIndexOf(' ', n)) + '…');
-
 const STATUS = {
-  pending: 'waiting', working: 'finding quote…', transcribed: 'heard, no book text',
-  nomatch: 'not found in text', error: 'failed',
+  pending: 'Waiting to find the quote', working: 'Finding the quote…', transcribed: 'Heard, no book text yet',
+  nomatch: 'Not in the book text', error: 'Could not find the quote',
 };
+const GLYPH = {
+  play: 'M7 5v14l11-7z',
+  trim: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.1 8.1L20 20M8.1 15.9L20 4',
+  share: 'M12 15V3M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7',
+  copy: 'M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V10a1 1 0 0 1 1-1zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3',
+  table: 'M4 6h16v12H4zM4 10h16M4 14h16M10 6v12',
+  picture: 'M4 5h16v14H4zM4 16l4.5-4.5 4 4 3-3L20 17',
+};
+const iconButton = (glyph, label, cls) => {
+  const b = el('button', cls || '');
+  b.type = 'button'; b.setAttribute('aria-label', label); b.append(icon(GLYPH[glyph]));
+  return b;
+};
+const SENTENCE_END = /[.!?…]+["”’)\]]*\s+/g;
+// The text before the bookmark point, split where its last sentence begins.
+function splitBefore(before) {
+  let cut = before.lastIndexOf('\n') + 1;
+  SENTENCE_END.lastIndex = cut;
+  for (let m; (m = SENTENCE_END.exec(before));) cut = m.index + m[0].length;
+  return [before.slice(0, cut), before.slice(cut)];
+}
+// The text after the point, split where that sentence ends.
+function splitAfter(after) {
+  const m = /[.!?…]+["”’)\]]*(?=\s|$)|\n/.exec(after);
+  const cut = m ? m.index + (m[0] === '\n' ? 0 : m[0].length) : after.length;
+  return [after.slice(0, cut), after.slice(cut)];
+}
+// For a closed card: only the sentence or so leading up to the bookmarked one.
+function leadIn(text) {
+  if (text.length <= 150) return text;
+  const cut = text.slice(-150), i = cut.search(/[.!?…]\s/);
+  return '… ' + (i >= 0 ? cut.slice(i + 2) : cut.slice(cut.indexOf(' ') + 1));
+}
 
 function renderMarks() {
   if (!cur) return;
-  const b = cur.book, ol = $('marks');
-  ol.textContent = '';
+  const b = cur.book, list = $('marks');
+  list.textContent = '';
   const n = b.marks.length, waiting = b.marks.filter((m) => m.status === 'pending' || m.status === 'working').length;
   $('markCount').textContent = n ? '(' + n + ')' : '';
   $('marksLabel').textContent = n ? String(n) : '';
   $('marksBtn').setAttribute('aria-label', 'Bookmarks' + (n ? ', ' + n : '') + (waiting ? ', ' + waiting + ' still being processed' : ''));
   $('marksBtn').classList.toggle('on', waiting > 0);
-  if (!b.marks.length) {
-    ol.append(el('li', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
+  const newest = settings.markOrder === 'new';
+  $('orderBook').setAttribute('aria-pressed', String(!newest)); $('orderNew').setAttribute('aria-pressed', String(newest));
+  $('markOrder').hidden = n < 2;
+  if (!n) {
+    list.append(el('p', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
     return;
   }
-  for (const m of b.marks) {
-    const li = el('li', 'mark');
-    const top = el('div', 'markhead');
-    top.append(el('span', 'when', fmt(m.t)));
-    const c = chapterAt(b, m.t);
-    if (c.count > 1) top.append(el('span', 'muted', c.title));
-    if (STATUS[m.status]) top.append(el('span', 'chip', STATUS[m.status]));
-    li.append(top);
-    let extra = null;
-
-    if (m.status === 'done') {
-      // Collapsed, a card shows just the text around the bookmark point.
-      const q = el('div', 'quote');
-      const open = expanded.has(m.id);
-      const before = open ? m.before : tail(m.before, 220), after = open ? m.after : head(m.after, 120);
-      q.append(document.createTextNode(before), el('span', 'pin', '🔖'), document.createTextNode(after));
-      li.append(q);
-      if (before !== m.before || after !== m.after || open) {
-        const more = el('button', 'small', open ? 'Less' : 'More');
-        more.addEventListener('click', () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); });
-        extra = more;
+  if (newest) {
+    const group = el('div', 'group');
+    [...b.marks].sort((x, y) => y.created - x.created).forEach((m) => group.append(markCard(b, m, true)));
+    list.append(group);
+  } else {
+    // In book order, under a heading for each chapter that has bookmarks.
+    let group = null, last = null, count = null, inGroup = 0;
+    for (const m of [...b.marks].sort((x, y) => x.t - y.t)) {
+      const c = chapterAt(b, m.t);
+      if (c.i !== last) {
+        if (count) count.textContent = String(inGroup);
+        group = el('div', 'group'); last = c.i; inGroup = 0;
+        const head = el('div', 'grouphead');
+        count = el('span');
+        head.append(el('span', '', c.count > 1 ? c.title : b.title), count);
+        group.append(head); list.append(group);
       }
-    } else if (m.transcript) {
-      li.append(el('div', 'quote raw', m.transcript));
-    } else if (m.status === 'error') {
-      li.append(el('div', 'warn', m.error || 'Something went wrong.'));
+      inGroup++;
+      group.append(markCard(b, m, false));
     }
-
-    if (m.status === 'done' && (m.section || m.page)) {
-      li.append(el('div', 'muted cite', [m.section, m.page && 'p. ' + m.page].filter(Boolean).join(' · ')));
-    }
-    const actions = el('div', 'row');
-    if (extra) actions.append(extra);
-    const play = el('button', 'small', 'Play');
-    play.addEventListener('click', () => { seek(m.t - 30); play(); closeSheet($('marksDlg')); });
-    actions.append(play);
-    if (m.status === 'done' || m.transcript) {
-      const copy = el('button', 'small', 'Copy');
-      copy.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(shareText(b, m)); toast('Copied'); } catch (e) { toast('Copy failed'); }
-      });
-      actions.append(copy);
-      if (navigator.share) {   // the system share sheet: Are.na, Notes, Messages…
-        const share = el('button', 'small', 'Share');
-        share.addEventListener('click', () => {
-          navigator.share({ text: shareText(b, m) }).catch((e) => { if (e.name !== 'AbortError') toast('Could not share'); });
-        });
-        actions.append(share);
-      }
-    }
-    for (const i of (m.status === 'done' && m.figs) || []) {
-      const f = cur.meta.figures[i];
-      if (!f) continue;
-      const view = el('button', 'small', f.kind === 'table' ? 'Table' : 'Picture');
-      view.setAttribute('aria-label', (f.kind === 'table' ? 'Table: ' : 'Picture: ') + (f.cap || 'no caption'));
-      view.addEventListener('click', () => openFigure(i));
-      actions.append(view);
-    }
-    if (m.status === 'done' && m.pdfPage != null && b.hasPagePdf) {
-      const page = el('button', 'small', 'Page');
-      page.setAttribute('aria-label', 'Show the scanned page');
-      page.addEventListener('click', () => { if (cur.pageSrc) showPdfPage(m.pdfPage); else toast('The page scan is still loading'); });
-      actions.append(page);
-    }
-    if (m.status === 'error') {
-      const retry = el('button', 'small', 'Retry');
-      retry.addEventListener('click', () => { m.status = 'pending'; delete m.error; save(true); renderMarks(); runQueue(); });
-      actions.append(retry);
-    }
-    const del = el('button', 'small', 'Delete');
-    del.addEventListener('click', () => {
-      if (!confirm('Delete the bookmark at ' + fmt(m.t) + '?')) return;
-      b.marks = b.marks.filter((x) => x !== m);
-      save(true); renderMarks();
-    });
-    actions.append(del);
-    li.append(actions);
-    ol.append(li);
+    if (count) count.textContent = String(inGroup);
   }
+  if (trim) paintTrim();
 }
+for (const [id, value] of [['orderBook', 'book'], ['orderNew', 'new']]) {
+  $(id).addEventListener('click', () => { settings.markOrder = value; save(true); renderMarks(); });
+}
+
+function markCard(b, m, showChapter) {
+  const card = el('div', 'mark'), c = chapterAt(b, m.t);
+  card.dataset.id = m.id;
+  const top = el('div', 'marktop');
+  const day = new Date(m.created).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+  top.append(el('span', 'where', STATUS[m.status] || (showChapter && c.count > 1 ? c.title : day)));
+  const pill = el('button', 'playpill');
+  pill.type = 'button'; pill.setAttribute('aria-label', 'Play from just before ' + fmt(m.t));
+  pill.append(icon(GLYPH.play), document.createTextNode(fmt(m.t)));
+  pill.addEventListener('click', () => { seek(m.t - 30); play(); closeSheet($('marksDlg')); });
+  top.append(pill);
+  card.append(top);
+
+  const remove = iconButton('trash', 'Delete bookmark');
+  remove.addEventListener('click', () => {
+    if (!confirm('Delete the bookmark at ' + fmt(m.t) + '?')) return;
+    if (trim && trim.m === m) trim = null;
+    b.marks = b.marks.filter((x) => x !== m);
+    save(true); renderMarks();
+  });
+  const foot = el('div', 'markfoot'), chips = el('div', 'chips'), acts = el('div', 'acts');
+
+  if (m.status === 'pending' || m.status === 'working') {
+    const skeleton = el('div', 'skeleton');
+    skeleton.append(el('i'), el('i'), el('i'));
+    acts.append(remove); foot.append(chips, acts);
+    card.append(skeleton, foot);
+    return card;
+  }
+  if (m.status === 'error') {
+    card.append(el('p', 'warn', m.error || 'Something went wrong.'));
+    const retry = el('button', 'small', 'Try again');
+    retry.addEventListener('click', () => { m.status = 'pending'; delete m.error; save(true); renderMarks(); runQueue(); });
+    chips.append(retry); acts.append(remove); foot.append(chips, acts);
+    card.append(foot);
+    return card;
+  }
+  const copy = iconButton('copy', 'Copy quote');
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(shareText(b, m)); toast('Copied'); } catch (e) { toast('Copy failed'); }
+  });
+  const share = navigator.share ? iconButton('share', 'Share quote') : null;   // the system share sheet: Are.na, Notes, Messages…
+  if (share) share.addEventListener('click', () => {
+    navigator.share({ text: shareText(b, m) }).catch((e) => { if (e.name !== 'AbortError') toast('Could not share'); });
+  });
+
+  if (m.status !== 'done') {   // heard, but not matched to book text
+    card.append(el('p', 'quote heard', '“' + (m.transcript || '') + '”'));
+    chips.append(el('span', 'muted small', b.hasText ? 'Shown as heard.' : 'Shown as heard. Add the book text for the exact wording.'));
+    if (share) acts.append(share);
+    acts.append(copy, remove); foot.append(chips, acts);
+    card.append(foot);
+    return card;
+  }
+  if (trim && trim.m === m) { card.classList.add('trimming'); card.append(trimEditor()); return card; }
+
+  // The quote, with a tick at the bookmark point and that sentence lightly
+  // marked. Closed, it opens on the lead-in to that sentence; tap for all of it.
+  const open = expanded.has(m.id);
+  const [lead, sentStart] = splitBefore(m.before), [sentEnd, rest] = splitAfter(m.after);
+  const quote = el('p', 'quote' + (open ? '' : ' clamped'));
+  quote.append(document.createTextNode(open ? lead : leadIn(lead)), el('span', 'pinned', sentStart), el('span', 'pin'), el('span', 'pinned', sentEnd), document.createTextNode(rest));
+  quote.setAttribute('role', 'button'); quote.tabIndex = 0;
+  quote.setAttribute('aria-label', (open ? 'Collapse' : 'Show all of') + ' this quote');
+  const toggle = () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); };
+  quote.addEventListener('click', toggle);
+  quote.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  card.append(quote);
+
+  if (m.page) {
+    const canShow = m.pdfPage != null && b.hasPagePdf;
+    const page = el(canShow ? 'button' : 'span', 'chip', 'p. ' + m.page);
+    if (canShow) { page.setAttribute('aria-label', 'Show scanned page ' + m.page); page.addEventListener('click', () => { if (cur.pageSrc) showPdfPage(m.pdfPage); else toast('The page scan is still loading'); }); }
+    chips.append(page);
+  }
+  for (const i of m.figs || []) {
+    const f = cur.meta.figures[i];
+    if (!f) continue;
+    const fig = el('button', 'chip');
+    fig.append(icon(GLYPH[f.kind === 'table' ? 'table' : 'picture']), document.createTextNode(f.kind === 'table' ? 'Table' : 'Picture'));
+    fig.setAttribute('aria-label', (f.kind === 'table' ? 'Table: ' : 'Picture: ') + (f.cap || 'no caption'));
+    fig.addEventListener('click', () => openFigure(i));
+    chips.append(fig);
+  }
+  if (cur.text) {
+    const cut = iconButton('trim', 'Trim quote', 'primary');
+    cut.addEventListener('click', () => startTrim(m));
+    acts.append(cut);
+  }
+  if (share) acts.append(share);
+  acts.append(copy, remove);
+  foot.append(chips, acts);
+  card.append(foot);
+  return card;
+}
+
+// ---------- trimming a quote ----------
+// The quote being trimmed is shown as sentences, with some of the book either
+// side. Tapping a sentence, or dragging one of the two handles, moves the
+// start or the end. The sentence holding the bookmark point always stays in.
+let trim = null;   // { m, from, to, sents, start, end, anchor, base: [start, end] }
+const pointOf = (m) => cur.text.starts[Math.min(m.loc[1], cur.text.starts.length - 1)];
+const bare = (str) => str.replace(/^…\s*/, '').replace(/\s*…$/, '');
+function startTrim(m) {
+  const text = cur.text;
+  if (!m.loc) {   // an older bookmark: find its quote in the book text first
+    const before = tokenize(m.before).words, loc = findInBook(text, before.concat(tokenize(m.after).words), before.length);
+    if (!loc) { toast('Could not find this quote in the book text'); return; }
+    m.loc = [loc.start, loc.split, loc.end];
+  }
+  const at = pointOf(m);
+  const from = m.trim ? m.trim[0] : at - bare(m.before).length, to = m.trim ? m.trim[1] : at + bare(m.after).length;
+  trim = { m, from: Math.min(from, at) - 900, to: Math.max(to, at) + 900 };
+  layoutTrim(from, to);
+  renderMarks();
+  const card = document.querySelector('.mark.trimming');
+  if (card) card.scrollIntoView({ block: 'start', behavior: calm.matches ? 'auto' : 'smooth' });
+}
+// Works out the sentences in view and which of them cover the characters [from, to).
+function layoutTrim(from, to) {
+  const text = cur.text, at = pointOf(trim.m), S = sentencesIn(text.text, Math.max(0, trim.from), Math.min(text.text.length, trim.to));
+  trim.sents = S;
+  const span = (a, b) => {
+    let i = S.findIndex((x) => x.b > a), j = S.length - 1;
+    while (j > 0 && S[j].a >= b) j--;
+    if (i < 0) i = S.length - 1;
+    return [Math.min(i, trim.anchor), Math.max(j, trim.anchor)];
+  };
+  trim.anchor = S.findIndex((x) => at < x.b);
+  if (trim.anchor < 0) trim.anchor = S.length - 1;
+  [trim.start, trim.end] = span(from, to);
+  // What the capture setting alone would give, for the "As captured" shortcut.
+  const q = quoteAt(text, { start: trim.m.loc[0], split: trim.m.loc[1], end: trim.m.loc[2] }, settings.capture);
+  trim.base = span(at - bare(q.before).length, at + bare(q.after).length);
+}
+function trimEditor() {
+  const S = trim.sents, text = cur.text.text, box = el('div', 'trimmer');
+  const presets = el('div', 'presets');
+  const preset = (label, id, range) => {
+    const b = el('button', '', label);
+    b.type = 'button'; b.id = id;
+    b.addEventListener('click', () => { [trim.start, trim.end] = range(); paintTrim(); });
+    presets.append(b);
+  };
+  const para = () => [S.findIndex((x) => x.p === S[trim.anchor].p), S.length - 1 - [...S].reverse().findIndex((x) => x.p === S[trim.anchor].p)];
+  preset('Sentence', 'trimSentence', () => [trim.anchor, trim.anchor]);
+  preset('Paragraph', 'trimPara', para);
+  preset('As captured', 'trimBase', () => trim.base);
+  trim.para = para();
+  box.append(el('p', 'muted small', 'Tap a sentence to start or end there, or drag the handles.'), presets);
+
+  const widen = (label, grow) => {
+    const b = el('button', 'more', label);
+    b.type = 'button';
+    b.addEventListener('click', () => { const a = S[trim.start].a, z = S[trim.end].b; grow(); layoutTrim(a, z); renderMarks(); });
+    return b;
+  };
+  if (trim.from > 0) box.append(widen('Show earlier text', () => { trim.from -= 1400; }));
+  const passage = el('div', 'passage');
+  let p = null, lastPara = -1;
+  S.forEach((x, i) => {
+    if (x.p !== lastPara) { p = el('p'); passage.append(p); lastPara = x.p; }
+    const span = el('span', 's', text.slice(x.a, x.b));
+    span.dataset.i = i; span.setAttribute('role', 'button'); span.tabIndex = 0;
+    const pick = () => { tapSentence(i); paintTrim(); };
+    span.addEventListener('click', pick);
+    span.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    p.append(span, document.createTextNode(' '));
+  });
+  for (const edge of ['start', 'end']) {
+    const h = el('span', 'handle ' + edge);
+    h.setAttribute('role', 'slider'); h.tabIndex = 0;
+    h.setAttribute('aria-label', edge === 'start' ? 'Start of quote' : 'End of quote');
+    h.addEventListener('pointerdown', (e) => dragHandle(e, edge, h, passage));
+    h.addEventListener('keydown', (e) => {   // arrow keys move an edge a sentence at a time
+      const step = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
+      if (!step) return;
+      e.preventDefault(); moveEdge(edge, trim[edge] + step); paintTrim();
+    });
+    passage.append(h);
+  }
+  box.append(passage);
+  if (trim.to < text.length) box.append(widen('Show later text', () => { trim.to += 1400; }));
+
+  const bar = el('div', 'trimbar'), count = el('span', 'count'), buttons = el('div', 'row');
+  count.id = 'trimCount';
+  const cancel = el('button', '', 'Cancel'), keep = el('button', 'primary', 'Save');
+  cancel.addEventListener('click', () => { trim = null; renderMarks(); });
+  keep.addEventListener('click', saveTrim);
+  buttons.append(cancel, keep); bar.append(count, buttons); box.append(bar);
+  return box;
+}
+// An edge can go anywhere on its own side of the bookmarked sentence.
+function moveEdge(edge, i) {
+  const last = trim.sents.length - 1;
+  if (edge === 'start') trim.start = Math.max(0, Math.min(i, trim.anchor)); else trim.end = Math.min(last, Math.max(i, trim.anchor));
+}
+// Before the bookmarked sentence a tap sets the start, after it the end.
+// Tapping the bookmarked sentence itself pulls the end in to it, and tapped
+// again pulls the start in, so two taps leave just that sentence.
+function tapSentence(i) {
+  if (i < trim.anchor) trim.start = i;
+  else if (i > trim.anchor) trim.end = i;
+  else if (trim.end > trim.anchor) trim.end = trim.anchor;
+  else trim.start = trim.anchor;
+}
+// Updates the highlight, handles, count and shortcuts without rebuilding the
+// card, so a drag in progress is not interrupted.
+function paintTrim() {
+  const passage = document.querySelector('.trimmer .passage');
+  if (!trim || !passage) return;
+  const S = trim.sents, spans = passage.querySelectorAll('.s');
+  spans.forEach((n, i) => { n.classList.toggle('in', i >= trim.start && i <= trim.end); n.classList.toggle('anchor', i === trim.anchor); });
+  const box = passage.getBoundingClientRect();
+  const firstRects = spans[trim.start].getClientRects(), lastRects = spans[trim.end].getClientRects();
+  const a = firstRects[0], z = lastRects[lastRects.length - 1];
+  const place = (h, x, rect) => { h.style.left = (x - box.left) + 'px'; h.style.top = (rect.top - box.top) + 'px'; h.style.height = rect.height + 'px'; };
+  if (a && z) { place(passage.querySelector('.handle.start'), a.left, a); place(passage.querySelector('.handle.end'), z.right, z); }
+  const words = S.slice(trim.start, trim.end + 1).reduce((n, x) => n + cur.text.text.slice(x.a, x.b).split(/\s+/).length, 0), n = trim.end - trim.start + 1;
+  $('trimCount').textContent = n + (n === 1 ? ' sentence' : ' sentences') + ' · ' + words + ' words';
+  const is = (r) => trim.start === r[0] && trim.end === r[1], one = trim.start === trim.anchor && trim.end === trim.anchor;
+  $('trimSentence').setAttribute('aria-pressed', String(one));
+  $('trimPara').setAttribute('aria-pressed', String(is(trim.para) && !one));
+  $('trimBase').setAttribute('aria-pressed', String(is(trim.base) && !one && !is(trim.para)));
+}
+window.addEventListener('resize', () => { if (trim) paintTrim(); });
+// Dragging a handle: the edge follows the sentence under the finger.
+function dragHandle(e, edge, handle, passage) {
+  e.preventDefault();
+  handle.setPointerCapture(e.pointerId);
+  handle.classList.add('dragging');
+  const rect = handle.getBoundingClientRect(), offsetY = rect.top + rect.height / 2 - e.clientY;   // finger to the middle of the line
+  const sheet = $('marksDlg');
+  let at = { x: e.clientX, y: e.clientY };
+  const follow = () => {
+    const under = document.elementsFromPoint(at.x, at.y + offsetY).find((n) => n.classList && n.classList.contains('s') && passage.contains(n));
+    if (!under) return;
+    const before = trim[edge];
+    moveEdge(edge, Number(under.dataset.i));
+    if (trim[edge] !== before) paintTrim();
+  };
+  const move = (ev) => { at = { x: ev.clientX, y: ev.clientY }; follow(); };
+  // Held near the top or bottom of the sheet, it keeps scrolling so the edge
+  // can be taken further than what is on screen.
+  const creep = setInterval(() => {
+    const frame = sheet.getBoundingClientRect();
+    const step = at.y < frame.top + 90 ? -10 : at.y > frame.bottom - 110 ? 10 : 0;
+    if (step) { sheet.scrollTop += step; follow(); }
+  }, 16);
+  const stop = () => {
+    clearInterval(creep);
+    handle.classList.remove('dragging');
+    handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', stop); handle.removeEventListener('pointercancel', stop);
+  };
+  handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
+}
+function saveTrim() {
+  const m = trim.m, S = trim.sents;
+  // Back at what the capture setting gives: no need to remember a custom trim.
+  if (trim.start === trim.base[0] && trim.end === trim.base[1]) delete m.trim; else m.trim = [S[trim.start].a, S[trim.end].b];
+  trim = null;
+  requote(m, cur.text);
+  expanded.add(m.id);
+  save(true); renderMarks();
+  toast('Quote trimmed');
+}
+$('marksDlg').addEventListener('close', () => { trim = null; });
 
 // ---------- speech-to-text worker ----------
 let asrWorker = null, asrSeq = 0, modelState = 'idle';   // idle | loading | ready | failed
@@ -1135,8 +1386,13 @@ function applyQuote(m, text) {
   delete m.words; delete m.split; delete m.transcript;
 }
 function requote(m, text) {
-  const q = quoteAt(text, { start: m.loc[0], split: m.loc[1], end: m.loc[2] }, settings.capture);
-  m.before = q.before; m.after = q.after;
+  const point = text.starts.length ? text.starts[Math.min(m.loc[1], text.starts.length - 1)] : 0;
+  if (m.trim && m.trim[0] <= point && m.trim[1] >= point) {   // trimmed by hand: exactly those characters
+    m.before = text.text.slice(m.trim[0], point); m.after = text.text.slice(point, m.trim[1]);
+  } else {
+    const q = quoteAt(text, { start: m.loc[0], split: m.loc[1], end: m.loc[2] }, settings.capture);
+    m.before = q.before; m.after = q.after;
+  }
   // Where in the book this is, for citing: its contents entry and print page.
   if (cur && cur.text === text && text.starts.length) {
     const at = text.starts[Math.min(m.loc[1], text.starts.length - 1)];
@@ -1691,7 +1947,7 @@ $('textFile').addEventListener('change', async (e) => {
     b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
     b.fromText = { title: doc.title, author: doc.author };
     // Saved positions pointed into the old text, so they can't be re-cut against the new one.
-    for (const m of b.marks) { delete m.loc; delete m.figs; }
+    for (const m of b.marks) { delete m.loc; delete m.figs; delete m.trim; }
     delete b.anchors;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
