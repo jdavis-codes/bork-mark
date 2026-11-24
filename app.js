@@ -1,4 +1,7 @@
-import { openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt } from './align.js';
+import {
+  openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt,
+  readPdfPages, guessFirstNumbered, buildPageIndex, pageOf,
+} from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
@@ -342,7 +345,7 @@ async function openBook(id) {
   const file = await stored(id, 'audio');
   if (!file) { toast('The audio for this book is missing from this device'); return; }
   closeBook();
-  cur = { book, source: null, text: null, meta: { toc: [], pages: [] }, audioUrl: null, coverUrl: null };
+  cur = { book, source: null, text: null, meta: { toc: [], pages: [] }, pageSrc: null, audioUrl: null, coverUrl: null };
   showPlayer();
   $('title').textContent = book.title;
   $('author').textContent = book.author;
@@ -371,6 +374,14 @@ async function openBook(id) {
     if (meta) try { mine.meta = JSON.parse(await meta.text()); } catch (e) {}
     mine.text = buildBook(await f.text());
     rematch(); runQueue(); renderInfo();
+  });
+  if (book.pageSrcName) stored(id, 'pagesrc').then(async (f) => {
+    if (!f || cur !== mine) return;
+    try {
+      const src = JSON.parse(await f.text());
+      mine.pageSrc = { labels: src.labels, count: src.pages.length, index: buildPageIndex(src.pages) };
+      findPages(); renderInfo();
+    } catch (e) { /* unreadable page source: carry on without it */ }
   });
 }
 
@@ -905,7 +916,32 @@ function requote(m, text) {
     const section = entryAt(cur.meta.toc, at), page = entryAt(cur.meta.pages, at);
     m.section = section ? section.label : ''; m.page = page ? page.label : '';
   }
+  if (cur && cur.pageSrc) {   // a scanned edition, when added, decides the page
+    m.pdfPage = pageOf(cur.pageSrc.index, m.before, m.after);
+    if (m.pdfPage != null) m.page = pageLabel(cur.book, cur.pageSrc, m.pdfPage);
+  }
 }
+// ---------- page numbers from a scanned PDF ----------
+// The printed page number for a PDF page (counted from 0): the PDF's own
+// label if it has them, otherwise counted from the page set as "page 1".
+function pageLabel(b, src, i) {
+  if (src.labels) return src.labels[i] || '';
+  const n = i + 1 - ((b.pageFirst || 1) - 1);
+  return n >= 1 ? String(n) : '';
+}
+// Looks up quotes in the scan. Quotes it can't place keep whatever page they had.
+function findPages(onlyMissing) {
+  if (!cur || !cur.pageSrc) return 0;
+  let found = 0;
+  for (const m of cur.book.marks) {
+    if (m.status !== 'done') continue;
+    if (!(onlyMissing && m.pdfPage != null)) m.pdfPage = pageOf(cur.pageSrc.index, m.before, m.after);
+    if (m.pdfPage != null) { m.page = pageLabel(cur.book, cur.pageSrc, m.pdfPage); found++; }
+  }
+  save(true); renderMarks();
+  return found;
+}
+
 // Author, Title, “Chapter”, p. 12 (audiobook, 1:23:45)
 function citation(b, m) {
   const c = chapterAt(b, m.t), where = m.section || (c.count > 1 ? c.title : '');
@@ -979,8 +1015,8 @@ function icon(d, cls) {
 }
 // A value with a pencil beside it. Tapping the pencil turns the text into a
 // plain underlined field; Return or tapping away saves, Escape cancels.
-function editable(value, label, onSave) {
-  const wrap = el('span', 'editable'), text = el('span', '', value || '—');
+function editable(value, label, onSave, shown) {
+  const wrap = el('span', 'editable'), text = el('span', '', shown || value || '—');
   const btn = el('button', 'pencil');
   btn.type = 'button'; btn.setAttribute('aria-label', 'Edit ' + label); btn.append(icon(PENCIL));
   btn.addEventListener('click', () => {
@@ -1063,8 +1099,20 @@ function renderInfo() {
     }
   }
 
+  if (b.pageSrcName) {
+    row('Page PDF', b.pageSrcName + (cur.pageSrc ? ' (' + cur.pageSrc.count + ' pages)' : ''));
+    // Scans start with unnumbered front matter; this says where page 1 is.
+    if (cur.pageSrc && !cur.pageSrc.labels) {
+      row('Page 1 is', editable(String(b.pageFirst || 1), 'which PDF page is printed page 1', (typed) => {
+        const n = parseInt(typed.replace(/\D+/g, ''), 10);
+        if (n >= 1 && n <= cur.pageSrc.count) { b.pageFirst = n; findPages(true); }
+        renderInfo();
+      }, 'PDF page ' + (b.pageFirst || 1)));
+    }
+  }
   row('Audio file', b.audioName + ' (' + b.kind + ')');
   row('Added', new Date(b.added).toLocaleDateString());
+  $('pageBtnLabel').textContent = b.pageSrcName ? 'Replace page PDF' : 'Add page PDF';
   $('textStatus').textContent = b.hasText
     ? 'Text: ' + (b.textName || 'added') + '. Bookmarks quote the book’s own wording.'
     : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
@@ -1151,6 +1199,27 @@ $('textFile').addEventListener('change', async (e) => {
     toast('Book text added');
   } catch (err) {
     if (cur === mine) { renderTextStatus(); toast('Could not read that file'); }
+  }
+});
+$('pageFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || !cur) return;
+  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; };
+  try {
+    say('Reading ' + f.name + '…');
+    const pdf = await readPdfPages(f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));
+    await store('write', b.id, 'pagesrc', new Blob([JSON.stringify(pdf)], { type: 'application/json' }));
+    b.pageSrcName = f.name;
+    b.pageFirst = guessFirstNumbered(pdf.pages) || 1;
+    save(true);
+    if (cur !== mine) return;
+    mine.pageSrc = { labels: pdf.labels, count: pdf.pages.length, index: buildPageIndex(pdf.pages) };
+    const quotes = b.marks.filter((m) => m.status === 'done').length, found = findPages();
+    renderInfo();
+    toast(quotes ? 'Pages found for ' + found + ' of ' + quotes + (quotes === 1 ? ' quote' : ' quotes') : 'Page PDF added');
+  } catch (err) {
+    if (cur === mine) { renderInfo(); toast('Could not use that PDF: ' + ((err && err.message) || err)); }
   }
 });
 $('removeBtn').addEventListener('click', async () => {
@@ -1284,7 +1353,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795507486';
+const BUILD = '1795508520';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

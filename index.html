@@ -311,6 +311,7 @@
   #toast[popover] { top: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
+    max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
     position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap;
@@ -505,6 +506,7 @@
   <p id="textStatus" class="muted"></p>
   <div class="row">
     <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
+    <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
     <button id="removeBtn">Remove book</button>
   </div>
 </dialog>
