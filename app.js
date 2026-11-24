@@ -241,7 +241,7 @@ async function openBook(id) {
   $('title').textContent = book.title;
   $('author').textContent = book.author;
   $('playerError').hidden = true;
-  $('speed').value = String(book.speed || 1);
+  renderSpeed();
   $('cover').hidden = true;
   cur.audioUrl = URL.createObjectURL(await playable(file));
   audio.src = cur.audioUrl;
@@ -269,11 +269,13 @@ async function openBook(id) {
 // with a mini player along the bottom.
 function showPlayer() {
   $('library').hidden = true; $('player').hidden = false;
+  $('tabbar').hidden = false; document.body.classList.add('has-bar');
   renderMini();
   window.scrollTo(0, 0);
 }
 function showLibrary() {
   $('player').hidden = true; $('library').hidden = false;
+  $('tabbar').hidden = true; document.body.classList.remove('has-bar');
   renderLibrary(); renderMini();
   window.scrollTo(0, 0);
 }
@@ -520,12 +522,29 @@ function runAction(cfg) {
     case 'prevChapter': seek(t - c.start > 3 || c.i === 0 ? c.start : ch[c.i - 1].start); break;
   }
 }
-$('speed').addEventListener('change', () => {
-  if (!cur) return;
-  cur.book.speed = Number($('speed').value);
-  audio.playbackRate = cur.book.speed;
-  save(true);
+const SPEEDS = [0.8, 1, 1.1, 1.25, 1.5, 1.75, 2];
+function renderSpeed() {
+  const v = (cur && cur.book.speed) || 1;
+  $('speedLabel').textContent = v + '×';
+  $('speedBtn').classList.toggle('on', v !== 1);
+}
+$('speedBtn').addEventListener('click', () => {
+  const ol = $('speedList'), now = cur.book.speed || 1;
+  ol.textContent = '';
+  for (const v of SPEEDS) {
+    const btn = el('button');
+    btn.append(el('span', '', v + '×' + (v === 1 ? '  (normal)' : '')));
+    if (v === now) btn.setAttribute('aria-current', 'true');
+    btn.addEventListener('click', () => {
+      cur.book.speed = v; audio.playbackRate = v;
+      save(true); renderSpeed();
+      $('speedDlg').close();
+    });
+    const li = el('li'); li.append(btn); ol.append(li);
+  }
+  $('speedDlg').showModal();
 });
+$('speedClose').addEventListener('click', () => $('speedDlg').close());
 
 // chapters
 $('chapterBtn').addEventListener('click', () => {
