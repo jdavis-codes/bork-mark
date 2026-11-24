@@ -470,9 +470,12 @@ export function passage(book, loc) {
 // ---------- one bookmark, end to end ----------
 // Cuts the audio around time T, transcribes it with the supplied function and
 // returns the spoken words plus the index of the word at T.
-export async function transcribeAround(source, T, before, after, transcribe) {
+export async function transcribeAround(source, T, before, after, transcribe, onStage = () => {}) {
+  onStage('cutting the audio clip');
   const c = await source.clip(T - before, T + after);
+  onStage('decoding the audio clip');
   const pcm = to16kMono(await decode(c.buffer));
+  onStage('transcribing');
   const out = await transcribe(pcm);
   const words = [], times = [];
   for (const ch of out.chunks) {

@@ -64,6 +64,8 @@
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   .bar > div { height: 100%; background: var(--accent); }
   #emptyLib { margin-top: 24px; }
+  .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
+  #modelNote:empty { display: none; }
   #addBtn { width: 100%; margin-top: 16px; padding: 14px; }
 
   /* player */
@@ -122,10 +124,18 @@
 <main id="library">
   <h1>Bork Mark</h1>
   <p class="muted">Bookmark audiobooks from your headphones or watch.</p>
+  <div id="crashNote" class="note" hidden>
+    <p id="crashText"></p>
+    <div class="row" style="margin-top:8px">
+      <button id="modelRetry" class="small" hidden>Load speech model</button>
+      <button id="crashDismiss" class="small">Dismiss</button>
+    </div>
+  </div>
   <ul id="books"></ul>
   <p id="emptyLib" class="muted" hidden>No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
   <button id="addBtn" class="primary">Add a book</button>
-  <p id="storage" class="muted" style="margin-top:18px"></p>
+  <p id="modelNote" class="muted" style="margin-top:18px"></p>
+  <p id="storage" class="muted" style="margin-top:4px"></p>
   <p class="muted" style="margin-top:6px">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
 </main>
 

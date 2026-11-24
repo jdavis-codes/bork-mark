@@ -24,6 +24,21 @@ function save(now) {
   if (now) { clearTimeout(saveTimer); write(); } else if (!saveTimer) saveTimer = setTimeout(write, 4000);
 }
 
+// ---------- crash breadcrumbs ----------
+// iOS kills a page that uses too much memory without any error we can catch.
+// Noting the current heavy step lets the next launch say what was going on,
+// and stops it from walking straight back into the same crash.
+const CRUMB = 'borkmark.crumb';
+let lastCrash = null;
+try { lastCrash = JSON.parse(localStorage.getItem(CRUMB)); } catch (e) {}
+function crumb(stage) {
+  try {
+    if (stage) localStorage.setItem(CRUMB, JSON.stringify({ stage, t: Date.now(), playing: !audio.paused }));
+    else localStorage.removeItem(CRUMB);
+  } catch (e) {}
+}
+crumb(null);
+
 // ---------- small helpers ----------
 const fmt = (s) => {
   s = Math.max(0, Math.floor(s));
@@ -158,6 +173,7 @@ $('addGo').addEventListener('click', async () => {
     save(true);
     $('addDlg').close();
     await openBook(id);
+    warmModel().catch(() => {});
   } catch (err) {
     await store('remove', id).catch(() => {});
     $('addStatus').textContent = 'Could not add this book: ' + ((err && err.message) || err);
@@ -207,7 +223,7 @@ async function openBook(id) {
     setMediaSession();
   });
   openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
-    .catch((e) => { if (cur === mine) $('queueStatus').textContent = 'Cannot read this audio for quotes: ' + e.message; });
+    .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
   if (book.hasText) stored(id, 'text').then(async (f) => {
     if (!f || cur !== mine) return;
     mine.text = buildBook(await f.text());
@@ -444,31 +460,65 @@ function renderMarks() {
 }
 
 // ---------- speech-to-text worker ----------
-let asrWorker = null, asrPending = null, asrSeq = 0;
-function transcribe(pcm) {
+let asrWorker = null, asrSeq = 0, modelState = 'idle';   // idle | loading | ready | failed
+const asrJobs = new Map();
+function asrRequest(pcm) {
   if (!asrWorker) {
     asrWorker = new Worker('./align-worker.js', { type: 'module' });
     asrWorker.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'progress' && m.total) {
-        $('queueStatus').textContent = 'Downloading the speech model (one time): ' + Math.round(100 * m.loaded / m.total) + '%';
-      } else if (m.type === 'stage') {
-        $('queueStatus').textContent = 'Finding quotes…';
-      } else if (asrPending && m.id === asrPending.id) {
-        const p = asrPending; asrPending = null;
-        if (m.type === 'done') p.resolve(m); else p.reject(new Error(m.message));
+        setQueueStatus('Downloading the speech model (one time): ' + Math.round(100 * m.loaded / m.total) + '%');
+        return;
       }
+      const job = asrJobs.get(m.id);
+      if (!job) return;
+      asrJobs.delete(m.id);
+      if (m.type === 'done') job.resolve(m); else job.reject(new Error(m.message));
     };
     asrWorker.onerror = (e) => {
-      if (asrPending) { const p = asrPending; asrPending = null; p.reject(new Error(e.message || 'speech model failed to start')); }
-      asrWorker = null;
+      for (const job of asrJobs.values()) job.reject(new Error(e.message || 'speech model failed to start'));
+      asrJobs.clear();
+      asrWorker = null; modelState = 'idle';
     };
   }
   return new Promise((resolve, reject) => {
-    asrPending = { id: ++asrSeq, resolve, reject };
-    asrWorker.postMessage({ id: asrPending.id, audio: pcm, model: MODEL, device: 'wasm' }, [pcm.buffer]);
+    const id = ++asrSeq;
+    asrJobs.set(id, { resolve, reject });
+    asrWorker.postMessage({ id, audio: pcm || null, model: MODEL, device: 'wasm' }, pcm ? [pcm.buffer] : []);
   });
 }
+const transcribe = (pcm) => asrRequest(pcm);
+
+// Loads the speech model ahead of time, so the first bookmark doesn't have
+// to do it in the middle of playback.
+let warming = null;
+function warmModel() {
+  if (modelState === 'ready') return Promise.resolve();
+  if (warming) return warming;
+  modelState = 'loading';
+  crumb('loading the speech model');
+  setQueueStatus('Getting the speech model ready…');
+  warming = asrRequest(null).then(() => {
+    modelState = 'ready';
+  }, (err) => {
+    modelState = 'failed';
+    setQueueStatus('Speech model could not load: ' + err.message);
+    throw err;
+  }).finally(() => {
+    warming = null; crumb(null);
+    if (modelState === 'ready') setQueueStatus('');
+    renderModelNote();
+  });
+  renderModelNote();
+  return warming;
+}
+
+function setQueueStatus(msg) {
+  $('queueStatus').textContent = msg;
+  $('modelNote').textContent = msg || (modelState === 'ready' ? 'Speech model ready.' : '');
+}
+function renderModelNote() { setQueueStatus($('queueStatus').textContent); }
 
 function applyQuote(m, text) {
   const q = quoteFor(text, m.words, m.split);
@@ -499,21 +549,25 @@ async function runQueue() {
       if (cur !== mine || document.visibilityState === 'hidden') break;
       const m = [...mine.book.marks].reverse().find((x) => x.status === 'pending');
       if (!m) break;
-      m.status = 'working'; renderMarks();
-      $('queueStatus').textContent = 'Finding quotes…';
+      // Saved before starting, so a crash here is not retried automatically.
+      m.status = 'working'; save(true); renderMarks();
       try {
-        const r = await transcribeAround(mine.source, m.t, CLIP_BEFORE, CLIP_AFTER, transcribe);
+        await warmModel();
+        setQueueStatus('Finding quotes…');
+        const r = await transcribeAround(mine.source, m.t, CLIP_BEFORE, CLIP_AFTER, transcribe, crumb);
         m.words = r.words; m.split = r.split; m.transcript = r.transcript;
         if (mine.text) applyQuote(m, mine.text); else m.status = 'transcribed';
       } catch (err) {
         m.status = 'error'; m.error = String((err && err.message) || err);
       }
+      crumb(null);
       save(true);
       if (cur === mine) renderMarks();
     }
   } finally {
     queueBusy = false;
-    if (cur === mine) $('queueStatus').textContent = '';
+    crumb(null);
+    if (modelState !== 'failed') setQueueStatus('');
   }
 }
 
@@ -556,8 +610,28 @@ $('removeBtn').addEventListener('click', async () => {
   renderLibrary();
 });
 
-// A bookmark interrupted mid-transcription goes back in the queue.
-for (const b of state.books) for (const m of b.marks) if (m.status === 'working') m.status = 'pending';
+// A bookmark that was mid-transcription when the app closed is not retried
+// automatically: if it crashed the app once, it would do so on every launch.
+for (const b of state.books) {
+  for (const m of b.marks) {
+    if (m.status === 'working') { m.status = 'error'; m.error = 'The app closed while finding this quote. Tap Retry to try again.'; }
+  }
+}
+save(true);
+
+if (lastCrash) {
+  $('crashNote').hidden = false;
+  $('crashText').textContent = 'Last time, the app closed unexpectedly while ' + lastCrash.stage
+    + (lastCrash.playing ? ' (audio was playing).' : '.') + ' Bookmarks are safe; any unfinished quote has a Retry button.';
+}
+$('crashDismiss').addEventListener('click', () => { $('crashNote').hidden = true; });
+$('modelRetry').addEventListener('click', () => { $('crashNote').hidden = true; warmModel().catch(() => {}); });
+
+// Load the model at launch, before any audio is playing. Skipped once after
+// a crash during loading so the app can't get stuck in a crash loop.
+const crashedLoading = lastCrash && /speech model/.test(lastCrash.stage);
+$('modelRetry').hidden = !crashedLoading;
+if (state.books.length && !crashedLoading) warmModel().catch(() => {});
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

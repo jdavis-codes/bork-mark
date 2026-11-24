@@ -4,27 +4,33 @@ import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers
 let asr = null;
 let loadedKey = '';
 
+async function ensure(model, device) {
+  const key = model + '|' + device;
+  if (key === loadedKey) return 0;
+  const t0 = performance.now();
+  asr = null; loadedKey = '';
+  asr = await pipeline('automatic-speech-recognition', model, {
+    device,
+    dtype: device === 'webgpu'
+      ? { encoder_model: 'fp32', decoder_model_merged: 'q4' }
+      : 'q8',
+    progress_callback: (p) => {
+      if (p.status === 'progress') {
+        self.postMessage({ type: 'progress', file: p.file, loaded: p.loaded, total: p.total });
+      }
+    },
+  });
+  loadedKey = key;
+  return performance.now() - t0;
+}
+
 self.onmessage = async (e) => {
   const { id, audio, model, device } = e.data;
   try {
-    const key = model + '|' + device;
-    let loadMs = 0;
-    if (key !== loadedKey) {
-      const t0 = performance.now();
-      asr = null; loadedKey = '';
-      asr = await pipeline('automatic-speech-recognition', model, {
-        device,
-        dtype: device === 'webgpu'
-          ? { encoder_model: 'fp32', decoder_model_merged: 'q4' }
-          : 'q8',
-        progress_callback: (p) => {
-          if (p.status === 'progress') {
-            self.postMessage({ type: 'progress', file: p.file, loaded: p.loaded, total: p.total });
-          }
-        },
-      });
-      loadedKey = key;
-      loadMs = performance.now() - t0;
+    const loadMs = await ensure(model, device);
+    if (!audio) {   // warm-up request: load the model and report back
+      self.postMessage({ type: 'done', id, loadMs });
+      return;
     }
     self.postMessage({ type: 'stage', stage: 'transcribing' });
     const t1 = performance.now();
