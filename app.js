@@ -115,6 +115,7 @@ function closeSheet(d) {
   if (!d.open || d.classList.contains('closing')) return;
   const finish = () => {
     d.classList.remove('closing'); d.close();
+    d.style.transform = ''; d.style.transition = '';
     if (byTouch && document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   };
   if (calm.matches) { finish(); return; }
@@ -129,6 +130,50 @@ for (const d of document.querySelectorAll('dialog')) {
     const r = d.getBoundingClientRect();
     if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeSheet(d);
   });
+}
+
+// Swipe down to close a sheet. The sheet follows the finger; letting go past
+// a third of the way, or with a quick flick, closes it, otherwise it springs
+// back. A swipe starts from the sheet's header at any time, or from anywhere
+// in the sheet once its content is scrolled to the top, so it never fights
+// with scrolling a long list. Sliders and text fields are left alone.
+for (const d of document.querySelectorAll('dialog.bottom, #settingsDlg')) {
+  let g = null;
+  d.addEventListener('touchstart', (e) => {
+    g = null;
+    if (e.touches.length !== 1 || d.classList.contains('closing')) return;
+    if (e.target.closest('input, select, textarea')) return;
+    const header = d.firstElementChild;
+    const inHeader = (header && header.contains(e.target)) || e.touches[0].clientY - d.getBoundingClientRect().top < 48;
+    if (!inHeader && d.scrollTop > 0) return;
+    g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };
+  }, { passive: true });
+  d.addEventListener('touchmove', (e) => {
+    if (!g) return;
+    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
+    if (!g.dragging) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;                  // not moved enough to tell
+      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }   // upward or sideways: not ours
+      g.dragging = true;
+      d.style.transition = 'none';
+    }
+    if (e.cancelable) e.preventDefault();
+    g.dy = Math.max(0, dy);
+    d.style.transform = 'translateY(' + g.dy + 'px)';
+  }, { passive: false });
+  const release = (e) => {
+    const was = g;
+    g = null;
+    if (!was || !was.dragging) return;
+    const speed = was.dy / Math.max(1, e.timeStamp - was.at);             // pixels per millisecond
+    const far = was.dy > Math.min(140, d.offsetHeight / 3);
+    if (e.type === 'touchend' && (far || (speed > 0.5 && was.dy > 30))) { closeSheet(d); return; }
+    d.style.transition = 'transform 0.2s';
+    d.style.transform = '';
+    setTimeout(() => { d.style.transition = ''; }, 220);
+  };
+  d.addEventListener('touchend', release);
+  d.addEventListener('touchcancel', release);
 }
 
 let toastTimer = null;
@@ -1239,7 +1284,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795507236';
+const BUILD = '1795507486';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

@@ -164,6 +164,16 @@
     html { min-height: calc(100% + env(safe-area-inset-top)); }
   }
 
+  /* a grab handle shows that sheets can be pulled down */
+  dialog.bottom, #settingsDlg { overscroll-behavior: none; }
+  dialog.bottom::before {
+    content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: -6px auto 10px;
+  }
+  .sheethead::before {
+    content: ""; position: absolute; left: 50%; top: calc(5px + env(safe-area-inset-top)); width: 38px; height: 4px;
+    margin-left: -19px; border-radius: 2px; background: var(--line);
+  }
+
   /* sheet motion */
   @keyframes sheet-up { from { transform: translateY(100%); } }
   @keyframes sheet-down { to { transform: translateY(100%); } }
