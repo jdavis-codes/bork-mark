@@ -6,7 +6,6 @@ const audio = $('audio');
 const KEY = 'borkmark.v1';
 const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
 const CLIP_BEFORE = 45, CLIP_AFTER = 15;   // seconds of audio transcribed around a bookmark
-const SKIP = 30;                           // seconds for the skip buttons
 const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
 
 // ---------- saved state ----------
@@ -15,6 +14,22 @@ try {
   const saved = JSON.parse(localStorage.getItem(KEY));
   if (saved && Array.isArray(saved.books)) state = saved;
 } catch (e) { /* storage unavailable: run without persistence */ }
+
+// What each button does. `next` and `prev` are the track buttons a headset or
+// watch sends; an action is mark | fwd | back | nextChapter | prevChapter | none.
+const DEFAULTS = {
+  next: { action: 'mark', secs: 30 },
+  prev: { action: 'mark', secs: 30 },
+  skipBack: 30, skipFwd: 30,     // on-screen and lock-screen skip buttons
+  lockSeek: true,                // lock screen shows skip buttons rather than track buttons
+  bgQuotes: false,               // find quotes while the phone is locked
+};
+const settings = state.settings = {
+  ...DEFAULTS, ...(state.settings || {}),
+  next: { ...DEFAULTS.next, ...((state.settings || {}).next || {}) },
+  prev: { ...DEFAULTS.prev, ...((state.settings || {}).prev || {}) },
+};
+const canWork = () => document.visibilityState !== 'hidden' || settings.bgQuotes;
 let saveTimer = null;
 function save(now) {
   const write = () => {
@@ -275,7 +290,8 @@ audio.addEventListener('pause', syncPlayState);
 audio.addEventListener('ratechange', updatePositionState);
 audio.addEventListener('seeked', updatePositionState);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') { if (cur) save(true); } else runQueue();
+  if (document.visibilityState === 'hidden') { if (cur) save(true); }
+  runQueue();
 });
 
 function renderTime(t) {
@@ -307,8 +323,22 @@ $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('
 $('playBtn').addEventListener('click', () => {
   if (audio.paused) audio.play().catch((e) => toast('Cannot play: ' + e.message)); else audio.pause();
 });
-$('backward').addEventListener('click', () => seek(audio.currentTime - SKIP));
-$('forward').addEventListener('click', () => seek(audio.currentTime + SKIP));
+$('backward').addEventListener('click', () => seek(audio.currentTime - settings.skipBack));
+$('forward').addEventListener('click', () => seek(audio.currentTime + settings.skipFwd));
+
+// Runs whatever a track button is set to do.
+function runAction(cfg) {
+  if (!cur) return;
+  const t = audio.currentTime, c = chapterAt(cur.book, t), ch = chaptersOf(cur.book);
+  switch (cfg.action) {
+    case 'mark': addMark(); break;
+    case 'fwd': seek(t + cfg.secs); break;
+    case 'back': seek(t - cfg.secs); break;
+    case 'nextChapter': if (c.i + 1 < ch.length) seek(ch[c.i + 1].start); break;
+    // Like a music player: first press returns to the chapter start.
+    case 'prevChapter': seek(t - c.start > 3 || c.i === 0 ? c.start : ch[c.i - 1].start); break;
+  }
+}
 $('speed').addEventListener('change', () => {
   if (!cur) return;
   cur.book.speed = Number($('speed').value);
@@ -346,12 +376,12 @@ function setMediaSession() {
   const on = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) {} };
   on('play', () => audio.play().catch(() => {}));
   on('pause', () => audio.pause());
-  // Seek buttons show on the lock screen; the watch and headphones still send
-  // next / previous, which is what drops a bookmark.
-  on('seekbackward', (d) => seek(audio.currentTime - ((d && d.seekOffset) || SKIP)));
-  on('seekforward', (d) => seek(audio.currentTime + ((d && d.seekOffset) || SKIP)));
-  on('nexttrack', () => addMark());
-  on('previoustrack', () => addMark());
+  // With seek handlers set, the lock screen shows skip buttons, while a watch
+  // or headset still sends next / previous.
+  on('seekbackward', settings.lockSeek ? () => seek(audio.currentTime - settings.skipBack) : null);
+  on('seekforward', settings.lockSeek ? () => seek(audio.currentTime + settings.skipFwd) : null);
+  on('nexttrack', settings.next.action === 'none' ? null : () => runAction(settings.next));
+  on('previoustrack', settings.prev.action === 'none' ? null : () => runAction(settings.prev));
 }
 function updatePositionState() {
   if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
@@ -540,13 +570,13 @@ function rematch() {
 
 let queueBusy = false;
 async function runQueue() {
-  if (queueBusy || !cur || !cur.source || document.visibilityState === 'hidden') return;
+  if (queueBusy || !cur || !cur.source || !canWork()) return;
   if (cur.book.hasText && !cur.text) return;   // text still loading
   queueBusy = true;
   const mine = cur;
   try {
     for (;;) {
-      if (cur !== mine || document.visibilityState === 'hidden') break;
+      if (cur !== mine || !canWork()) break;
       const m = [...mine.book.marks].reverse().find((x) => x.status === 'pending');
       if (!m) break;
       // Saved before starting, so a crash here is not retried automatically.
@@ -609,6 +639,38 @@ $('removeBtn').addEventListener('click', async () => {
   $('player').hidden = true; $('library').hidden = false;
   renderLibrary();
 });
+
+// ---------- settings ----------
+const clampSecs = (v, fallback) => { const n = Math.round(Number(v)); return n >= 1 && n <= 600 ? n : fallback; };
+function renderSettings() {
+  for (const k of ['next', 'prev']) {
+    $(k + 'Action').value = settings[k].action;
+    $(k + 'Secs').value = settings[k].secs;
+    $(k + 'SecsRow').hidden = settings[k].action !== 'fwd' && settings[k].action !== 'back';
+  }
+  $('skipBack').value = settings.skipBack; $('skipFwd').value = settings.skipFwd;
+  $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
+  $('bgQuotes').checked = settings.bgQuotes;
+  $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
+  $('backward').setAttribute('aria-label', 'Back ' + settings.skipBack + ' seconds');
+  $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
+}
+function readSettings() {
+  for (const k of ['next', 'prev']) {
+    settings[k].action = $(k + 'Action').value;
+    settings[k].secs = clampSecs($(k + 'Secs').value, settings[k].secs);
+  }
+  settings.skipBack = clampSecs($('skipBack').value, settings.skipBack);
+  settings.skipFwd = clampSecs($('skipFwd').value, settings.skipFwd);
+  settings.lockSeek = $('lockSeek').value === 'skip';
+  settings.bgQuotes = $('bgQuotes').checked;
+  save(true);
+  renderSettings(); setMediaSession(); runQueue();
+}
+$('settingsDlg').addEventListener('change', readSettings);
+for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); });
+$('settingsClose').addEventListener('click', () => $('settingsDlg').close());
+renderSettings();
 
 // A bookmark that was mid-transcription when the app closed is not retried
 // automatically: if it crashed the app once, it would do so on every launch.

@@ -111,6 +111,12 @@
   #chapList button[aria-current=true] { color: var(--accent); font-weight: 600; }
   #chapList span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
   .picked { overflow-wrap: anywhere; margin: 6px 0 14px; }
+  h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 22px 0 8px; }
+  .field { margin-top: 12px; }
+  .field label { font-weight: 600; }
+  .field select { width: 100%; margin-top: 6px; }
+  input[type=number] { font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; width: 5em; }
+  #settingsDlg { overflow-y: auto; }
   #toast {
     position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
@@ -122,7 +128,7 @@
 <body>
 
 <main id="library">
-  <h1>Bork Mark</h1>
+  <div class="row spread"><h1>Bork Mark</h1><button id="settingsBtn" class="small">Settings</button></div>
   <p class="muted">Bookmark audiobooks from your headphones or watch.</p>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
@@ -142,6 +148,8 @@
 <main id="player" hidden>
   <div class="row spread">
     <button id="backBtn" class="plain">‹ Library</button>
+    <span style="flex:1"></span>
+    <button id="settingsBtn2" class="small">Settings</button>
     <select id="speed" aria-label="Playback speed">
       <option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.1">1.1×</option>
       <option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option>
@@ -157,13 +165,13 @@
 
   <div class="transport">
     <button id="backward" aria-label="Back 30 seconds">
-      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4.5h4.5"/><text x="12" y="14.8" text-anchor="middle">30</text></svg>
+      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v4.5h4.5"/><text id="backwardLabel" x="12" y="14.8" text-anchor="middle">30</text></svg>
     </button>
     <button id="playBtn" aria-label="Play">
       <svg viewBox="0 0 24 24"><path id="playIcon" d="M8 5v14l11-7z"/></svg>
     </button>
     <button id="forward" aria-label="Forward 30 seconds">
-      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/><text x="12" y="14.8" text-anchor="middle">30</text></svg>
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/><text id="forwardLabel" x="12" y="14.8" text-anchor="middle">30</text></svg>
     </button>
   </div>
 
@@ -200,6 +208,55 @@
     <button id="addCancel">Cancel</button>
     <button id="addGo" class="primary" disabled>Add</button>
   </div>
+</dialog>
+
+<dialog id="settingsDlg">
+  <div class="row spread"><h2>Settings</h2><button id="settingsClose" class="small">Done</button></div>
+
+  <h3>Headphone and watch buttons</h3>
+    <div class="field">
+      <label for="nextAction">Next track</label>
+      <p class="muted">Usually a double-press on headphones.</p>
+      <select id="nextAction">
+          <option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option>
+          <option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option>
+      </select>
+      <div id="nextSecsRow" class="row" style="margin-top:8px" hidden>
+        <label for="nextSecs">Seconds</label><input id="nextSecs" type="number" inputmode="numeric" min="1" max="600">
+      </div>
+    </div>
+    <div class="field">
+      <label for="prevAction">Previous track</label>
+      <p class="muted">Usually a triple-press on headphones.</p>
+      <select id="prevAction">
+          <option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option>
+          <option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option>
+      </select>
+      <div id="prevSecsRow" class="row" style="margin-top:8px" hidden>
+        <label for="prevSecs">Seconds</label><input id="prevSecs" type="number" inputmode="numeric" min="1" max="600">
+      </div>
+    </div>
+
+  <h3>Skip buttons</h3>
+  <p class="muted">The two round buttons in the player, and the lock screen when it shows skip buttons.</p>
+  <div class="row" style="margin-top:8px">
+    <label for="skipBack">Back</label><input id="skipBack" type="number" inputmode="numeric" min="1" max="600">
+    <label for="skipFwd">Forward</label><input id="skipFwd" type="number" inputmode="numeric" min="1" max="600">
+    <span class="muted">seconds</span>
+  </div>
+
+  <h3>Lock screen</h3>
+  <div class="field">
+    <label for="lockSeek">Buttons shown</label>
+    <select id="lockSeek">
+      <option value="skip">Skip back / forward</option>
+      <option value="track">Previous / next track (same as headphones)</option>
+    </select>
+  </div>
+  <label class="row" style="margin-top:14px; flex-wrap:nowrap; align-items:flex-start">
+    <input id="bgQuotes" type="checkbox" style="margin-top:4px">
+    <span>Find quotes while the phone is locked<br><span class="muted">Experimental. Only works while audio is playing, and if iOS runs short of memory it may close the app and stop playback.</span></span>
+  </label>
 </dialog>
 
 <dialog id="chapDlg">
