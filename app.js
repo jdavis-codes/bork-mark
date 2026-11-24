@@ -134,11 +134,19 @@ for (const d of document.querySelectorAll('dialog')) {
 
 let toastTimer = null;
 function toast(msg) {
-  $('toast').textContent = msg;
-  $('toast').classList.add('show');
+  const t = $('toast');
+  t.textContent = msg;
+  // Shown as a popover so it sits above any open sheet rather than behind it.
+  if (t.showPopover) { try { t.hidePopover(); } catch (e) {} try { t.showPopover(); } catch (e) {} }
+  t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => { if (!t.classList.contains('show') && t.hidePopover) { try { t.hidePopover(); } catch (e) {} } }, 250);
+  }, 2200);
 }
+// iOS only shows a button's pressed look if the page listens for touches.
+document.addEventListener('touchstart', () => {}, { passive: true });
 
 // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
 // without one, so label the blob from its first bytes.
@@ -916,36 +924,121 @@ async function runQueue() {
 // ---------- sheets: bookmarks and book info ----------
 $('marksBtn').addEventListener('click', () => { renderMarks(); $('marksDlg').showModal(); $('marksDlg').scrollTop = 0; });
 $('marksClose').addEventListener('click', () => closeSheet($('marksDlg')));
+const PENCIL = 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4';
+function icon(d, cls) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  if (cls) svg.setAttribute('class', cls);
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d); svg.append(path);
+  return svg;
+}
+// A value with a pencil beside it. Tapping the pencil turns the text into a
+// plain underlined field; Return or tapping away saves, Escape cancels.
+function editable(value, label, onSave) {
+  const wrap = el('span', 'editable'), text = el('span', '', value || '—');
+  const btn = el('button', 'pencil');
+  btn.type = 'button'; btn.setAttribute('aria-label', 'Edit ' + label); btn.append(icon(PENCIL));
+  btn.addEventListener('click', () => {
+    const input = el('input', 'inline');
+    input.type = 'text'; input.value = value; input.setAttribute('aria-label', label);
+    input.autocomplete = 'off'; input.enterKeyHint = 'done';
+    let done = false;
+    const finish = (keep) => { if (done) return; done = true; if (keep) onSave(input.value.trim()); else renderInfo(); };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') { e.stopPropagation(); finish(false); } });
+    input.addEventListener('blur', () => finish(true));
+    wrap.replaceChildren(input);
+    input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+  });
+  wrap.append(text, btn);
+  return wrap;
+}
+
+let chaptersOpen = false, chapStatusText = '';
 function renderInfo() {
   if (!cur) return;
-  const b = cur.book;
-  for (const f of ['title', 'author']) {
-    const cap = f === 'title' ? 'Title' : 'Author';
-    $('edit' + cap).value = b[f];
-    // Say where the value came from, and what the other source says if it differs.
-    const notes = [SOURCES[b.src[f]]];
-    if (b.src[f] !== 'audio' && b.fromAudio[f] && b.fromAudio[f] !== b[f]) notes.push('The audio file says “' + b.fromAudio[f] + '”.');
-    if (b.src[f] === 'you' && b.fromText[f] && b.fromText[f] !== b[f]) notes.push('The book text says “' + b.fromText[f] + '”.');
-    $(f + 'Src').textContent = notes.join(' ');
-    $(f + 'Reset').hidden = b.src[f] !== 'you';
-  }
-  const ch = b.chapters || [], n = ch.length;
-  const fromText = ch.filter((c) => c.src === 'text').length, byYou = ch.filter((c) => c.src === 'you').length;
-  $('chapSrc').textContent = n < 2 ? 'This audio file has no chapters.'
-    : n + ' chapters, timed by the audio file. Names: ' + [n - fromText - byYou && (n - fromText - byYou) + ' from the audio file',
-      fromText && fromText + ' matched to the book’s contents', byYou && byYou + ' edited by you'].filter(Boolean).join(', ') + '.';
-  $('chapEdit').hidden = n < 2;
-  $('chapReset').hidden = !b.audioChapters;
-  const canName = n > 1 && cur.text && cur.meta.toc.length > 0;
-  $('chapAuto').hidden = !canName;
-  $('chapAuto').disabled = naming;
-  $('pageStatus').textContent = !b.hasText ? '' : !/\.epub$/i.test(b.textName || '') ? 'Plain text has no contents list or page numbers.'
-    : (cur.meta.toc.length ? cur.meta.toc.length + ' contents entries. ' : 'No contents list found. ')
-      + (cur.meta.pages.length ? cur.meta.pages.length + ' print page numbers, so quotes can cite pages.' : 'This EPUB has no print page numbers, so quotes cite the chapter instead.');
-  const dl = $('infoList');
+  const b = cur.book, dl = $('infoList');
   dl.textContent = '';
-  const rows = [['Length', fmt(b.duration)], ['Audio file', b.audioName + ' (' + b.kind + ')'], ['Added', new Date(b.added).toLocaleDateString()]];
-  for (const [k, v] of rows) dl.append(el('dt', '', k), el('dd', '', v));
+  const row = (label, value, note) => {
+    const dd = el('dd');
+    dd.append(typeof value === 'string' ? document.createTextNode(value) : value);
+    if (note) dd.append(typeof note === 'string' ? el('div', 'subnote', note) : note);
+    dl.append(el('dt', '', label), dd);
+    return dd;
+  };
+
+  for (const f of ['title', 'author']) {
+    // Where the value came from, and what the other source says if it differs.
+    const note = el('div', 'subnote', SOURCES[b.src[f]]);
+    if (b.src[f] !== 'audio' && b.fromAudio[f] && b.fromAudio[f] !== b[f]) note.append(' Audio file: “' + b.fromAudio[f] + '”.');
+    if (b.src[f] === 'you' && b.fromText[f] && b.fromText[f] !== b[f]) note.append(' Book text: “' + b.fromText[f] + '”.');
+    if (b.src[f] === 'you') {
+      const reset = el('button', 'linkbtn', 'Reset');
+      reset.addEventListener('click', () => { delete b.edited[f]; metaChanged(); });
+      note.append(' ', reset);
+    }
+    row(f === 'title' ? 'Title' : 'Author', editable(b[f], f, (typed) => {
+      const auto = b.fromText[f] || b.fromAudio[f] || '';
+      if (!typed || typed === auto) delete b.edited[f]; else b.edited[f] = typed;
+      metaChanged();
+    }), note);
+  }
+  row('Length', fmt(b.duration));
+
+  const ch = b.chapters || [], n = ch.length;
+  if (n < 2) {
+    row('Chapters', 'none in this audio file');
+  } else {
+    const fromText = ch.filter((c) => c.src === 'text').length, byYou = ch.filter((c) => c.src === 'you').length;
+    const toggle = el('button', 'disclose', String(n));
+    toggle.setAttribute('aria-expanded', String(chaptersOpen));
+    toggle.setAttribute('aria-label', n + ' chapters, ' + (chaptersOpen ? 'hide' : 'show') + ' list');
+    toggle.append(icon('M6 9l6 6 6-6'));
+    toggle.addEventListener('click', () => { chaptersOpen = !chaptersOpen; renderInfo(); });
+    row('Chapters', toggle, 'Names: ' + [n - fromText - byYou && (n - fromText - byYou) + ' from the audio file',
+      fromText && fromText + ' from the book’s contents', byYou && byYou + ' edited by you'].filter(Boolean).join(', ') + '.');
+    if (chaptersOpen) {
+      const box = el('div', 'chapbox'), ol = el('ol');
+      ch.forEach((c, k) => {
+        const li = el('li');
+        li.append(el('span', 'muted', fmt(c.start)), editable(c.title, 'name of chapter ' + (k + 1), (typed) => {
+          if (typed && typed !== c.title) { keepAudioChapters(b); c.title = typed; c.src = 'you'; }
+          chaptersChanged();
+        }));
+        ol.append(li);
+      });
+      const tools = el('div', 'row');
+      if (cur.text && cur.meta.toc.length) {
+        const auto = el('button', 'small', 'Name from book text');
+        auto.disabled = naming;
+        auto.addEventListener('click', nameChapters);
+        tools.append(auto);
+      }
+      if (b.audioChapters) {
+        const reset = el('button', 'small', 'Reset names');
+        reset.addEventListener('click', () => {
+          if (!confirm('Put back the chapter names from the audio file?')) return;
+          b.chapters = b.audioChapters; delete b.audioChapters;
+          chaptersChanged();
+        });
+        tools.append(reset);
+      }
+      const status = el('p', 'subnote', chapStatusText);
+      status.id = 'chapStatus';
+      box.append(ol, tools, status);
+      dl.append(box);
+    }
+  }
+
+  const isEpub = /\.epub$/i.test(b.textName || '');
+  row('Book text', b.hasText ? (b.textName || 'added') : 'none yet',
+    !b.hasText ? 'Bookmarks show what the app heard. Add the EPUB for exact quotes.'
+      : !isEpub ? 'Plain text: no contents list or page numbers.'
+        : (cur.meta.toc.length ? cur.meta.toc.length + ' contents entries. ' : 'No contents list. ')
+          + (cur.meta.pages.length ? cur.meta.pages.length + ' print page numbers, so quotes cite pages.' : 'No print page numbers, so quotes cite the chapter.'));
+  row('Audio file', b.audioName + ' (' + b.kind + ')');
+  row('Added', new Date(b.added).toLocaleDateString());
+  $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
 }
 // Title and author changed: update everywhere they show.
 function metaChanged() {
@@ -954,17 +1047,7 @@ function metaChanged() {
   $('title').textContent = b.title; $('author').textContent = b.author;
   setMediaSession(); renderInfo();
 }
-for (const f of ['title', 'author']) {
-  const cap = f === 'title' ? 'Title' : 'Author';
-  $('edit' + cap).addEventListener('change', (e) => {
-    const b = cur.book, typed = e.target.value.trim();
-    const auto = b.fromText[f] || b.fromAudio[f] || '';
-    if (!typed || typed === auto) delete b.edited[f]; else b.edited[f] = typed;
-    metaChanged();
-  });
-  $(f + 'Reset').addEventListener('click', () => { delete cur.book.edited[f]; metaChanged(); });
-}
-$('infoBtn').addEventListener('click', () => { renderInfo(); renderTextStatus(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
+$('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 
 // ---------- chapter names ----------
@@ -973,31 +1056,6 @@ function chaptersChanged() {
   save(true); renderInfo();
   renderTime(audio.currentTime || cur.book.position || 0); renderMarks();
 }
-$('chapEdit').addEventListener('click', () => {
-  const b = cur.book, ol = $('chapEditList');
-  ol.textContent = '';
-  b.chapters.forEach((ch, i) => {
-    const li = el('li'), input = el('input', 'textin');
-    input.type = 'text'; input.value = ch.title; input.setAttribute('aria-label', 'Name of chapter ' + (i + 1));
-    input.addEventListener('change', () => {
-      const typed = input.value.trim();
-      if (!typed || typed === ch.title) { input.value = ch.title; return; }
-      keepAudioChapters(b);
-      ch.title = typed; ch.src = 'you';
-      chaptersChanged();
-    });
-    li.append(el('span', 'muted', fmt(ch.start)), input);
-    ol.append(li);
-  });
-  $('chapEditDlg').showModal(); $('chapEditDlg').scrollTop = 0;
-});
-$('chapEditClose').addEventListener('click', () => closeSheet($('chapEditDlg')));
-$('chapReset').addEventListener('click', () => {
-  const b = cur.book;
-  if (!b.audioChapters || !confirm('Put back the chapter names from the audio file?')) return;
-  b.chapters = b.audioChapters; delete b.audioChapters;
-  chaptersChanged();
-});
 
 // Names chapters from the book's contents list. The audio file knows when
 // each chapter starts but often not what it is called; the EPUB knows the
@@ -1006,9 +1064,10 @@ $('chapReset').addEventListener('click', () => {
 let naming = false;
 const LISTEN = 25;        // seconds heard at the start of each chapter
 const NEAR_START = 1500;  // characters: how close to a contents entry counts as its beginning
-$('chapAuto').addEventListener('click', async () => {
+async function nameChapters() {
   if (naming || !cur || !cur.text || !cur.source) return;
-  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('chapStatus').textContent = msg; };
+  const mine = cur, b = mine.book;
+  const say = (msg) => { if (cur !== mine) return; chapStatusText = msg; const p = $('chapStatus'); if (p) p.textContent = msg; };
   naming = true; renderInfo();
   let named = 0;
   try {
@@ -1037,23 +1096,17 @@ $('chapAuto').addEventListener('click', async () => {
   naming = false; crumb(null);
   if (cur === mine) chaptersChanged();
   runQueue();
-});
+}
 
 // ---------- book text and removal ----------
-function renderTextStatus() {
-  const b = cur.book;
-  $('textStatus').textContent = b.hasText
-    ? (b.textName || 'Added') + '. Bookmarks quote the book’s own wording.'
-    : 'None yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
-  $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
-}
+const renderTextStatus = renderInfo;
 $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
   const mine = cur, b = mine.book;
   try {
-    $('textStatus').textContent = 'Reading ' + f.name + '…';
+    toast('Reading ' + f.name + '…');
     const doc = await readBook(f);
     await storeText(b.id, doc);
     b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
@@ -1199,18 +1252,43 @@ $('appReload').addEventListener('click', async () => {
   } catch (e) { /* offline: reload with what we have */ }
   location.reload();
 });
-// When the published app files last changed, so it's clear what is running.
+// Every published build has a number, here and in version.json. When the
+// server's number differs from this one, a newer version is waiting.
+const BUILD = '1795507126';
+const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+async function latestBuild() {
+  const res = await fetch('version.json', { cache: 'no-store' });
+  return String((await res.json()).build);
+}
 async function showVersion() {
+  const mine = 'This version: ' + buildDate(BUILD) + '.';
+  $('appVersion').textContent = mine;
   try {
-    const res = await fetch('app.js', { method: 'HEAD', cache: 'no-cache' });
-    const when = new Date(res.headers.get('last-modified'));
-    if (isNaN(when)) throw new Error('no date');
-    $('appVersion').textContent = 'Latest version published ' + when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) + '. Reload to make sure you are running it.';
+    const latest = await latestBuild();
+    $('appVersion').textContent = mine + (latest === BUILD ? ' Up to date.' : ' A newer one (' + buildDate(latest) + ') is available: tap Reload app.');
   } catch (e) {
-    $('appVersion').textContent = 'Could not check for a newer version (offline?).';
+    $('appVersion').textContent = mine + ' Could not check for a newer one (offline?).';
   }
 }
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showVersion);
+// On launch and whenever the app comes back to the screen: if a newer build
+// is published and nothing is playing or open, switch to it straight away.
+// Remembering the build it reloaded for stops this from looping.
+async function autoUpdate() {
+  try {
+    const latest = await latestBuild();
+    if (latest === BUILD || sessionStorage.getItem('borkmark.reloadedFor') === latest) return;
+    if (!audio.paused || document.querySelector('dialog[open]')) return;
+    sessionStorage.setItem('borkmark.reloadedFor', latest);
+    log('updating to build ' + latest);
+    if (cur) { cur.book.position = audio.currentTime || cur.book.position; save(true); }
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+    if (reg) await reg.update().catch(() => {});
+    location.reload();
+  } catch (e) { /* offline, or storage unavailable */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') autoUpdate(); });
+autoUpdate();
 renderSettings();
 
 // A bookmark that was mid-transcription when the app closed is not retried

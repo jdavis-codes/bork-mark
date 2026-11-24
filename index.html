@@ -183,18 +183,30 @@
     dialog, dialog::backdrop { animation: none !important; }
     .tabs button, .transport button, #markBtn, .round { transition: none; }
   }
-  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; }
-  .textin {
-    font: inherit; font-size: 16px; width: 100%; min-width: 0; padding: 10px 12px; color: var(--fg);
-    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; margin: 14px 0 16px; }
+  .subnote { color: var(--muted); font-size: 0.8rem; margin: 2px 0 0; }
+  .subnote:empty { display: none; }
+  .linkbtn { border: none; padding: 0; color: var(--accent); font-size: inherit; }
+  /* inline editing: no box, a pencil beside the value */
+  .editable { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+  .editable > span { min-width: 0; overflow-wrap: anywhere; }
+  .pencil { flex: none; border: none; padding: 3px; margin: -1px 0 0; line-height: 0; border-radius: 6px; color: var(--muted); }
+  .pencil svg, .disclose svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .inline {
+    font: inherit; font-size: 16px; color: var(--fg); width: 100%; min-width: 0; padding: 0 0 2px; margin: 0;
+    background: transparent; border: none; border-bottom: 1.5px solid var(--accent); border-radius: 0; outline: none;
   }
-  .linkbtn { border: none; padding: 0; color: var(--accent); font-size: 0.9rem; }
-  .filebtn.small { padding: 6px 10px; font-size: 0.85rem; }
-  #chapStatus:empty, #pageStatus:empty { display: none; }
-  #chapEditDlg { overflow-y: auto; }
-  #chapEditList { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
-  #chapEditList li { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); align-items: center; gap: 10px; }
-  #chapEditList span { font-variant-numeric: tabular-nums; }
+  .disclose { display: inline-flex; align-items: center; gap: 4px; border: none; padding: 0; border-radius: 6px; }
+  .disclose svg { transition: transform 0.2s; color: var(--muted); }
+  .disclose[aria-expanded=true] svg { transform: rotate(180deg); }
+  .chapbox { grid-column: 1 / -1; display: grid; gap: 10px; padding: 10px 12px; background: var(--bg); border-radius: 10px; }
+  .chapbox ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .chapbox li { display: grid; grid-template-columns: 4em minmax(0, 1fr); gap: 8px; align-items: start; font-size: 0.9rem; }
+  .chapbox li > span:first-child { font-variant-numeric: tabular-nums; }
+  .chapbox .row:empty { display: none; }
+  /* every button dims and dips while pressed */
+  button, .filebtn, .swatch { transition: opacity 0.12s, transform 0.12s; }
+  button:active, .filebtn:active { opacity: 0.55; transform: scale(0.96); }
   .cite { margin: -2px 0 8px; }
   #infoList dt { color: var(--muted); } #infoList dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -285,6 +297,8 @@
   .fieldhead output { color: var(--muted); font-variant-numeric: tabular-nums; }
   .switchrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .sheet section > button { justify-self: start; }
+  #toast[popover] { top: auto; right: auto; margin: 0; border: none; overflow: visible; }
+  #toast[popover]:not(:popover-open) { display: none; }
   #toast {
     position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
@@ -473,44 +487,14 @@
   <ol id="marks"></ol>
 </dialog>
 
-<dialog id="infoDlg" class="bottom tall">
+<dialog id="infoDlg" class="bottom">
   <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="small">Close</button></div>
-  <div class="stack" style="margin-top:16px">
-    <div class="field">
-      <div class="fieldhead"><label for="editTitle">Title</label><button id="titleReset" class="linkbtn" hidden>Reset</button></div>
-      <input id="editTitle" class="textin" type="text" autocomplete="off">
-      <p id="titleSrc" class="muted"></p>
-    </div>
-    <div class="field">
-      <div class="fieldhead"><label for="editAuthor">Author</label><button id="authorReset" class="linkbtn" hidden>Reset</button></div>
-      <input id="editAuthor" class="textin" type="text" autocomplete="off">
-      <p id="authorSrc" class="muted"></p>
-    </div>
-    <div class="field">
-      <div class="fieldhead"><span class="fieldname">Chapters</span></div>
-      <p id="chapSrc" class="muted"></p>
-      <div class="row">
-        <button id="chapEdit" class="small">Edit names</button>
-        <button id="chapAuto" class="small">Name from book text</button>
-        <button id="chapReset" class="small" hidden>Reset</button>
-      </div>
-      <p id="chapStatus" class="muted"></p>
-    </div>
-    <div class="field">
-      <div class="fieldhead"><span class="fieldname">Book text</span></div>
-      <p id="textStatus" class="muted"></p>
-      <p id="pageStatus" class="muted"></p>
-      <div class="row"><label class="filebtn small"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label></div>
-    </div>
-    <dl id="infoList"></dl>
-    <p id="playerError" class="warn" hidden></p>
-    <div class="row"><button id="removeBtn">Remove book</button></div>
+  <dl id="infoList"></dl>
+  <p id="playerError" class="warn" hidden></p>
+  <div class="row">
+    <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
+    <button id="removeBtn">Remove book</button>
   </div>
-</dialog>
-
-<dialog id="chapEditDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Chapter names</h2><button id="chapEditClose" class="small">Done</button></div>
-  <ol id="chapEditList"></ol>
 </dialog>
 
 <nav id="tabbar" hidden aria-label="Player options">
@@ -561,7 +545,7 @@
 </div>
 
 <audio id="audio" preload="metadata"></audio>
-<div id="toast" role="status"></div>
+<div id="toast" role="status" popover="manual"></div>
 
 <script type="module" src="app.js"></script>
 </body>
