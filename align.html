@@ -69,7 +69,7 @@
   <section>
     <h2>1. Audio and book</h2>
     <div class="row">
-      <label class="filebtn">Choose MP3<input id="audioFile" type="file" accept="audio/*,.mp3,.m4a,.m4b"></label>
+      <label class="filebtn">Choose audio (M4B or MP3)<input id="audioFile" type="file" accept="audio/*,.mp3,.m4a,.m4b"></label>
       <label class="filebtn">Choose EPUB or TXT<input id="bookFile" type="file" accept=".epub,.txt,application/epub+zip,text/plain"></label>
     </div>
     <p id="audioStatus" class="muted" style="margin-top:10px">No audio loaded.</p>
@@ -125,7 +125,7 @@
 </main>
 
 <script type="module">
-import { indexMp3, byteRange, decode, to16kMono, readBook, buildBook, tokenize, locate, passage } from './align.js';
+import { openAudio, decode, to16kMono, readBook, buildBook, tokenize, locate, passage } from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
@@ -138,7 +138,7 @@ const fmtPos = (s) => {
 const secs = (ms) => (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + ' s';
 
 const WHOLE_FILE_LIMIT = 40 << 20;
-let audioFile = null, mp3Index = null, book = null, bookName = '';
+let audioFile = null, source = null, book = null, bookName = '';
 let busy = false, lastResult = null, audioUrl = null;
 
 if (!navigator.gpu) {
@@ -151,25 +151,22 @@ const refresh = () => { $('go').disabled = busy || !audioFile; };
 $('audioFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
-  audioFile = null; mp3Index = null; refresh();
+  audioFile = null; source = null; refresh();
   if (audioUrl) URL.revokeObjectURL(audioUrl);
   audioUrl = URL.createObjectURL(f);
   audio.src = audioUrl;
   const mb = (f.size / 1048576).toFixed(1) + ' MB';
-  const isMp3 = /\.mp3$/i.test(f.name) || f.type === 'audio/mpeg';
   const status = $('audioStatus');
   status.className = 'muted';
+  status.textContent = 'Indexing ' + f.name + '…';
   try {
-    if (isMp3) {
-      const t0 = performance.now();
-      const idx = await indexMp3(f, (p) => { status.textContent = 'Indexing ' + f.name + '… ' + Math.round(p * 100) + '%'; });
-      if (idx.frames < 20) throw new Error('no MP3 frames found');
-      mp3Index = idx;
-      status.textContent = f.name + ' · ' + mb + ' · ' + fmtPos(idx.duration) + ' · indexed in ' + secs(performance.now() - t0);
-    } else if (f.size <= WHOLE_FILE_LIMIT) {
-      status.textContent = f.name + ' · ' + mb + ' · not an MP3, so the whole file is decoded for each run (slow).';
-    } else {
-      throw new Error('only MP3 can be sliced; other formats must be under 40 MB');
+    const t0 = performance.now();
+    try {
+      source = await openAudio(f, (p) => { status.textContent = 'Indexing ' + f.name + '… ' + Math.round(p * 100) + '%'; });
+      status.textContent = f.name + ' · ' + mb + ' · ' + source.kind + ' · ' + fmtPos(source.duration) + ' · indexed in ' + secs(performance.now() - t0);
+    } catch (err) {
+      if (f.size > WHOLE_FILE_LIMIT) throw err;
+      status.textContent = f.name + ' · ' + mb + ' · cannot be sliced (' + err.message + '), so the whole file is decoded for each run (slow).';
     }
     audioFile = f;
   } catch (err) {
@@ -198,7 +195,7 @@ $('bookFile').addEventListener('change', async (e) => {
 });
 
 document.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => {
-  const max = isFinite(audio.duration) ? audio.duration : (mp3Index ? mp3Index.duration : 1e9);
+  const max = isFinite(audio.duration) ? audio.duration : (source ? source.duration : 1e9);
   audio.currentTime = Math.max(0, Math.min(max, audio.currentTime + Number(b.dataset.jump)));
 }));
 
@@ -241,10 +238,10 @@ $('go').addEventListener('click', async () => {
     say('Cutting the clip…');
     const t0 = performance.now();
     let pcm, clipStart;
-    if (mp3Index) {
-      const r = byteRange(mp3Index, Math.max(0, T - before), T + after, audioFile.size);
-      clipStart = r.startTime;
-      pcm = to16kMono(await decode(await audioFile.slice(r.start, r.end).arrayBuffer()));
+    if (source) {
+      const c = await source.clip(T - before, T + after);
+      clipStart = c.startTime;
+      pcm = to16kMono(await decode(c.buffer));
     } else {
       const all = to16kMono(await decode(await audioFile.arrayBuffer()));
       clipStart = Math.max(0, T - before);
