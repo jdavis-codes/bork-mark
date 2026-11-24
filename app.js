@@ -1087,8 +1087,8 @@ function removeCard(b, m) {
   const group = card.parentNode, gone = group.querySelectorAll('.mark').length === 1 && b.marks.length > 1 ? group : card;
   gone.style.height = gone.getBoundingClientRect().height + 'px'; gone.style.overflow = 'hidden';
   gone.getBoundingClientRect();
-  gone.style.transition = 'height 0.28s cubic-bezier(0.3, 0.7, 0.3, 1), padding 0.28s, opacity 0.18s, transform 0.28s';
-  gone.style.height = '0px'; gone.style.paddingTop = '0px'; gone.style.paddingBottom = '0px';
+  gone.style.transition = 'height 0.28s cubic-bezier(0.3, 0.7, 0.3, 1), padding 0.28s, margin 0.28s, border-width 0.28s, opacity 0.18s, transform 0.28s';
+  gone.style.height = '0px'; gone.style.paddingTop = '0px'; gone.style.paddingBottom = '0px'; gone.style.marginBottom = '0px'; gone.style.borderWidth = '0px';
   gone.style.opacity = '0'; gone.style.transform = 'translateX(-16px)';
   setTimeout(finish, 290);
 }

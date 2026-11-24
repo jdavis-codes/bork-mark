@@ -173,9 +173,17 @@
   /* fills the bookmark's own strip, from the divider above it to the one below */
   .mark.flash { animation: justEdited 1.6s ease-out; }
   @keyframes justEdited {
-    0%, 25% { background: color-mix(in srgb, var(--fg) 9%, transparent); }
-    100% { background: transparent; }
+    0%, 25% { background: color-mix(in srgb, var(--fg) 9%, var(--rest)); }
+    100% { background: var(--rest); }
   }
+  /* Alternative layout, each bookmark as its own card instead of rows split by
+     lines. Switched on by the class "cards" on the list. */
+  #marks.cards .grouphead { border-top: none; padding: 16px 2px 8px; }
+  #marks.cards .group:first-child .grouphead { padding-top: 8px; }
+  #marks.cards .mark { --rest: var(--bg); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
+  #marks.cards .mark + .mark { border-top: 1px solid var(--line); }
+  #marks.cards .trimbar { background: var(--card); }
+  #marks.cards .trimbar button:not(.primary) { background: var(--bg); }
   @media (prefers-reduced-motion: reduce) { .mark.flash { animation-duration: 0.01s; } }
   .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
   .seg button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; color: var(--muted); }
@@ -187,7 +195,9 @@
   }
   .group:first-child .grouphead { border-top: none; padding-top: 6px; }
   .grouphead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .mark { padding: 10px 0 12px; display: grid; gap: 8px; }
+  /* align-content: start keeps the rows at the top while the card's height is being eased,
+     so nothing inside it shifts as it opens or closes */
+  .mark { padding: 10px 0 12px; display: grid; gap: 8px; align-content: start; --rest: transparent; }
   .mark + .mark { border-top: 1px solid var(--line); }
   .marktop, .markfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .where { font-size: 0.82rem; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -237,7 +247,7 @@
   .presets button { padding: 7px 12px; border-radius: 999px; font-size: 0.85rem; }
   .presets button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
   /* a plain "+" above and below the text brings in more of the book */
-  .trimmer .more { justify-self: center; padding: 7px; border-radius: 50%; line-height: 0; color: var(--muted); }
+  .trimmer .more { justify-self: center; padding: 7px; border: none; border-radius: 50%; line-height: 0; color: var(--muted); }
   .trimmer .more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   .passage { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }   /* a held press drags an edge instead of selecting text */
   .passage { position: relative; font-family: Georgia, "Iowan Old Style", serif; font-size: 1.04rem; line-height: 1.62; }
