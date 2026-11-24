@@ -47,6 +47,7 @@ const DEFAULTS = {
   figPause: false,               // …and pause there
   // What a bookmark captures: seconds of audio either side, or whole paragraphs.
   capture: { mode: 'time', before: 45, after: 15, parasBefore: 1, parasAfter: 1 },
+  trimSnap: true,                // trimming: ends settle on whole sentences
   markOrder: 'book',             // bookmarks list: 'book' (by chapter) or 'new' (latest first)
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
 };
@@ -1109,7 +1110,7 @@ function markCard(b, m, showChapter) {
   const open = expanded.has(m.id);
   const [lead, sentStart] = splitBefore(m.before), [sentEnd, rest] = splitAfter(m.after);
   const quote = el('p', 'quote' + (open ? '' : ' clamped'));
-  quote.append(document.createTextNode(open ? lead : leadIn(lead)), el('span', 'pinned', sentStart), el('span', 'pin'), el('span', 'pinned', sentEnd), document.createTextNode(rest));
+  quote.append(document.createTextNode(open ? lead : leadIn(lead)), el('span', 'pinned', sentStart), pinIcon(), el('span', 'pinned', sentEnd), document.createTextNode(rest));
   quote.setAttribute('role', 'button'); quote.tabIndex = 0;
   quote.setAttribute('aria-label', (open ? 'Collapse' : 'Show all of') + ' this quote');
   const toggle = () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); };
@@ -1145,12 +1146,24 @@ function markCard(b, m, showChapter) {
 }
 
 // ---------- trimming a quote ----------
-// The quote being trimmed is shown as sentences, with some of the book either
-// side. Tapping a sentence, or dragging one of the two handles, moves the
-// start or the end. The sentence holding the bookmark point always stays in.
-let trim = null;   // { m, from, to, sents, start, end, anchor, base: [start, end] }
+// The quote being trimmed is shown with some of the book either side. Its
+// start and end are character positions: a handle follows the finger word by
+// word, and on letting go the edge settles on the nearest sentence boundary
+// (unless that is switched off in Settings). Tapping also moves an edge. The
+// bookmark point itself always stays inside the quote.
+let trim = null;   // { m, from, to, sents, anchor, point, pointEnd, a, b, base: [a, b] }
 const pointOf = (m) => cur.text.starts[Math.min(m.loc[1], cur.text.starts.length - 1)];
 const bare = (str) => str.replace(/^…\s*/, '').replace(/\s*…$/, '');
+// A small bookmark shape, drawn inline at the place the button was pressed.
+function pinIcon() {
+  const pin = el('span', 'pin'), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '6 3 12 18'); svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M7 4h10v16l-5-4-5 4z');
+  svg.append(path); pin.append(svg);
+  pin.setAttribute('role', 'img'); pin.setAttribute('aria-label', 'bookmarked here');
+  return pin;
+}
 function startTrim(m) {
   const text = cur.text;
   if (!m.loc) {   // an older bookmark: find its quote in the book text first
@@ -1159,73 +1172,92 @@ function startTrim(m) {
     m.loc = [loc.start, loc.split, loc.end];
   }
   const at = pointOf(m);
-  const from = m.trim ? m.trim[0] : at - bare(m.before).length, to = m.trim ? m.trim[1] : at + bare(m.after).length;
-  trim = { m, from: Math.min(from, at) - 900, to: Math.max(to, at) + 900 };
-  layoutTrim(from, to);
+  const a = m.trim ? m.trim[0] : at - bare(m.before).length, b = m.trim ? m.trim[1] : at + bare(m.after).length;
+  trim = { m, from: Math.min(a, at) - 900, to: Math.max(b, at) + 900, a, b };
+  layoutTrim();
   renderMarks();
   const card = document.querySelector('.mark.trimming');
   if (card) card.scrollIntoView({ block: 'start', behavior: calm.matches ? 'auto' : 'smooth' });
 }
-// Works out the sentences in view and which of them cover the characters [from, to).
-function layoutTrim(from, to) {
-  const text = cur.text, at = pointOf(trim.m), S = sentencesIn(text.text, Math.max(0, trim.from), Math.min(text.text.length, trim.to));
-  trim.sents = S;
-  const span = (a, b) => {
-    let i = S.findIndex((x) => x.b > a), j = S.length - 1;
-    while (j > 0 && S[j].a >= b) j--;
-    if (i < 0) i = S.length - 1;
-    return [Math.min(i, trim.anchor), Math.max(j, trim.anchor)];
-  };
+// Works out the sentences in view, and the limits the two edges must respect.
+function layoutTrim() {
+  const text = cur.text, at = pointOf(trim.m);
+  const S = trim.sents = sentencesIn(text.text, Math.max(0, trim.from), Math.min(text.text.length, trim.to));
+  trim.point = at;
+  trim.pointEnd = at + ((/^\S+/.exec(text.text.slice(at, at + 80)) || [' '])[0].length);   // end of the word at the point
   trim.anchor = S.findIndex((x) => at < x.b);
   if (trim.anchor < 0) trim.anchor = S.length - 1;
-  [trim.start, trim.end] = span(from, to);
   // What the capture setting alone would give, for the "As captured" shortcut.
   const q = quoteAt(text, { start: trim.m.loc[0], split: trim.m.loc[1], end: trim.m.loc[2] }, settings.capture);
-  trim.base = span(at - bare(q.before).length, at + bare(q.after).length);
+  trim.base = [at - bare(q.before).length, at + bare(q.after).length];
+  setTrim(trim.a, trim.b);
+}
+// The start can be anywhere up to the point, the end anywhere from the end of its word.
+function setTrim(a, b) {
+  const S = trim.sents;
+  trim.a = Math.max(S[0].a, Math.min(a, trim.point));
+  trim.b = Math.min(S[S.length - 1].b, Math.max(b, trim.pointEnd));
 }
 function trimEditor() {
   const S = trim.sents, text = cur.text.text, box = el('div', 'trimmer');
   const presets = el('div', 'presets');
   const preset = (label, id, range) => {
-    const b = el('button', '', label);
-    b.type = 'button'; b.id = id;
-    b.addEventListener('click', () => { [trim.start, trim.end] = range(); paintTrim(); });
-    presets.append(b);
+    const btn = el('button', '', label);
+    btn.type = 'button'; btn.id = id;
+    btn.addEventListener('click', () => {
+      const [a, b] = range();
+      // the capture may reach beyond the text on screen: bring that text in first
+      if (a < S[0].a || b > S[S.length - 1].b) { trim.from = Math.min(trim.from, a - 200); trim.to = Math.max(trim.to, b + 200); trim.a = a; trim.b = b; layoutTrim(); renderMarks(); return; }
+      setTrim(a, b); paintTrim();
+    });
+    presets.append(btn);
   };
-  const para = () => [S.findIndex((x) => x.p === S[trim.anchor].p), S.length - 1 - [...S].reverse().findIndex((x) => x.p === S[trim.anchor].p)];
-  preset('Sentence', 'trimSentence', () => [trim.anchor, trim.anchor]);
-  preset('Paragraph', 'trimPara', para);
+  const first = S.findIndex((x) => x.p === S[trim.anchor].p), last = S.length - 1 - [...S].reverse().findIndex((x) => x.p === S[trim.anchor].p);
+  trim.sentence = [S[trim.anchor].a, S[trim.anchor].b];
+  trim.para = [S[first].a, S[last].b];
+  preset('Sentence', 'trimSentence', () => trim.sentence);
+  preset('Paragraph', 'trimPara', () => trim.para);
   preset('As captured', 'trimBase', () => trim.base);
-  trim.para = para();
-  box.append(el('p', 'muted small', 'Tap a sentence to start or end there, or drag the handles.'), presets);
+  box.append(el('p', 'muted small', settings.trimSnap ? 'Drag a handle or tap a sentence. The ends settle on whole sentences.' : 'Drag a handle or tap a word to set where the quote starts and ends.'), presets);
 
   const widen = (label, grow) => {
-    const b = el('button', 'more', label);
-    b.type = 'button';
-    b.addEventListener('click', () => { const a = S[trim.start].a, z = S[trim.end].b; grow(); layoutTrim(a, z); renderMarks(); });
-    return b;
+    const btn = el('button', 'more', label);
+    btn.type = 'button';
+    btn.addEventListener('click', () => { grow(); layoutTrim(); renderMarks(); });
+    return btn;
   };
   if (trim.from > 0) box.append(widen('Show earlier text', () => { trim.from -= 1400; }));
+  // Every word is its own piece, so the highlight and the handles can follow a finger word by word.
   const passage = el('div', 'passage');
-  let p = null, lastPara = -1;
+  let p = null, lastPara = -1, pinned = false;
   S.forEach((x, i) => {
     if (x.p !== lastPara) { p = el('p'); passage.append(p); lastPara = x.p; }
-    const span = el('span', 's', text.slice(x.a, x.b));
-    span.dataset.i = i; span.setAttribute('role', 'button'); span.tabIndex = 0;
-    const pick = () => { tapSentence(i); paintTrim(); };
-    span.addEventListener('click', pick);
-    span.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
-    p.append(span, document.createTextNode(' '));
+    const sent = el('span', 'sent' + (i === trim.anchor ? ' anchor' : ''));
+    sent.dataset.i = i;
+    const body = text.slice(x.a, x.b), word = /\S+\s*/g;
+    for (let m; (m = word.exec(body));) {
+      const a = x.a + m.index, w = el('span', 'w', m[0]);
+      w.dataset.a = a; w.dataset.b = a + m[0].trimEnd().length;
+      if (!pinned && a >= trim.point) { sent.append(pinIcon()); pinned = true; }
+      sent.append(w);
+    }
+    p.append(sent, document.createTextNode(' '));
+  });
+  passage.addEventListener('click', (e) => {
+    const w = e.target.closest('.w');
+    if (!w) return;
+    tapWord(Number(w.dataset.a), Number(w.dataset.b), Number(w.parentNode.dataset.i));
+    paintTrim();
   });
   for (const edge of ['start', 'end']) {
     const h = el('span', 'handle ' + edge);
     h.setAttribute('role', 'slider'); h.tabIndex = 0;
     h.setAttribute('aria-label', edge === 'start' ? 'Start of quote' : 'End of quote');
     h.addEventListener('pointerdown', (e) => dragHandle(e, edge, h, passage));
-    h.addEventListener('keydown', (e) => {   // arrow keys move an edge a sentence at a time
+    h.addEventListener('keydown', (e) => {   // arrow keys step an edge by a sentence, or by a word when not snapping
       const step = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : 0;
       if (!step) return;
-      e.preventDefault(); moveEdge(edge, trim[edge] + step); paintTrim();
+      e.preventDefault(); stepEdge(edge, step, passage); paintTrim();
     });
     passage.append(h);
   }
@@ -1240,41 +1272,63 @@ function trimEditor() {
   buttons.append(cancel, keep); bar.append(count, buttons); box.append(bar);
   return box;
 }
-// An edge can go anywhere on its own side of the bookmarked sentence.
-function moveEdge(edge, i) {
-  const last = trim.sents.length - 1;
-  if (edge === 'start') trim.start = Math.max(0, Math.min(i, trim.anchor)); else trim.end = Math.min(last, Math.max(i, trim.anchor));
+// The sentence boundaries an edge may rest on: starts up to the bookmarked
+// sentence for the start, ends from it onward for the end.
+const sentenceStops = (edge) => (edge === 'start' ? trim.sents.slice(0, trim.anchor + 1).map((x) => x.a) : trim.sents.slice(trim.anchor).map((x) => x.b));
+const nearest = (stops, value) => stops.reduce((best, x) => (Math.abs(x - value) < Math.abs(best - value) ? x : best), stops[0]);
+function snapEdge(edge) {
+  if (edge === 'start') setTrim(nearest(sentenceStops('start'), trim.a), trim.b); else setTrim(trim.a, nearest(sentenceStops('end'), trim.b));
 }
-// Before the bookmarked sentence a tap sets the start, after it the end.
-// Tapping the bookmarked sentence itself pulls the end in to it, and tapped
-// again pulls the start in, so two taps leave just that sentence.
-function tapSentence(i) {
-  if (i < trim.anchor) trim.start = i;
-  else if (i > trim.anchor) trim.end = i;
-  else if (trim.end > trim.anchor) trim.end = trim.anchor;
-  else trim.start = trim.anchor;
+function stepEdge(edge, step, passage) {
+  const stops = settings.trimSnap ? sentenceStops(edge)
+    : Array.from(passage.querySelectorAll('.w'), (w) => Number(edge === 'start' ? w.dataset.a : w.dataset.b));
+  const at = stops.indexOf(nearest(stops, edge === 'start' ? trim.a : trim.b));
+  const next = stops[Math.max(0, Math.min(stops.length - 1, at + step))];
+  if (edge === 'start') setTrim(next, trim.b); else setTrim(trim.a, next);
+}
+// A tap before the bookmark point moves the start, after it the end. A tap on
+// the bookmarked sentence (or word) pulls the end in to it, and tapped again
+// pulls the start in.
+function tapWord(a, b, sentence) {
+  if (settings.trimSnap) {
+    const S = trim.sents, here = S[trim.anchor];
+    if (sentence < trim.anchor) setTrim(S[sentence].a, trim.b);
+    else if (sentence > trim.anchor) setTrim(trim.a, S[sentence].b);
+    else if (trim.b > here.b) setTrim(trim.a, here.b);
+    else setTrim(here.a, trim.b);
+  } else if (a < trim.point) setTrim(a, trim.b);
+  else if (b > trim.pointEnd) setTrim(trim.a, b);
+  else if (trim.b > trim.pointEnd) setTrim(trim.a, trim.pointEnd);
+  else setTrim(trim.point, trim.b);
 }
 // Updates the highlight, handles, count and shortcuts without rebuilding the
 // card, so a drag in progress is not interrupted.
 function paintTrim() {
   const passage = document.querySelector('.trimmer .passage');
   if (!trim || !passage) return;
-  const S = trim.sents, spans = passage.querySelectorAll('.s');
-  spans.forEach((n, i) => { n.classList.toggle('in', i >= trim.start && i <= trim.end); n.classList.toggle('anchor', i === trim.anchor); });
-  const box = passage.getBoundingClientRect();
-  const firstRects = spans[trim.start].getClientRects(), lastRects = spans[trim.end].getClientRects();
-  const a = firstRects[0], z = lastRects[lastRects.length - 1];
-  const place = (h, x, rect) => { h.style.left = (x - box.left) + 'px'; h.style.top = (rect.top - box.top) + 'px'; h.style.height = rect.height + 'px'; };
-  if (a && z) { place(passage.querySelector('.handle.start'), a.left, a); place(passage.querySelector('.handle.end'), z.right, z); }
-  const words = S.slice(trim.start, trim.end + 1).reduce((n, x) => n + cur.text.text.slice(x.a, x.b).split(/\s+/).length, 0), n = trim.end - trim.start + 1;
+  let first = null, last = null, words = 0;
+  for (const w of passage.querySelectorAll('.w')) {
+    const on = Number(w.dataset.a) >= trim.a && Number(w.dataset.b) <= trim.b;
+    w.classList.toggle('in', on);
+    if (on) { words++; first = first || w; last = w; }
+  }
+  if (first) {
+    // measured on the letters alone, so the end handle sits right after the last one
+    const box = passage.getBoundingClientRect(), letters = (w) => { const r = document.createRange(), t = w.firstChild; r.setStart(t, 0); r.setEnd(t, Number(w.dataset.b) - Number(w.dataset.a)); return r.getClientRects(); };
+    const head = letters(first)[0], tails = letters(last), tail = tails[tails.length - 1];
+    const place = (h, x, rect) => { h.style.left = (x - box.left) + 'px'; h.style.top = (rect.top - box.top) + 'px'; h.style.height = rect.height + 'px'; };
+    if (head && tail) { place(passage.querySelector('.handle.start'), head.left, head); place(passage.querySelector('.handle.end'), tail.right, tail); }
+  }
+  const n = trim.sents.filter((x) => x.b > trim.a && x.a < trim.b).length;
   $('trimCount').textContent = n + (n === 1 ? ' sentence' : ' sentences') + ' · ' + words + ' words';
-  const is = (r) => trim.start === r[0] && trim.end === r[1], one = trim.start === trim.anchor && trim.end === trim.anchor;
-  $('trimSentence').setAttribute('aria-pressed', String(one));
-  $('trimPara').setAttribute('aria-pressed', String(is(trim.para) && !one));
-  $('trimBase').setAttribute('aria-pressed', String(is(trim.base) && !one && !is(trim.para)));
+  const is = (r) => trim.a === r[0] && trim.b === r[1];
+  $('trimSentence').setAttribute('aria-pressed', String(is(trim.sentence)));
+  $('trimPara').setAttribute('aria-pressed', String(is(trim.para) && !is(trim.sentence)));
+  $('trimBase').setAttribute('aria-pressed', String(is(trim.base) && !is(trim.sentence) && !is(trim.para)));
 }
 window.addEventListener('resize', () => { if (trim) paintTrim(); });
-// Dragging a handle: the edge follows the sentence under the finger.
+// Dragging a handle: the edge follows the word under the finger, and settles
+// on a sentence boundary when let go.
 function dragHandle(e, edge, handle, passage) {
   e.preventDefault();
   handle.setPointerCapture(e.pointerId);
@@ -1283,11 +1337,13 @@ function dragHandle(e, edge, handle, passage) {
   const sheet = $('marksDlg');
   let at = { x: e.clientX, y: e.clientY };
   const follow = () => {
-    const under = document.elementsFromPoint(at.x, at.y + offsetY).find((n) => n.classList && n.classList.contains('s') && passage.contains(n));
-    if (!under) return;
-    const before = trim[edge];
-    moveEdge(edge, Number(under.dataset.i));
-    if (trim[edge] !== before) paintTrim();
+    const w = document.elementsFromPoint(at.x, at.y + offsetY).find((n) => n.classList && n.classList.contains('w') && passage.contains(n));
+    if (!w) return;
+    const a = trim.a, b = trim.b, box = w.getBoundingClientRect(), pastMiddle = at.x > box.left + box.width / 2;
+    // the start goes before the word under the finger, or after it once past its middle; the end likewise
+    if (edge === 'start') setTrim(pastMiddle ? Number(w.dataset.b) + 1 : Number(w.dataset.a), b);
+    else setTrim(a, pastMiddle ? Number(w.dataset.b) : Number(w.dataset.a) - 1);
+    if (trim.a !== a || trim.b !== b) paintTrim();
   };
   const move = (ev) => { at = { x: ev.clientX, y: ev.clientY }; follow(); };
   // Held near the top or bottom of the sheet, it keeps scrolling so the edge
@@ -1301,13 +1357,14 @@ function dragHandle(e, edge, handle, passage) {
     clearInterval(creep);
     handle.classList.remove('dragging');
     handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', stop); handle.removeEventListener('pointercancel', stop);
+    if (settings.trimSnap) { passage.classList.add('settling'); snapEdge(edge); paintTrim(); setTimeout(() => passage.classList.remove('settling'), 220); }
   };
   handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', stop); handle.addEventListener('pointercancel', stop);
 }
 function saveTrim() {
-  const m = trim.m, S = trim.sents;
+  const m = trim.m;
   // Back at what the capture setting gives: no need to remember a custom trim.
-  if (trim.start === trim.base[0] && trim.end === trim.base[1]) delete m.trim; else m.trim = [S[trim.start].a, S[trim.end].b];
+  if (trim.a === trim.base[0] && trim.b === trim.base[1]) delete m.trim; else m.trim = [trim.a, trim.b];
   trim = null;
   requote(m, cur.text);
   expanded.add(m.id);
@@ -2073,7 +2130,7 @@ function renderSettings() {
   $('capTime').hidden = settings.capture.mode !== 'time';
   $('capParas').hidden = settings.capture.mode !== 'paras';
   $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
-  $('bgQuotes').checked = settings.bgQuotes;
+  $('bgQuotes').checked = settings.bgQuotes; $('trimSnap').checked = settings.trimSnap;
   $('sounds').checked = settings.sounds; $('figAlert').checked = settings.figAlert; $('figPause').checked = settings.figPause;
   $('figPauseRow').hidden = !settings.figAlert;
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
@@ -2086,7 +2143,7 @@ function readSettings() {
   settings.next.action = $('nextAction').value; settings.prev.action = $('prevAction').value;
   settings.capture.mode = $('capMode').value;
   settings.lockSeek = $('lockSeek').value === 'skip';
-  settings.bgQuotes = $('bgQuotes').checked;
+  settings.bgQuotes = $('bgQuotes').checked; settings.trimSnap = $('trimSnap').checked;
   settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;
   save(true);
   renderSettings(); setMediaSession(); runQueue();
