@@ -1,0 +1,9 @@
+{
+  "name": "Bork Mark",
+  "short_name": "Bork Mark",
+  "description": "Bookmark audiobooks hands-free",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#151614",
+  "theme_color": "#14532d"
+}
