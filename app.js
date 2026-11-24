@@ -1016,7 +1016,6 @@ function renderMarks() {
   $('marksBtn').classList.toggle('on', waiting > 0);
   const newest = settings.markOrder === 'new';
   $('orderBook').setAttribute('aria-pressed', String(!newest)); $('orderNew').setAttribute('aria-pressed', String(newest));
-  $('markOrder').hidden = n < 2;
   if (!n) {
     list.append(el('p', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
     return;
@@ -1053,13 +1052,21 @@ for (const [id, value] of [['orderBook', 'book'], ['orderNew', 'new']]) {
 const cardFor = (id) => Array.from(document.querySelectorAll('#marks .mark')).find((n) => n.dataset.id === id);
 // Runs `change` (which redraws the list), then eases that card from the height
 // it had to the height it has now, so it opens or closes instead of jumping.
-function easeCard(id, change) {
+function easeCard(id, change, settle) {
   const old = cardFor(id), from = old ? old.getBoundingClientRect().height : null;
   change();
   const card = cardFor(id);
-  if (!card || from == null || calm.matches) return;
+  if (!card) return;
   const to = card.getBoundingClientRect().height;
-  if (Math.abs(to - from) < 2) return;
+  if (settle) {
+    // After an edit: bring this bookmark to the middle of the sheet and light it up briefly.
+    const sheet = $('marksDlg'), frame = sheet.getBoundingClientRect();
+    const top = card.getBoundingClientRect().top - frame.top + sheet.scrollTop;
+    sheet.scrollTo({ top: Math.max(0, top + to / 2 - sheet.clientHeight / 2), behavior: calm.matches ? 'auto' : 'smooth' });
+    card.classList.add('flash');
+    setTimeout(() => card.classList.remove('flash'), 1700);
+  }
+  if (from == null || calm.matches || Math.abs(to - from) < 2) return;
   card.style.height = from + 'px'; card.style.overflow = 'hidden';
   card.getBoundingClientRect();                       // start the transition from here
   card.style.transition = 'height 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)';
@@ -1304,7 +1311,7 @@ function trimEditor() {
   const bar = el('div', 'trimbar'), count = el('span', 'count'), buttons = el('div', 'row');
   count.id = 'trimCount';
   const cancel = el('button', '', 'Cancel'), keep = el('button', 'primary', 'Save');
-  cancel.addEventListener('click', () => { const id = trim.m.id; easeCard(id, () => { trim = null; renderMarks(); }); });
+  cancel.addEventListener('click', () => { const id = trim.m.id; easeCard(id, () => { trim = null; renderMarks(); }, true); });
   keep.addEventListener('click', saveTrim);
   buttons.append(cancel, keep); bar.append(count, buttons); box.append(bar);
   return box;
@@ -1448,7 +1455,7 @@ function saveTrim() {
     requote(m, cur.text);
     expanded.add(m.id);
     save(true); renderMarks();
-  });
+  }, true);
   toast('Quote trimmed');
 }
 $('marksDlg').addEventListener('close', () => { trim = null; });

@@ -154,15 +154,32 @@
   :root { --tint: color-mix(in srgb, var(--accent) 16%, transparent); }
   /* the heading stays at the top of the sheet while the list scrolls, with the order switch on the right */
   .markshead {
+    /* top is measured from inside the sheet's 16px padding, which the negative margin cancels */
     position: sticky; top: -16px; z-index: 3; display: flex; align-items: center; gap: 8px;
-    margin: -16px -16px 0; padding: 22px 16px 10px; background: var(--card);
+    margin: -16px -16px 0; padding: 16px 16px 10px; background: var(--card);
+  }
+  /* The grab handle is drawn in the heading itself, so the heading sits in the
+     same place whether or not the list is scrolled, and the list fades out
+     under it instead of being cut off. */
+  #marksDlg::before { display: none; }
+  .markshead::before { content: ""; position: absolute; left: 50%; top: 6px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
+  .markshead::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; pointer-events: none;
+    background: linear-gradient(var(--card), color-mix(in srgb, var(--card) 0%, transparent));
   }
   .markshead h2 { flex: 1; min-width: 0; white-space: nowrap; }
-  .markshead .iconbtn { margin-right: -8px; }
+  .markshead .iconbtn { margin: -8px -8px -8px 0; }
+  /* a bookmark that was just edited glows briefly */
+  .mark.flash { animation: justEdited 1.6s ease-out; border-radius: 8px; }
+  @keyframes justEdited {
+    0%, 25% { background: color-mix(in srgb, var(--fg) 9%, transparent); box-shadow: 0 0 0 8px color-mix(in srgb, var(--fg) 9%, transparent); }   /* a gentle lightening, not a colour */
+    100% { background: transparent; box-shadow: 0 0 0 8px transparent; }
+  }
+  @media (prefers-reduced-motion: reduce) { .mark.flash { animation-duration: 0.01s; } }
   .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
   .seg button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14); }
-  #marks { margin-top: 8px; }
+  #marks { margin-top: 4px; }
   .grouphead {
     display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 14px 0 6px; border-top: 1px solid var(--line);
     font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
