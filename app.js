@@ -1049,6 +1049,38 @@ for (const [id, value] of [['orderBook', 'book'], ['orderNew', 'new']]) {
   $(id).addEventListener('click', () => { settings.markOrder = value; save(true); renderMarks(); });
 }
 
+// ---- motion in the list ----
+const cardFor = (id) => Array.from(document.querySelectorAll('#marks .mark')).find((n) => n.dataset.id === id);
+// Runs `change` (which redraws the list), then eases that card from the height
+// it had to the height it has now, so it opens or closes instead of jumping.
+function easeCard(id, change) {
+  const old = cardFor(id), from = old ? old.getBoundingClientRect().height : null;
+  change();
+  const card = cardFor(id);
+  if (!card || from == null || calm.matches) return;
+  const to = card.getBoundingClientRect().height;
+  if (Math.abs(to - from) < 2) return;
+  card.style.height = from + 'px'; card.style.overflow = 'hidden';
+  card.getBoundingClientRect();                       // start the transition from here
+  card.style.transition = 'height 0.26s cubic-bezier(0.2, 0.8, 0.2, 1)';
+  card.style.height = to + 'px';
+  setTimeout(() => { card.style.height = ''; card.style.overflow = ''; card.style.transition = ''; if (trim) paintTrim(); }, 280);
+}
+// Deleting: the card fades and folds away, and the ones below slide up into
+// its place. If it was the only one under its chapter heading, the heading goes with it.
+function removeCard(b, m) {
+  const finish = () => { b.marks = b.marks.filter((x) => x !== m); save(true); renderMarks(); };
+  const card = cardFor(m.id);
+  if (!card || calm.matches) { finish(); return; }
+  const group = card.parentNode, gone = group.querySelectorAll('.mark').length === 1 && b.marks.length > 1 ? group : card;
+  gone.style.height = gone.getBoundingClientRect().height + 'px'; gone.style.overflow = 'hidden';
+  gone.getBoundingClientRect();
+  gone.style.transition = 'height 0.28s cubic-bezier(0.3, 0.7, 0.3, 1), padding 0.28s, opacity 0.18s, transform 0.28s';
+  gone.style.height = '0px'; gone.style.paddingTop = '0px'; gone.style.paddingBottom = '0px';
+  gone.style.opacity = '0'; gone.style.transform = 'translateX(-16px)';
+  setTimeout(finish, 290);
+}
+
 function markCard(b, m, showChapter) {
   const card = el('div', 'mark'), c = chapterAt(b, m.t);
   card.dataset.id = m.id;
@@ -1066,8 +1098,7 @@ function markCard(b, m, showChapter) {
   remove.addEventListener('click', () => {
     if (!confirm('Delete the bookmark at ' + fmt(m.t) + '?')) return;
     if (trim && trim.m === m) trim = null;
-    b.marks = b.marks.filter((x) => x !== m);
-    save(true); renderMarks();
+    removeCard(b, m);
   });
   const foot = el('div', 'markfoot'), chips = el('div', 'chips'), acts = el('div', 'acts');
 
@@ -1110,10 +1141,14 @@ function markCard(b, m, showChapter) {
   const open = expanded.has(m.id);
   const [lead, sentStart] = splitBefore(m.before), [sentEnd, rest] = splitAfter(m.after);
   const quote = el('p', 'quote' + (open ? '' : ' clamped'));
-  quote.append(document.createTextNode(open ? lead : leadIn(lead)), el('span', 'pinned', sentStart), pinIcon(), el('span', 'pinned', sentEnd), document.createTextNode(rest));
+  // Closed, at most about 170 characters come before the bookmark icon, so it is always among the lines shown.
+  const ROOM = 170;
+  const shownLead = open ? lead : sentStart.length >= ROOM ? '' : leadIn(lead).slice(-(ROOM - sentStart.length)).replace(/^\S*\s/, (cut) => (leadIn(lead).length > ROOM - sentStart.length ? '… ' : cut));
+  const shownStart = open || sentStart.length < ROOM ? sentStart : '… ' + sentStart.slice(sentStart.indexOf(' ', sentStart.length - ROOM) + 1);
+  quote.append(document.createTextNode(shownLead), el('span', 'pinned', shownStart), pinIcon(), el('span', 'pinned', sentEnd), document.createTextNode(rest));
   quote.setAttribute('role', 'button'); quote.tabIndex = 0;
   quote.setAttribute('aria-label', (open ? 'Collapse' : 'Show all of') + ' this quote');
-  const toggle = () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); };
+  const toggle = () => easeCard(m.id, () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); });
   quote.addEventListener('click', toggle);
   quote.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
   card.append(quote);
@@ -1175,7 +1210,7 @@ function startTrim(m) {
   const a = m.trim ? m.trim[0] : at - bare(m.before).length, b = m.trim ? m.trim[1] : at + bare(m.after).length;
   trim = { m, from: Math.min(a, at) - 900, to: Math.max(b, at) + 900, a, b };
   layoutTrim();
-  renderMarks();
+  easeCard(m.id, renderMarks);
   const card = document.querySelector('.mark.trimming');
   if (card) card.scrollIntoView({ block: 'start', behavior: calm.matches ? 'auto' : 'smooth' });
 }
@@ -1269,7 +1304,7 @@ function trimEditor() {
   const bar = el('div', 'trimbar'), count = el('span', 'count'), buttons = el('div', 'row');
   count.id = 'trimCount';
   const cancel = el('button', '', 'Cancel'), keep = el('button', 'primary', 'Save');
-  cancel.addEventListener('click', () => { trim = null; renderMarks(); });
+  cancel.addEventListener('click', () => { const id = trim.m.id; easeCard(id, () => { trim = null; renderMarks(); }); });
   keep.addEventListener('click', saveTrim);
   buttons.append(cancel, keep); bar.append(count, buttons); box.append(bar);
   return box;
@@ -1408,10 +1443,12 @@ function saveTrim() {
   const m = trim.m;
   // Back at what the capture setting gives: no need to remember a custom trim.
   if (trim.a === trim.base[0] && trim.b === trim.base[1]) delete m.trim; else m.trim = [trim.a, trim.b];
-  trim = null;
-  requote(m, cur.text);
-  expanded.add(m.id);
-  save(true); renderMarks();
+  easeCard(m.id, () => {
+    trim = null;
+    requote(m, cur.text);
+    expanded.add(m.id);
+    save(true); renderMarks();
+  });
   toast('Quote trimmed');
 }
 $('marksDlg').addEventListener('close', () => { trim = null; });

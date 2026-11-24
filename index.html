@@ -152,7 +152,14 @@
   #queueStatus:empty { display: none; }
   /* bookmarks list */
   :root { --tint: color-mix(in srgb, var(--accent) 16%, transparent); }
-  .seg { display: inline-grid; grid-auto-flow: column; background: var(--soft); border-radius: 10px; padding: 3px; margin-top: 10px; }
+  /* the heading stays at the top of the sheet while the list scrolls, with the order switch on the right */
+  .markshead {
+    position: sticky; top: -16px; z-index: 3; display: flex; align-items: center; gap: 8px;
+    margin: -16px -16px 0; padding: 22px 16px 10px; background: var(--card);
+  }
+  .markshead h2 { flex: 1; min-width: 0; white-space: nowrap; }
+  .markshead .iconbtn { margin-right: -8px; }
+  .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
   .seg button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14); }
   #marks { margin-top: 8px; }
@@ -189,6 +196,17 @@
   .acts button { border: none; padding: 8px; border-radius: 10px; line-height: 0; color: var(--muted); }
   .acts button.primary { background: none; color: var(--accent); }
   .acts svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  /* small controls: a quick dip and a soft tint while pressed, springing back on release */
+  .playpill, .chip, .acts button, .seg button, .presets button, .trimmer .more {
+    transition: transform 0.22s cubic-bezier(0.3, 1.5, 0.5, 1), background-color 0.15s, opacity 0.15s;
+  }
+  .playpill:active, button.chip:active, .presets button:active, .trimmer .more:active { transform: scale(0.92); opacity: 1; }
+  .acts button:active { transform: scale(0.86); opacity: 1; background: var(--soft); }
+  button.chip:active { background: var(--soft); }
+  .playpill:active { background: var(--line); }
+  .seg button:active { transform: scale(0.95); opacity: 1; }
+  button.chip { cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { .playpill, .chip, .acts button, .seg button, .presets button, .trimmer .more { transition: none; } }
   .skeleton { display: grid; gap: 7px; }
   .skeleton i { height: 0.8em; border-radius: 4px; background: linear-gradient(90deg, var(--soft), var(--line), var(--soft)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
   .skeleton i:nth-child(2) { width: 92%; } .skeleton i:nth-child(3) { width: 64%; }
@@ -724,10 +742,13 @@
 </dialog>
 
 <dialog id="marksDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Bookmarks <span id="markCount" class="muted"></span></h2><button id="marksClose" class="small">Close</button></div>
-  <div id="markOrder" class="seg" role="group" aria-label="Order of bookmarks">
-    <button id="orderBook" aria-pressed="true">Book order</button>
-    <button id="orderNew" aria-pressed="false">Newest</button>
+  <div class="markshead">
+    <h2 tabindex="-1" autofocus>Bookmarks <span id="markCount" class="muted"></span></h2>
+    <div id="markOrder" class="seg" role="group" aria-label="Order of bookmarks">
+      <button id="orderBook" aria-pressed="true">Book order</button>
+      <button id="orderNew" aria-pressed="false">Newest</button>
+    </div>
+    <button id="marksClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <p id="queueStatus" class="muted"></p>
   <div id="marks"></div>
