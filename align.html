@@ -42,9 +42,10 @@
   }
   button, .filebtn { cursor: pointer; }
   button:disabled { opacity: 0.45; cursor: default; }
-  input[type=number] { width: 5.5em; padding: 8px 10px; }
+  input[type=number], input[type=text] { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--fg); width: 5.5em; padding: 8px 10px; }
   select { width: 100%; min-width: 0; }
-  #audioStatus, #bookStatus { overflow-wrap: anywhere; }
+  #audioStatus, #bookStatus, #playerStatus { overflow-wrap: anywhere; }
+  #playerStatus { margin: 10px 0 0; font-size: 0.875rem; }
   input[type=file] { display: none; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
@@ -87,6 +88,12 @@
       <button data-jump="30">+30 s</button>
       <button data-jump="300">+5 min</button>
     </div>
+    <div class="row" style="margin-top:10px">
+      <label for="pos">Position</label>
+      <input id="pos" type="text" inputmode="numeric" value="0:00" style="width:7em" aria-describedby="posHelp">
+      <span id="posHelp" class="muted">h:mm:ss, follows the player or type your own</span>
+    </div>
+    <p id="playerStatus" class="warn" hidden></p>
   </section>
 
   <section>
@@ -141,6 +148,7 @@ const secs = (ms) => (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + ' s';
 
 const WHOLE_FILE_LIMIT = 40 << 20;
 let audioFile = null, source = null, book = null, bookName = '';
+let playType = '';
 let busy = false, lastResult = null, audioUrl = null;
 
 if (!navigator.gpu) {
@@ -165,7 +173,10 @@ $('audioFile').addEventListener('change', async (e) => {
   if (!f) return;
   audioFile = null; source = null; refresh();
   if (audioUrl) URL.revokeObjectURL(audioUrl);
-  audioUrl = URL.createObjectURL(await playable(f));
+  const pf = await playable(f);
+  playType = pf.type;
+  $('playerStatus').hidden = true;
+  audioUrl = URL.createObjectURL(pf);
   audio.src = audioUrl;
   const mb = (f.size / 1048576).toFixed(1) + ' MB';
   const status = $('audioStatus');
@@ -206,10 +217,36 @@ $('bookFile').addEventListener('change', async (e) => {
   }
 });
 
+// The position field is the source of truth, so alignment can still be
+// tested when the player itself refuses the file.
+let position = 0;
+const maxPos = () => (source ? source.duration : isFinite(audio.duration) ? audio.duration : 1e9);
+const parsePos = (str) => {
+  const parts = str.trim().split(':').map(Number);
+  if (!parts.length || parts.some((n) => !isFinite(n) || n < 0)) return null;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+};
+function setPosition(t, fromPlayer) {
+  position = Math.max(0, Math.min(maxPos(), t));
+  if (document.activeElement !== $('pos')) $('pos').value = fmtPos(position);
+  if (!fromPlayer && !audio.error) { try { audio.currentTime = position; } catch (e) {} }
+}
+audio.addEventListener('timeupdate', () => setPosition(audio.currentTime, true));
+$('pos').addEventListener('change', () => {
+  const t = parsePos($('pos').value);
+  $('pos').blur();
+  setPosition(t === null ? position : t);
+});
 document.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => {
-  const max = isFinite(audio.duration) ? audio.duration : (source ? source.duration : 1e9);
-  audio.currentTime = Math.max(0, Math.min(max, audio.currentTime + Number(b.dataset.jump)));
+  setPosition(position + Number(b.dataset.jump));
 }));
+audio.addEventListener('error', () => {
+  const e = audio.error, st = $('playerStatus');
+  st.hidden = false;
+  st.textContent = 'The player cannot play this file (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '')
+    + '; labelled ' + (playType || 'no type') + '). You can still type a position above and align.';
+});
+audio.addEventListener('loadedmetadata', () => { $('playerStatus').hidden = true; });
 
 // ---- worker ----
 let worker = null, pending = null, runId = 0;
@@ -242,7 +279,9 @@ function transcribe(pcm, model, device) {
 $('go').addEventListener('click', async () => {
   if (busy || !audioFile) return;
   busy = true; refresh();
-  const T = audio.currentTime;
+  const typed = parsePos($('pos').value);
+  if (typed !== null) setPosition(typed);
+  const T = position;
   const before = Math.max(5, Number($('before').value) || 45);
   const after = Math.max(0, Number($('after').value) || 0);
   const model = $('model').value, device = $('device').value;
@@ -288,6 +327,7 @@ $('go').addEventListener('click', async () => {
       book: book ? bookName : null,
       transcript: out.text.trim(),
       before: pas ? pas.before : null, after: pas ? pas.after : null,
+      playerError: audio.error ? { code: audio.error.code, message: audio.error.message || '', type: playType } : null,
       ua: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated === true,
     };
     render(lastResult, !!book);
