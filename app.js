@@ -1505,6 +1505,7 @@ function saveTrim() {
 $('marksDlg').addEventListener('close', () => { trim = null; });
 
 // ---------- speech-to-text worker ----------
+let altRuntime = false;   // fetch the model's runtime from the second host
 let asrWorker = null, asrSeq = 0, modelState = 'idle';   // idle | loading | ready | failed
 const asrJobs = new Map();
 function asrRequest(pcm) {
@@ -1530,10 +1531,44 @@ function asrRequest(pcm) {
   return new Promise((resolve, reject) => {
     const id = ++asrSeq;
     asrJobs.set(id, { resolve, reject });
-    asrWorker.postMessage({ id, audio: pcm || null, model: MODEL, device: 'wasm' }, pcm ? [pcm.buffer] : []);
+    asrWorker.postMessage({ id, audio: pcm || null, model: MODEL, device: 'wasm', alt: altRuntime }, pcm ? [pcm.buffer] : []);
   });
 }
 const transcribe = (pcm) => asrRequest(pcm);
+
+// The model's runtime is a large download from a CDN, and on a phone that
+// sometimes fails part-way. A failed start can't be resumed, so each retry
+// begins again with a new worker and without any saved copy of the runtime,
+// in case the saved copy is what is broken.
+const MODEL_RETRIES = [1500, 6000];
+async function forgetRuntime() {
+  try {
+    for (const name of await caches.keys()) {
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) if (/onnxruntime-web|\.wasm(\?|$)/.test(req.url)) await cache.delete(req);
+    }
+  } catch (e) { /* no cache storage here */ }
+}
+async function loadModel() {
+  for (let attempt = 0; ; attempt++) {
+    try { await asrRequest(null); if (attempt) log('speech model loaded on try ' + (attempt + 1) + (altRuntime ? ', from the second host' : '')); return; } catch (err) {
+      log('speech model failed, try ' + (attempt + 1) + ': ' + err.message + ' | online ' + navigator.onLine
+        + ' | service worker ' + !!(navigator.serviceWorker && navigator.serviceWorker.controller));
+      if (asrWorker) { asrWorker.terminate(); asrWorker = null; }
+      for (const job of asrJobs.values()) job.reject(err);
+      asrJobs.clear();
+      await forgetRuntime();
+      if (attempt >= MODEL_RETRIES.length) { altRuntime = false; throw err; }
+      altRuntime = attempt >= 1;   // third try: the other host
+      setQueueStatus('The speech model didn’t load. Trying again…');
+      await new Promise((r) => setTimeout(r, MODEL_RETRIES[attempt]));
+    }
+  }
+}
+// After giving up, try once more whenever the connection or the app comes back.
+function retryModel() { if (modelState === 'failed' && state.books.length) warmModel().then(runQueue, () => {}); }
+window.addEventListener('online', retryModel);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') retryModel(); });
 
 // Loads the speech model ahead of time, so the first bookmark doesn't have
 // to do it in the middle of playback.
@@ -1544,11 +1579,13 @@ function warmModel() {
   modelState = 'loading';
   crumb('loading the speech model');
   setQueueStatus('Getting the speech model ready…');
-  warming = asrRequest(null).then(() => {
+  warming = loadModel().then(() => {
     modelState = 'ready';
   }, (err) => {
     modelState = 'failed';
-    setQueueStatus('Speech model could not load: ' + err.message);
+    setQueueStatus(/network|load failed|fetch/i.test(err.message)
+      ? 'The speech model didn’t download (network error). Bookmarks are still saved; quotes will be found once it loads.'
+      : 'Speech model could not load: ' + err.message);
     throw err;
   }).finally(() => {
     warming = null; crumb(null);
@@ -1562,6 +1599,7 @@ function warmModel() {
 function setQueueStatus(msg) {
   $('queueStatus').textContent = msg;
   $('modelNote').textContent = msg || (modelState === 'ready' ? 'Speech model ready.' : '');
+  $('modelAgain').hidden = modelState !== 'failed';
 }
 function renderModelNote() { setQueueStatus($('queueStatus').textContent); }
 
@@ -2457,6 +2495,7 @@ if (lastCrash) {
     + (lastCrash.playing ? ' (audio was playing).' : '.') + ' Bookmarks are safe; any unfinished quote has a Retry button.';
 }
 $('crashDismiss').addEventListener('click', () => { $('crashNote').hidden = true; });
+$('modelAgain').addEventListener('click', retryModel);
 $('modelRetry').addEventListener('click', () => { $('crashNote').hidden = true; warmModel().catch(() => {}); });
 
 // Load the model at launch, before any audio is playing. Skipped once after

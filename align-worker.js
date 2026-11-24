@@ -1,12 +1,26 @@
 // Runs Whisper off the main thread so the page stays responsive.
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
 
 let asr = null;
 let loadedKey = '';
 
-async function ensure(model, device) {
+// The runtime normally comes from jsDelivr. `alt` switches to a second host,
+// for when the first can't be reached (a content blocker, a bad cached copy).
+function useAltRuntime() {
+  const wasm = env.backends.onnx.wasm, version = env.backends.onnx.versions && env.backends.onnx.versions.web;
+  if (!version) return;
+  const base = 'https://unpkg.com/onnxruntime-web@' + version + '/dist/';
+  const file = (url) => String(url).split('/').pop();
+  const paths = wasm.wasmPaths;
+  wasm.wasmPaths = paths && typeof paths === 'object'
+    ? { mjs: base + file(paths.mjs), wasm: base + file(paths.wasm) } : base;
+  env.useWasmCache = false;
+}
+
+async function ensure(model, device, alt) {
   const key = model + '|' + device;
   if (key === loadedKey) return 0;
+  if (alt) useAltRuntime();
   const t0 = performance.now();
   asr = null; loadedKey = '';
   asr = await pipeline('automatic-speech-recognition', model, {
@@ -25,9 +39,9 @@ async function ensure(model, device) {
 }
 
 self.onmessage = async (e) => {
-  const { id, audio, model, device } = e.data;
+  const { id, audio, model, device, alt } = e.data;
   try {
-    const loadMs = await ensure(model, device);
+    const loadMs = await ensure(model, device, alt);
     if (!audio) {   // warm-up request: load the model and report back
       self.postMessage({ type: 'done', id, loadMs });
       return;

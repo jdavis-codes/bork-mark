@@ -26,8 +26,11 @@ self.addEventListener('fetch', (e) => {
     try {
       // "no-cache" makes the browser check with the server instead of reusing
       // a copy up to ten minutes old, which let a new page run an old script.
-      const res = cdn ? await fetch(req) : await fetch(url.href, { cache: 'no-cache' });
-      if (res.ok) cache.put(req, res.clone());
+      // CDN downloads are large and sometimes drop on a phone: one more go.
+      const res = cdn ? await fetch(req).catch(() => fetch(req.url, { mode: 'cors', credentials: 'omit' }))
+        : await fetch(url.href, { cache: 'no-cache' });
+      // A full disk must not turn a good download into a failed one.
+      if (res.ok) cache.put(req, res.clone()).catch(() => {});
       return res;
     } catch (err) {
       const hit = await cache.match(req, { ignoreSearch: true });
