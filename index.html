@@ -199,6 +199,20 @@
     margin-left: -19px; border-radius: 2px; background: var(--line);
   }
 
+  /* The player is a fixed screen, so the page behind it must not scroll or
+     bounce. Skipped on very short screens, where it may not all fit. */
+  @media (min-height: 480px) {
+    html:has(body.has-bar), body.has-bar { overflow: hidden; overscroll-behavior: none; }
+  }
+
+  /* moving between library and player: the cover and the bottom bar glide
+     between their two positions while the rest cross-fades */
+  #cover, #miniCover { view-transition-name: cover; }
+  #tabbar, #mini { view-transition-name: bottom-bar; }
+  ::view-transition-group(*) { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.2, 0.85, 0.25, 1); }
+  ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
+  @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+
   /* sheet motion */
   @keyframes sheet-up { from { transform: translateY(100%); } }
   @keyframes sheet-down { to { transform: translateY(100%); } }

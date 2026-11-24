@@ -257,7 +257,9 @@ async function renderLibrary() {
     fill.style.width = Math.round(100 * (b.position || 0) / (b.duration || 1)) + '%';
     bar.append(fill); info.append(bar);
     btn.append(img, info);
-    btn.addEventListener('click', () => openBook(b.id));
+    // The tapped cover grows into the player's cover. If this book is the
+    // one in the mini player, that cover is the one that grows instead.
+    btn.addEventListener('click', () => morph(() => openBook(b.id, img.getAttribute('src')), cur && cur.book === b ? null : img));
     const li = el('li'); li.append(btn); ul.append(li);
     if (b.hasCover) stored(b.id, 'cover').then((f) => {
       if (!f) return;
@@ -360,7 +362,7 @@ function chapterAt(b, t) {
   return { i, start: ch[i].start, end: i + 1 < ch.length ? ch[i + 1].start : b.duration, title: ch[i].title, count: ch.length };
 }
 
-async function openBook(id) {
+async function openBook(id, coverNow) {
   const book = state.books.find((b) => b.id === id);
   if (!book) return;
   if (cur && cur.book === book) { showPlayer(); return; }   // already loaded, maybe playing
@@ -374,7 +376,8 @@ async function openBook(id) {
   $('playerError').hidden = true;
   renderInfo();
   renderSpeed();
-  $('cover').removeAttribute('src');
+  // Show the library's copy of the cover at once; the book's own copy replaces it when loaded.
+  if (coverNow) $('cover').src = coverNow; else $('cover').removeAttribute('src');
   cur.audioUrl = URL.createObjectURL(await playable(file));
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
@@ -407,6 +410,21 @@ async function openBook(id) {
   });
 }
 
+// Animates a change of screen. The browser takes a picture before and after
+// `update` and blends them; elements that share a name in both pictures (the
+// cover, the bottom bar) glide from their old place and size to the new one.
+// `fromCover` is a library thumbnail to treat as the cover for this change.
+function morph(update, fromCover) {
+  if (!document.startViewTransition || calm.matches) return update();
+  const mini = $('miniCover');
+  if (fromCover) { fromCover.style.viewTransitionName = 'cover'; mini.style.viewTransitionName = 'none'; }
+  const reset = () => { if (fromCover) fromCover.style.viewTransitionName = ''; mini.style.viewTransitionName = ''; };
+  let t;
+  try { t = document.startViewTransition(async () => { await update(); reset(); }); } catch (e) { reset(); return update(); }
+  t.ready.catch((e) => log('screen animation skipped: ' + ((e && e.message) || e)));
+  t.finished.catch(() => {}).then(reset);
+}
+
 // The two screens. Going to the library leaves the book loaded and playing,
 // with a mini player along the bottom.
 function showPlayer() {
@@ -436,7 +454,7 @@ function closeBook() {
   cur = null;
   renderMini();
 }
-$('backBtn').addEventListener('click', showLibrary);
+$('backBtn').addEventListener('click', () => morph(showLibrary));
 
 // ---------- mini player (library screen) ----------
 function renderMini() {
@@ -451,7 +469,7 @@ function renderMini() {
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
   $('miniFill').style.width = (100 * t / (b.duration || 1)) + '%';
 }
-$('miniOpen').addEventListener('click', showPlayer);
+$('miniOpen').addEventListener('click', () => morph(showPlayer));
 $('miniMark').addEventListener('click', () => addMark());
 $('miniPlay').addEventListener('click', () => {
   log('screen: ' + (audio.paused ? 'play' : 'pause') + ' (mini player)');
@@ -1375,7 +1393,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795508811';
+const BUILD = '1795509161';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
