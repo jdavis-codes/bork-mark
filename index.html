@@ -156,7 +156,7 @@
   .markshead {
     /* top is measured from inside the sheet's 16px padding, which the negative margin cancels */
     position: sticky; top: -16px; z-index: 3; display: flex; align-items: center; gap: 8px;
-    margin: -16px -16px 0; padding: 16px 16px 10px; background: var(--card);
+    margin: -16px -16px 0; padding: 16px 16px 10px; height: 64px; background: var(--card);   /* a fixed height, so the chapter headings below can pin at exactly its bottom edge */
   }
   /* The grab handle is drawn in the heading itself, so the heading sits in the
      same place whether or not the list is scrolled, and the list fades out
@@ -180,7 +180,7 @@
   .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
   .seg button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14); }
-  #marks { margin-top: 4px; }
+  #marks { margin-top: 0; }
   /* Chapter headings: real headings, with space above them, that stay under
      the main heading while their bookmarks scroll past. */
   .group + .group { margin-top: 18px; }
@@ -244,7 +244,10 @@
   .presets button { padding: 7px 12px; border-radius: 999px; font-size: 0.85rem; }
   .presets button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
   /* a plain "+" above and below the text brings in more of the book */
-  .trimmer .more { justify-self: center; padding: 7px; border: none; border-radius: 50%; line-height: 0; color: var(--muted); }
+  .trimmer .more { justify-self: center; padding: 6px; margin: -4px 0; border: none; border-radius: 50%; line-height: 0; color: var(--muted); }
+  .trimmer .more { margin-top: -2px; }
+  .passage p:last-of-type { margin-bottom: 0; }
+  .passage + .more { margin-top: -6px; }   /* tuned so each + has the same clear space (14px) on both sides */
   .trimmer .more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   .passage { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }   /* a held press drags an edge instead of selecting text */
   .passage { position: relative; font-family: Georgia, "Iowan Old Style", serif; font-size: 1.04rem; line-height: 1.62; }
