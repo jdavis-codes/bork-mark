@@ -39,6 +39,21 @@ function save(now) {
   if (now) { clearTimeout(saveTimer); write(); } else if (!saveTimer) saveTimer = setTimeout(write, 4000);
 }
 
+// ---------- diagnostics log ----------
+// A short rolling record of button presses and player events, kept on the
+// device and copyable from Settings, for working out problems after the fact.
+const LOGKEY = 'borkmark.log';
+let logLines = [];
+try { logLines = JSON.parse(localStorage.getItem(LOGKEY)) || []; } catch (e) {}
+function log(msg) {
+  const d = new Date();
+  const stamp = d.toLocaleTimeString([], { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  logLines.push(stamp + (document.visibilityState === 'hidden' ? ' [bg] ' : ' ') + msg);
+  if (logLines.length > 300) logLines = logLines.slice(-300);
+  try { localStorage.setItem(LOGKEY, JSON.stringify(logLines)); } catch (e) {}
+}
+log('--- app opened');
+
 // ---------- crash breadcrumbs ----------
 // iOS kills a page that uses too much memory without any error we can catch.
 // Noting the current heavy step lets the next launch say what was going on,
@@ -47,6 +62,7 @@ const CRUMB = 'borkmark.crumb';
 let lastCrash = null;
 try { lastCrash = JSON.parse(localStorage.getItem(CRUMB)); } catch (e) {}
 function crumb(stage) {
+  if (stage) log('work: ' + stage);
   try {
     if (stage) localStorage.setItem(CRUMB, JSON.stringify({ stage, t: Date.now(), playing: !audio.paused }));
     else localStorage.removeItem(CRUMB);
@@ -290,6 +306,7 @@ audio.addEventListener('pause', syncPlayState);
 audio.addEventListener('ratechange', updatePositionState);
 audio.addEventListener('seeked', updatePositionState);
 document.addEventListener('visibilitychange', () => {
+  log('page ' + document.visibilityState);
   if (document.visibilityState === 'hidden') { if (cur) save(true); }
   runQueue();
 });
@@ -320,9 +337,38 @@ $('scrub').addEventListener('input', () => {
   $('overall').textContent = fmt(t) + ' of ' + fmt(cur.book.duration);
 });
 $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('scrub').value)); });
+// Starts playback, and checks a few seconds later that it really started.
+// If Safari accepted the request but nothing is playing, it has usually let
+// go of the file while paused, so the file is reopened and tried once more.
+let wantPlaying = false, playCheck = null;
+function play(isRetry) {
+  if (!cur) return;
+  wantPlaying = true;
+  const from = audio.currentTime;
+  const p = audio.play();
+  if (p) p.catch((e) => { log('play() refused: ' + e.name + ': ' + e.message); if (!isRetry) toast('Cannot play: ' + e.message); });
+  clearTimeout(playCheck);
+  playCheck = setTimeout(() => {
+    if (!cur || !wantPlaying) return;
+    if (!audio.paused && audio.currentTime !== from) return;   // playing normally
+    log('playback did not start (paused=' + audio.paused + ', readyState=' + audio.readyState + ', networkState=' + audio.networkState
+      + ', error=' + (audio.error ? audio.error.code : 'none') + ')' + (isRetry ? '; giving up' : '; reopening the file'));
+    if (isRetry) { toast('Playback would not restart. Go back to the library and reopen the book.'); return; }
+    const t = cur.book.position;
+    audio.addEventListener('loadedmetadata', () => { cur.book.position = t; play(true); }, { once: true });
+    audio.src = cur.audioUrl;
+    audio.load();
+    cur.book.position = t;
+  }, 2500);
+}
+function pause() { wantPlaying = false; clearTimeout(playCheck); audio.pause(); }
 $('playBtn').addEventListener('click', () => {
-  if (audio.paused) audio.play().catch((e) => toast('Cannot play: ' + e.message)); else audio.pause();
+  log('screen: ' + (audio.paused ? 'play' : 'pause'));
+  if (audio.paused) play(); else pause();
 });
+for (const ev of ['play', 'playing', 'pause', 'waiting', 'stalled', 'ended', 'error', 'emptied', 'loadedmetadata']) {
+  audio.addEventListener(ev, () => log('audio: ' + ev + ' at ' + fmt(audio.currentTime) + ' (ready ' + audio.readyState + ')'));
+}
 $('backward').addEventListener('click', () => seek(audio.currentTime - settings.skipBack));
 $('forward').addEventListener('click', () => seek(audio.currentTime + settings.skipFwd));
 
@@ -374,14 +420,14 @@ function setMediaSession() {
     });
   }
   const on = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) {} };
-  on('play', () => audio.play().catch(() => {}));
-  on('pause', () => audio.pause());
+  on('play', () => { log('button: play'); play(); });
+  on('pause', () => { log('button: pause'); pause(); });
   // With seek handlers set, the lock screen shows skip buttons, while a watch
   // or headset still sends next / previous.
-  on('seekbackward', settings.lockSeek ? () => seek(audio.currentTime - settings.skipBack) : null);
-  on('seekforward', settings.lockSeek ? () => seek(audio.currentTime + settings.skipFwd) : null);
-  on('nexttrack', settings.next.action === 'none' ? null : () => runAction(settings.next));
-  on('previoustrack', settings.prev.action === 'none' ? null : () => runAction(settings.prev));
+  on('seekbackward', settings.lockSeek ? () => log('button: skip back') || seek(audio.currentTime - settings.skipBack) : null);
+  on('seekforward', settings.lockSeek ? () => log('button: skip forward') || seek(audio.currentTime + settings.skipFwd) : null);
+  on('nexttrack', settings.next.action === 'none' ? null : () => { log('button: next track -> ' + settings.next.action); runAction(settings.next); });
+  on('previoustrack', settings.prev.action === 'none' ? null : () => { log('button: previous track -> ' + settings.prev.action); runAction(settings.prev); });
 }
 function updatePositionState() {
   if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
@@ -461,7 +507,7 @@ function renderMarks() {
     const actions = el('div', 'row');
     if (extra) actions.append(extra);
     const play = el('button', 'small', 'Play');
-    play.addEventListener('click', () => { seek(m.t - 30); audio.play().catch(() => {}); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    play.addEventListener('click', () => { seek(m.t - 30); play(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
     actions.append(play);
     if (m.status === 'done' || m.transcript) {
       const copy = el('button', 'small', 'Copy');
@@ -670,6 +716,10 @@ function readSettings() {
 $('settingsDlg').addEventListener('change', readSettings);
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); });
 $('settingsClose').addEventListener('click', () => $('settingsDlg').close());
+$('logCopy').addEventListener('click', async () => {
+  const text = logLines.join('\n') + '\n' + navigator.userAgent;
+  try { await navigator.clipboard.writeText(text); toast('Log copied'); } catch (e) { toast('Copy failed'); }
+});
 renderSettings();
 
 // A bookmark that was mid-transcription when the app closed is not retried
