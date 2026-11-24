@@ -183,7 +183,8 @@
     dialog, dialog::backdrop { animation: none !important; }
     .tabs button, .transport button, #markBtn, .round { transition: none; }
   }
-  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; margin: 14px 0 16px; }
+  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 14px 0; }
+  #infoDlg > p { margin-bottom: 12px; }
   .subnote { color: var(--muted); font-size: 0.8rem; margin: 2px 0 0; }
   .subnote:empty { display: none; }
   .linkbtn { border: none; padding: 0; color: var(--accent); font-size: inherit; }
@@ -491,6 +492,7 @@
   <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="small">Close</button></div>
   <dl id="infoList"></dl>
   <p id="playerError" class="warn" hidden></p>
+  <p id="textStatus" class="muted"></p>
   <div class="row">
     <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
     <button id="removeBtn">Remove book</button>

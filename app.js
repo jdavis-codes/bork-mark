@@ -17,7 +17,6 @@ try {
 
 // A book's title and author can come from four places. In order of trust:
 // typed by you, the book text (EPUB), the audio file's tags, the file name.
-const SOURCES = { you: 'Edited by you.', text: 'From the book text.', audio: 'From the audio file.', file: 'From the audio file’s name.' };
 function resolveMeta(b) {
   b.edited = b.edited || {}; b.fromText = b.fromText || {}; b.src = b.src || {};
   // Books added before sources were tracked only have the audio's values.
@@ -959,29 +958,20 @@ function renderInfo() {
   if (!cur) return;
   const b = cur.book, dl = $('infoList');
   dl.textContent = '';
-  const row = (label, value, note) => {
+  const row = (label, value) => {
     const dd = el('dd');
     dd.append(typeof value === 'string' ? document.createTextNode(value) : value);
-    if (note) dd.append(typeof note === 'string' ? el('div', 'subnote', note) : note);
     dl.append(el('dt', '', label), dd);
     return dd;
   };
 
   for (const f of ['title', 'author']) {
-    // Where the value came from, and what the other source says if it differs.
-    const note = el('div', 'subnote', SOURCES[b.src[f]]);
-    if (b.src[f] !== 'audio' && b.fromAudio[f] && b.fromAudio[f] !== b[f]) note.append(' Audio file: “' + b.fromAudio[f] + '”.');
-    if (b.src[f] === 'you' && b.fromText[f] && b.fromText[f] !== b[f]) note.append(' Book text: “' + b.fromText[f] + '”.');
-    if (b.src[f] === 'you') {
-      const reset = el('button', 'linkbtn', 'Reset');
-      reset.addEventListener('click', () => { delete b.edited[f]; metaChanged(); });
-      note.append(' ', reset);
-    }
+    // Saving an empty field goes back to the value from the book text or audio file.
     row(f === 'title' ? 'Title' : 'Author', editable(b[f], f, (typed) => {
       const auto = b.fromText[f] || b.fromAudio[f] || '';
       if (!typed || typed === auto) delete b.edited[f]; else b.edited[f] = typed;
       metaChanged();
-    }), note);
+    }));
   }
   row('Length', fmt(b.duration));
 
@@ -989,14 +979,12 @@ function renderInfo() {
   if (n < 2) {
     row('Chapters', 'none in this audio file');
   } else {
-    const fromText = ch.filter((c) => c.src === 'text').length, byYou = ch.filter((c) => c.src === 'you').length;
     const toggle = el('button', 'disclose', String(n));
     toggle.setAttribute('aria-expanded', String(chaptersOpen));
     toggle.setAttribute('aria-label', n + ' chapters, ' + (chaptersOpen ? 'hide' : 'show') + ' list');
     toggle.append(icon('M6 9l6 6 6-6'));
     toggle.addEventListener('click', () => { chaptersOpen = !chaptersOpen; renderInfo(); });
-    row('Chapters', toggle, 'Names: ' + [n - fromText - byYou && (n - fromText - byYou) + ' from the audio file',
-      fromText && fromText + ' from the book’s contents', byYou && byYou + ' edited by you'].filter(Boolean).join(', ') + '.');
+    row('Chapters', toggle);
     if (chaptersOpen) {
       const box = el('div', 'chapbox'), ol = el('ol');
       ch.forEach((c, k) => {
@@ -1030,14 +1018,11 @@ function renderInfo() {
     }
   }
 
-  const isEpub = /\.epub$/i.test(b.textName || '');
-  row('Book text', b.hasText ? (b.textName || 'added') : 'none yet',
-    !b.hasText ? 'Bookmarks show what the app heard. Add the EPUB for exact quotes.'
-      : !isEpub ? 'Plain text: no contents list or page numbers.'
-        : (cur.meta.toc.length ? cur.meta.toc.length + ' contents entries. ' : 'No contents list. ')
-          + (cur.meta.pages.length ? cur.meta.pages.length + ' print page numbers, so quotes cite pages.' : 'No print page numbers, so quotes cite the chapter.'));
   row('Audio file', b.audioName + ' (' + b.kind + ')');
   row('Added', new Date(b.added).toLocaleDateString());
+  $('textStatus').textContent = b.hasText
+    ? 'Text: ' + (b.textName || 'added') + '. Bookmarks quote the book’s own wording.'
+    : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
   $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
 }
 // Title and author changed: update everywhere they show.
@@ -1254,7 +1239,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795507126';
+const BUILD = '1795507236';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
