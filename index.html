@@ -208,10 +208,26 @@
   /* moving between library and player: the cover and the bottom bar glide
      between their two positions while the rest cross-fades */
   #cover, #miniCover { view-transition-name: cover; }
-  #tabbar, #mini { view-transition-name: bottom-bar; }
+  #tabbar { view-transition-name: tabbar; }
+  #mini { view-transition-name: mini; }
+  /* each bar slides in from the bottom edge and back out, in step with the cover */
+  ::view-transition-new(tabbar):only-child, ::view-transition-new(mini):only-child { animation: 0.36s cubic-bezier(0.2, 0.85, 0.25, 1) both sheet-up; }
+  ::view-transition-old(tabbar):only-child, ::view-transition-old(mini):only-child { animation: 0.26s ease-in both sheet-down; }
   ::view-transition-group(*) { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.2, 0.85, 0.25, 1); }
   ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
   @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+
+  /* pictures, tables and scanned pages */
+  #viewDlg { overflow-y: auto; }
+  #viewTitle { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+  #viewBody { margin-top: 12px; }
+  .figimg { display: block; width: 100%; height: auto; border-radius: 8px; background: #fff; }
+  .figscroll { overflow-x: auto; }
+  .figtable { border-collapse: collapse; font-size: 0.85rem; }
+  .figtable th, .figtable td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .figtable th { background: var(--soft); }
+  .figlist li { grid-template-columns: 4.2em minmax(0, 1fr); }
+  .figlist .linkbtn { text-align: left; overflow-wrap: anywhere; }
 
   /* sheet motion */
   @keyframes sheet-up { from { transform: translateY(100%); } }
@@ -502,6 +518,21 @@
     </section>
 
     <section>
+      <h3>Sounds and figures</h3>
+      <div class="field">
+        <label class="switchrow" for="sounds"><span>Sounds</span><input id="sounds" type="checkbox" class="switch"></label>
+        <p class="muted">A short tone when you bookmark, skip from your headphones or watch, or reach a picture.</p>
+      </div>
+      <div class="field">
+        <label class="switchrow" for="figAlert"><span>Notice pictures and tables</span><input id="figAlert" type="checkbox" class="switch"></label>
+        <p class="muted">When the reading reaches one in the book text, the app chimes and shows it. To keep track of the place, it listens to a few seconds of the book every few minutes. Locked, that needs “Find quotes while locked”.</p>
+      </div>
+      <div class="field" id="figPauseRow">
+        <label class="switchrow" for="figPause"><span>Pause there</span><input id="figPause" type="checkbox" class="switch"></label>
+      </div>
+    </section>
+
+    <section>
       <h3>Lock screen</h3>
       <div class="field">
         <div class="fieldhead"><label for="lockSeek">Buttons shown</label></div>
@@ -582,6 +613,11 @@
     </button>
   </div>
 </nav>
+
+<dialog id="viewDlg" class="bottom tall">
+  <div class="row spread" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="small">Close</button></div>
+  <div id="viewBody"></div>
+</dialog>
 
 <dialog id="speedDlg" class="bottom">
   <div class="row spread"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="small">Close</button></div>

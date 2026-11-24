@@ -1,6 +1,6 @@
 import {
   openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt,
-  readPdfPages, guessFirstNumbered, buildPageIndex, pageOf,
+  readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage,
 } from './align.js';
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +41,9 @@ const DEFAULTS = {
   skipBack: 30, skipFwd: 30,     // on-screen and lock-screen skip buttons
   lockSeek: true,                // lock screen shows skip buttons rather than track buttons
   bgQuotes: false,               // find quotes while the phone is locked
+  sounds: true,                  // short tones for bookmark, skip and figures
+  figAlert: true,                // chime when the narration reaches a picture or table
+  figPause: false,               // …and pause there
   // What a bookmark captures: seconds of audio either side, or whole paragraphs.
   capture: { mode: 'time', before: 45, after: 15, parasBefore: 1, parasAfter: 1 },
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
@@ -235,7 +238,8 @@ async function stored(dir, name) {
 // The book text, plus where its contents entries and print pages fall in it.
 async function storeText(id, doc) {
   await store('write', id, 'text', new Blob([doc.text], { type: 'text/plain' }));
-  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages })], { type: 'application/json' }));
+  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures })], { type: 'application/json' }));
+  for (let i = 0; i < doc.images.length; i++) await store('write', id, 'img-' + i, doc.images[i]);
 }
 
 // ---------- library ----------
@@ -324,6 +328,7 @@ $('addGo').addEventListener('click', async () => {
       try {
         pdf = await readPdfPages(pf, (p) => addSay('Reading the page scan… ' + Math.round(p * 100) + '%', 0.85 + p * 0.15));
         await store('write', id, 'pagesrc', new Blob([JSON.stringify(pdf)], { type: 'application/json' }));
+        await store('write', id, 'pagepdf', pf);
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
     const book = {
@@ -333,7 +338,7 @@ $('addGo').addEventListener('click', async () => {
       hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
     };
-    if (pdf) { book.pageSrcName = pf.name; book.pageFirst = guessFirstNumbered(pdf.pages) || 1; }
+    if (pdf) { book.hasPagePdf = true; book.pageSrcName = pf.name; book.pageFirst = guessFirstNumbered(pdf.pages) || 1; }
     resolveMeta(book);
     state.books.unshift(book);
     save(true);
@@ -369,7 +374,7 @@ async function openBook(id, coverNow) {
   const file = await stored(id, 'audio');
   if (!file) { toast('The audio for this book is missing from this device'); return; }
   closeBook();
-  cur = { book, source: null, text: null, meta: { toc: [], pages: [] }, pageSrc: null, audioUrl: null, coverUrl: null };
+  cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: null };
   showPlayer();
   $('title').textContent = book.title;
   $('author').textContent = book.author;
@@ -396,7 +401,7 @@ async function openBook(id, coverNow) {
   if (book.hasText) stored(id, 'text').then(async (f) => {
     if (!f || cur !== mine) return;
     const meta = await stored(id, 'meta');
-    if (meta) try { mine.meta = JSON.parse(await meta.text()); } catch (e) {}
+    if (meta) try { mine.meta = { toc: [], pages: [], figures: [], ...JSON.parse(await meta.text()) }; } catch (e) {}
     mine.text = buildBook(await f.text());
     rematch(); runQueue(); renderInfo();
   });
@@ -443,6 +448,7 @@ function showLibrary() {
 function closeBook() {
   if (!cur) return;
   setSleep(null);
+  trackLast = null; pendingFigure = null; reached.clear();
   wantPlaying = false; clearTimeout(playCheck);
   audio.pause();
   keepAlive(false);
@@ -534,9 +540,11 @@ audio.addEventListener('timeupdate', () => {
   if (!scrubbing) renderTime(audio.currentTime);
   if (!$('mini').hidden) renderMini();
   if (sleep && sleep.end != null) checkSleep();
+  trackFigures();
 });
 audio.addEventListener('error', () => {
-  if (!cur || !audio.getAttribute('src')) return;
+  // Unloading the previous book can raise a stray error; only a real one for this book counts.
+  if (!cur || !audio.error || audio.getAttribute('src') !== cur.audioUrl) return;
   const e = audio.error;
   $('playerError').hidden = false;
   $('playerError').textContent = 'This file cannot be played here (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '') + ').';
@@ -556,8 +564,10 @@ audio.addEventListener('play', syncPlayState);
 audio.addEventListener('pause', syncPlayState);
 audio.addEventListener('ratechange', updatePositionState);
 audio.addEventListener('seeked', updatePositionState);
+audio.addEventListener('seeked', () => { trackLast = null; });
 document.addEventListener('visibilitychange', () => {
   log('page ' + document.visibilityState);
+  showPendingFigure();
   if (document.visibilityState === 'visible' && wantPlaying && cur) {
     const from = audio.currentTime;
     setTimeout(() => { if (wantPlaying && cur && (audio.paused || audio.currentTime === from)) unstick(); }, 700);
@@ -638,6 +648,58 @@ function keepAlive(on) {
   }
 }
 
+// ---------- sounds ----------
+// Short tones that confirm an action when the phone is out of sight: two
+// rising notes for a bookmark, a quick up or down pair for skipping forward
+// or back, three notes at a picture or table. They play through their own
+// small audio elements alongside the book.
+const SOUNDS = {
+  mark: [[880, 70], [1320, 120]],
+  fwd: [[700, 45], [1050, 55]],
+  back: [[1050, 45], [700, 55]],
+  figure: [[660, 90], [880, 90], [1100, 150]],
+};
+function toneWav(notes) {
+  const rate = 22050, gap = 0.03;
+  const total = notes.reduce((sum, [, ms]) => sum + ms / 1000 + gap, 0);
+  const n = Math.ceil(rate * total), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const str = (o, t) => { for (let k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  let at = 0;
+  for (const [freq, ms] of notes) {
+    const len = Math.floor(rate * ms / 1000);
+    for (let k = 0; k < len; k++) {
+      const env = Math.min(1, k / 200, (len - k) / 400);   // soft start and end, so no clicks
+      v.setInt16(44 + (at + k) * 2, Math.round(Math.sin(2 * Math.PI * freq * k / rate) * env * 0.3 * 32767), true);
+    }
+    at += len + Math.floor(rate * gap);
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+const fx = {};
+let fxReady = false;
+// iOS only lets a page start sound it has already started once from a tap,
+// so each tone is played silently the first time the user presses play.
+function primeSounds() {
+  if (fxReady || !settings.sounds) return;
+  fxReady = true;
+  for (const key of Object.keys(SOUNDS)) {
+    const a = fx[key] || (fx[key] = new Audio(URL.createObjectURL(toneWav(SOUNDS[key]))));
+    a.preload = 'auto'; a.muted = true;
+    a.play().then(() => { a.pause(); a.currentTime = 0; a.muted = false; }, () => { a.muted = false; fxReady = false; });
+  }
+}
+function sound(key) {
+  const a = fx[key];
+  if (!settings.sounds || !a) return;
+  try { a.currentTime = 0; } catch (e) {}
+  const p = a.play();
+  if (p) p.catch((e) => log('sound "' + key + '" did not play: ' + e.name));
+}
+
 // Starts playback, and checks a few seconds later that audio is really
 // moving. Safari can report "playing" while nothing comes out.
 let wantPlaying = false, playCheck = null;
@@ -645,6 +707,7 @@ function play(isRetry) {
   if (!cur) return;
   wantPlaying = true;
   keepAlive(true);
+  primeSounds();
   const from = audio.currentTime;
   const p = audio.play();
   if (p) p.catch((e) => { log('play() refused: ' + e.name + ': ' + e.message); if (!isRetry) toast('Cannot play: ' + e.message); });
@@ -688,8 +751,8 @@ function runAction(cfg) {
   const t = audio.currentTime, c = chapterAt(cur.book, t), ch = chaptersOf(cur.book);
   switch (cfg.action) {
     case 'mark': addMark(); break;
-    case 'fwd': seek(t + cfg.secs); break;
-    case 'back': seek(t - cfg.secs); break;
+    case 'fwd': seek(t + cfg.secs); sound('fwd'); break;
+    case 'back': seek(t - cfg.secs); sound('back'); break;
     case 'nextChapter': if (c.i + 1 < ch.length) seek(ch[c.i + 1].start); break;
     // Like a music player: first press returns to the chapter start.
     case 'prevChapter': seek(t - c.start > 3 || c.i === 0 ? c.start : ch[c.i - 1].start); break;
@@ -756,8 +819,8 @@ function setMediaSession() {
   });
   // With seek handlers set, the lock screen shows skip buttons, while a watch
   // or headset still sends next / previous.
-  on('seekbackward', settings.lockSeek ? () => log('button: skip back') || seek(audio.currentTime - settings.skipBack) : null);
-  on('seekforward', settings.lockSeek ? () => log('button: skip forward') || seek(audio.currentTime + settings.skipFwd) : null);
+  on('seekbackward', settings.lockSeek ? () => { log('button: skip back'); seek(audio.currentTime - settings.skipBack); sound('back'); } : null);
+  on('seekforward', settings.lockSeek ? () => { log('button: skip forward'); seek(audio.currentTime + settings.skipFwd); sound('fwd'); } : null);
   on('nexttrack', settings.next.action === 'none' ? null : () => { log('button: next track -> ' + settings.next.action); runAction(settings.next); });
   on('previoustrack', settings.prev.action === 'none' ? null : () => { log('button: previous track -> ' + settings.prev.action); runAction(settings.prev); });
 }
@@ -780,6 +843,7 @@ function addMark() {
   lastMarkAt = now;
   const t = audio.currentTime || cur.book.position || 0;
   cur.book.marks.unshift({ id: crypto.randomUUID(), t, created: now, status: 'pending' });
+  sound('mark');
   save(true);
   renderMarks();
   toast('Bookmarked ' + fmt(t));
@@ -860,6 +924,20 @@ function renderMarks() {
         });
         actions.append(share);
       }
+    }
+    for (const i of (m.status === 'done' && m.figs) || []) {
+      const f = cur.meta.figures[i];
+      if (!f) continue;
+      const view = el('button', 'small', f.kind === 'table' ? 'Table' : 'Picture');
+      view.setAttribute('aria-label', (f.kind === 'table' ? 'Table: ' : 'Picture: ') + (f.cap || 'no caption'));
+      view.addEventListener('click', () => openFigure(i));
+      actions.append(view);
+    }
+    if (m.status === 'done' && m.pdfPage != null && b.hasPagePdf) {
+      const page = el('button', 'small', 'Page');
+      page.setAttribute('aria-label', 'Show the scanned page');
+      page.addEventListener('click', () => openPdfPage(m));
+      actions.append(page);
     }
     if (m.status === 'error') {
       const retry = el('button', 'small', 'Retry');
@@ -956,6 +1034,11 @@ function requote(m, text) {
     const section = entryAt(cur.meta.toc, at), page = entryAt(cur.meta.pages, at);
     m.section = section ? section.label : ''; m.page = page ? page.label : '';
   }
+  if (cur && cur.text === text && text.starts.length) {   // pictures and tables that fall inside the quote
+    const at = text.starts[Math.min(m.loc[1], text.starts.length - 1)];
+    const from = at - m.before.length - 40, to = at + m.after.length + 40;
+    m.figs = cur.meta.figures.map((f, i) => (f.at >= from && f.at <= to ? i : -1)).filter((i) => i >= 0).slice(0, 6);
+  }
   if (cur && cur.pageSrc) {   // a scanned edition, when added, decides the page
     m.pdfPage = pageOf(cur.pageSrc.index, m.before, m.after);
     if (m.pdfPage != null) m.page = pageLabel(cur.book, cur.pageSrc, m.pdfPage);
@@ -1008,7 +1091,7 @@ function rematch() {
 
 let queueBusy = false;
 async function runQueue() {
-  if (queueBusy || naming || !cur || !cur.source || !canWork()) return;
+  if (queueBusy || naming || probing || !cur || !cur.source || !canWork()) return;
   if (cur.book.hasText && !cur.text) return;   // text still loading
   queueBusy = true;
   const mine = cur;
@@ -1039,6 +1122,158 @@ async function runQueue() {
     crumb(null);
     if (modelState !== 'failed') setQueueStatus('');
   }
+}
+
+// ---------- looking at a picture, table or scanned page ----------
+let viewUrl = null;
+function showViewer(title, node) {
+  if (viewUrl) { URL.revokeObjectURL(viewUrl); viewUrl = null; }
+  $('viewTitle').textContent = title;
+  $('viewBody').replaceChildren(node);
+  if (!$('viewDlg').open) $('viewDlg').showModal();
+  $('viewDlg').scrollTop = 0;
+}
+async function openFigure(i) {
+  if (!cur) return;
+  const f = cur.meta.figures[i];
+  if (!f) return;
+  if (f.kind === 'table') {
+    const table = el('table', 'figtable');
+    f.rows.forEach((cells, r) => {
+      const tr = el('tr');
+      for (const c of cells) tr.append(el(r === 0 ? 'th' : 'td', '', c));
+      table.append(tr);
+    });
+    const wrap = el('div', 'figscroll'); wrap.append(table);
+    showViewer(f.cap || 'Table', wrap);
+    return;
+  }
+  const file = await stored(cur.book.id, 'img-' + f.img);
+  if (!file) { toast('That picture is not stored on this device'); return; }
+  const img = el('img', 'figimg');
+  img.alt = f.cap || '';
+  showViewer(f.cap || 'Picture', img);
+  viewUrl = URL.createObjectURL(file);
+  img.src = viewUrl;
+}
+async function openPdfPage(m) {
+  const mine = cur, file = await stored(mine.book.id, 'pagepdf');
+  if (!file) { toast('The page scan is not stored on this device'); return; }
+  showViewer((m.page ? 'Page ' + m.page : 'Scanned page') + ' · ' + mine.book.pageSrcName, el('p', 'muted', 'Drawing the page…'));
+  try {
+    const canvas = await renderPdfPage(file, m.pdfPage + 1);
+    canvas.className = 'figimg';
+    if (cur === mine && $('viewDlg').open) $('viewBody').replaceChildren(canvas);
+  } catch (err) {
+    if ($('viewDlg').open) $('viewBody').replaceChildren(el('p', 'warn', 'Could not draw that page: ' + ((err && err.message) || err)));
+  }
+}
+$('viewClose').addEventListener('click', () => closeSheet($('viewDlg')));
+
+// ---------- knowing where the narration is in the text ----------
+// To chime or pause at a picture, the app has to know which part of the text
+// is being read. It keeps "anchors", moments where audio time and text
+// position are both known: every bookmark that found its quote is one, and
+// while this feature is on the app also listens to a few seconds of the book
+// now and then to add more. Between anchors it assumes a steady reading pace.
+function anchorList() {
+  const b = cur.book, starts = cur.text.starts, list = (b.anchors || []).map(([t, at]) => ({ t, at }));
+  for (const m of b.marks) if (m.loc && starts.length) list.push({ t: m.t, at: starts[Math.min(m.loc[1], starts.length - 1)] });
+  return list.sort((x, y) => x.t - y.t);
+}
+// Characters of text read per second of audio around time t. Taken from the
+// nearest pair of anchors when there is one; otherwise from the whole book if
+// that gives a believable figure, and failing that an ordinary reading speed.
+function pace(list, t) {
+  let best = null;
+  for (let i = 1; i < list.length; i++) {
+    const a = list[i - 1], z = list[i], rate = (z.at - a.at) / (z.t - a.t);
+    if (z.t - a.t < 20 || !(rate > 6 && rate < 40)) continue;
+    const far = Math.min(Math.abs(a.t - t), Math.abs(z.t - t));
+    if (!best || far < best.far) best = { far, rate };
+  }
+  if (best) return best.rate;
+  const whole = cur.text.text.length / (cur.book.duration || 1);
+  return whole > 9 && whole < 25 ? whole : 15;
+}
+function textAt(t, list) {
+  if (!list.length) return null;
+  let lo = null, hi = null;
+  for (const a of list) { if (a.t <= t) lo = a; else { hi = a; break; } }
+  if (lo && hi) {
+    const rate = (hi.at - lo.at) / (hi.t - lo.t);
+    if (rate > 6 && rate < 40) return lo.at + (t - lo.t) * rate;
+  }
+  // Outside the anchors, or between two that disagree: carry on from the nearer one.
+  const a = !hi || (lo && t - lo.t <= hi.t - t) ? lo : hi;
+  return a.at + (t - a.t) * pace(list, t);
+}
+
+const PROBE_EVERY = 300;      // seconds of audio allowed between anchors in normal listening
+const PROBE_NEAR = 40;        // …and when a figure is coming up within the next 90 seconds
+let probing = false, probeRest = 0;
+async function probe(t) {
+  if (probing || queueBusy || naming || !canWork() || !cur.source || modelState === 'failed' || Date.now() < probeRest) return;
+  probing = true;
+  const mine = cur, b = mine.book;
+  try {
+    await warmModel();
+    const r = await transcribeAround(mine.source, t, 12, 3, transcribe, crumb);
+    const loc = findInBook(mine.text, r.words, r.split);
+    if (loc && mine.text.starts.length) {
+      (b.anchors = b.anchors || []).push([Math.round(t), mine.text.starts[Math.min(loc.split, mine.text.starts.length - 1)]]);
+      if (b.anchors.length > 400) b.anchors.shift();
+      save();
+    } else {
+      probeRest = Date.now() + 60000;   // nothing recognisable here (music, credits): wait before trying again
+    }
+  } catch (err) {
+    probeRest = Date.now() + 60000;
+  }
+  crumb(null);
+  probing = false;
+  runQueue();
+}
+
+let trackLast = null, trackChecked = 0, pendingFigure = null;
+const reached = new Map();    // figure index -> audio time it was announced at
+function trackFigures() {
+  if (Date.now() - trackChecked < 2000) return;
+  trackChecked = Date.now();
+  if (!cur || !settings.figAlert || !cur.text || !cur.meta.figures.length || audio.paused) return;
+  const t = audio.currentTime, list = anchorList(), est = textAt(t, list), figs = cur.meta.figures;
+  const gap = list.reduce((best, a) => Math.min(best, Math.abs(a.t - t)), Infinity);
+  const next = est == null ? null : figs.find((f) => f.at > est);
+  const soon = !!next && (next.at - est) / pace(list, t) < 90;
+  if (gap > PROBE_EVERY || (soon && gap > PROBE_NEAR)) probe(t);
+  if (est == null) return;
+  // Announce each figure the reading has just passed. A jump (seek, or a fresh
+  // anchor correcting the estimate backwards) is not "passing".
+  if (trackLast && t > trackLast.t && t - trackLast.t < 15 && est > trackLast.est) {
+    figs.forEach((f, i) => {
+      if (f.at <= trackLast.est || f.at > est) return;
+      if (reached.has(i) && Math.abs(reached.get(i) - t) < 180) return;
+      reached.set(i, t);
+      reachFigure(i);
+    });
+  }
+  trackLast = { t, est };
+}
+function reachFigure(i) {
+  const f = cur.meta.figures[i], what = (f.kind === 'table' ? 'Table' : 'Picture') + (f.cap ? ': ' + f.cap : '');
+  log('figure reached at ' + fmt(audio.currentTime) + ': ' + what.slice(0, 60));
+  sound('figure');
+  if (settings.figPause) pause();
+  pendingFigure = i;
+  showPendingFigure();
+  toast(what.length > 60 ? what.slice(0, 58) + '…' : what);
+}
+// Opens the figure straight away if the app is on screen, otherwise the next time it is.
+function showPendingFigure() {
+  if (pendingFigure == null || !cur || document.visibilityState !== 'visible' || document.querySelector('dialog[open]')) return;
+  const i = pendingFigure;
+  pendingFigure = null;
+  openFigure(i);
 }
 
 // ---------- sheets: bookmarks and book info ----------
@@ -1074,7 +1309,7 @@ function editable(value, label, onSave, shown) {
   return wrap;
 }
 
-let chaptersOpen = false, chapStatusText = '';
+let chaptersOpen = false, figuresOpen = false, chapStatusText = '';
 function renderInfo() {
   if (!cur) return;
   const b = cur.book, dl = $('infoList');
@@ -1139,6 +1374,28 @@ function renderInfo() {
     }
   }
 
+  const figs = cur.meta.figures || [];
+  if (figs.length) {
+    const toggle = el('button', 'disclose', String(figs.length));
+    toggle.setAttribute('aria-expanded', String(figuresOpen));
+    toggle.setAttribute('aria-label', figs.length + ' pictures and tables, ' + (figuresOpen ? 'hide' : 'show') + ' list');
+    toggle.append(icon('M6 9l6 6 6-6'));
+    toggle.addEventListener('click', () => { figuresOpen = !figuresOpen; renderInfo(); });
+    row('Figures', toggle);
+    if (figuresOpen) {
+      const box = el('div', 'chapbox'), ol = el('ol', 'figlist');
+      figs.forEach((f, i) => {
+        const li = el('li'), btn = el('button', 'linkbtn', f.cap || (f.kind === 'table' ? 'Table' : 'Picture') + ' ' + (i + 1));
+        btn.addEventListener('click', () => openFigure(i));
+        const sec = entryAt(cur.meta.toc, f.at);
+        li.append(el('span', 'muted', f.kind === 'table' ? 'Table' : 'Picture'), btn);
+        if (sec) btn.title = sec.label;
+        ol.append(li);
+      });
+      box.append(ol);
+      dl.append(box);
+    }
+  }
   if (b.pageSrcName) {
     row('Page PDF', b.pageSrcName + (cur.pageSrc ? ' (' + cur.pageSrc.count + ' pages)' : ''));
     // Scans start with unnumbered front matter; this says where page 1 is.
@@ -1165,7 +1422,7 @@ function metaChanged() {
   $('title').textContent = b.title; $('author').textContent = b.author;
   setMediaSession(); renderInfo();
 }
-$('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
+$('infoBtn').addEventListener('click', () => { chaptersOpen = false; figuresOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 
 // ---------- chapter names ----------
@@ -1189,7 +1446,7 @@ async function nameChapters() {
   naming = true; renderInfo();
   let named = 0;
   try {
-    while (queueBusy) { say('Waiting for bookmarks to finish…'); await new Promise((r) => setTimeout(r, 500)); }
+    while (queueBusy || probing) { say('Waiting for bookmarks to finish…'); await new Promise((r) => setTimeout(r, 500)); }
     await warmModel();
     for (let i = 0; i < b.chapters.length && cur === mine; i++) {
       const ch = b.chapters[i];
@@ -1230,10 +1487,11 @@ $('textFile').addEventListener('change', async (e) => {
     b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
     b.fromText = { title: doc.title, author: doc.author };
     // Saved positions pointed into the old text, so they can't be re-cut against the new one.
-    for (const m of b.marks) delete m.loc;
+    for (const m of b.marks) { delete m.loc; delete m.figs; }
+    delete b.anchors;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
-    mine.meta = { toc: doc.toc, pages: doc.pages };
+    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures };
     mine.text = buildBook(doc.text);
     metaChanged(); renderTextStatus(); rematch(); runQueue();
     toast('Book text added');
@@ -1250,6 +1508,8 @@ $('pageFile').addEventListener('change', async (e) => {
     say('Reading ' + f.name + '…');
     const pdf = await readPdfPages(f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));
     await store('write', b.id, 'pagesrc', new Blob([JSON.stringify(pdf)], { type: 'application/json' }));
+    await store('write', b.id, 'pagepdf', f);
+    b.hasPagePdf = true;
     b.pageSrcName = f.name;
     b.pageFirst = guessFirstNumbered(pdf.pages) || 1;
     save(true);
@@ -1353,6 +1613,8 @@ function renderSettings() {
   $('capParas').hidden = settings.capture.mode !== 'paras';
   $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
   $('bgQuotes').checked = settings.bgQuotes;
+  $('sounds').checked = settings.sounds; $('figAlert').checked = settings.figAlert; $('figPause').checked = settings.figPause;
+  $('figPauseRow').hidden = !settings.figAlert;
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
   $('backward').setAttribute('aria-label', 'Back ' + settings.skipBack + ' seconds');
   $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
@@ -1364,6 +1626,7 @@ function readSettings() {
   settings.capture.mode = $('capMode').value;
   settings.lockSeek = $('lockSeek').value === 'skip';
   settings.bgQuotes = $('bgQuotes').checked;
+  settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;
   save(true);
   renderSettings(); setMediaSession(); runQueue();
   if (JSON.stringify(settings.capture) !== was) requoteAll();
@@ -1393,7 +1656,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795509161';
+const BUILD = '1795510228';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

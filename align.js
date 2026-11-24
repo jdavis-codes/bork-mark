@@ -352,7 +352,7 @@ const epubType = (n) => (n.getAttribute('epub:type') || n.getAttributeNS('http:/
 // Text of one chapter file. `anchors` lists places in this file that the
 // table of contents or page list points at; a marker is left at each so its
 // position in the finished text can be found.
-function htmlToText(markup, anchors = []) {
+function htmlToText(markup, anchors = [], ctx = null) {
   let doc = new DOMParser().parseFromString(markup, 'application/xhtml+xml');
   if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(markup, 'text/html');
   const body = doc.querySelector('body') || doc.documentElement;
@@ -364,6 +364,33 @@ function htmlToText(markup, anchors = []) {
     const label = n.getAttribute('title') || n.getAttribute('aria-label') || n.textContent.trim() || (n.id.match(/\d+$/) || [''])[0];
     n.textContent = '';
     if (label && !listed.has(n.id)) n.parentNode.insertBefore(doc.createTextNode(marker('P', label)), n);
+  }
+  // Pictures and tables: a marker is left where each one sits, and what it is
+  // goes into ctx.figs.
+  if (ctx) {
+    const seen = new Set();
+    const add = (node, fig) => { ctx.figs.push(fig); node.parentNode.insertBefore(doc.createTextNode(marker('F', ctx.figs.length - 1)), node); };
+    const srcOf = (img) => resolveHref(dirOf(ctx.path), img.getAttribute('src') || img.getAttribute('href')
+      || img.getAttributeNS('http://www.w3.org/1999/xlink', 'href') || '')[0];
+    const tableFig = (table, cap) => {
+      const rows = Array.from(table.querySelectorAll('tr')).slice(0, 60)
+        .map((tr) => Array.from(tr.children).slice(0, 12).map((c) => clean(c.textContent).slice(0, 200)));
+      // one row or one column is page layout, not data
+      return rows.length > 1 && rows.some((r) => r.length > 1) ? { kind: 'table', cap: cap || clean((table.querySelector('caption') || {}).textContent), rows } : null;
+    };
+    for (const fig of body.querySelectorAll('figure')) {
+      const img = fig.querySelector('img, image'), table = fig.querySelector('table');
+      const cap = clean((fig.querySelector('figcaption') || {}).textContent);
+      fig.querySelectorAll('img, image, table').forEach((n) => seen.add(n));
+      if (img && srcOf(img)) add(fig, { kind: 'image', src: srcOf(img), cap: cap || clean(img.getAttribute('alt')) });
+      else if (table && tableFig(table, cap)) add(fig, tableFig(table, cap));
+    }
+    for (const img of body.querySelectorAll('img, image')) {
+      if (!seen.has(img) && srcOf(img)) add(img, { kind: 'image', src: srcOf(img), cap: clean(img.getAttribute('alt') || img.getAttribute('title')) });
+    }
+    for (const table of body.querySelectorAll('table')) {
+      if (!seen.has(table) && !table.parentNode.closest('table') && tableFig(table, '')) add(table, tableFig(table, ''));
+    }
   }
   for (const a of anchors) {
     let target = null;
@@ -391,14 +418,16 @@ const dirOf = (path) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/'
 const byTag = (node, name) => Array.from(node.getElementsByTagNameNS('*', name));
 const clean = (str) => (str || '').replace(/\s+/g, ' ').trim();
 
-// Reads a book into {text, title, author, toc, pages}. `toc` and `pages` are
+// Reads a book into {text, title, author, toc, pages, figures, images}. Each
+// figure is {at, kind: 'image' | 'table', cap, img | rows}; img indexes `images`.
+// `toc` and `pages` are
 // lists of {label, at}, where `at` is a character position in `text`; pages
 // are the print edition's page numbers when the EPUB records them.
 export async function readBook(file) {
   if (!/\.epub$/i.test(file.name)) {
     // Plain text is often hard-wrapped; join lines within a paragraph.
     const text = (await file.text()).replace(/\r/g, '').replace(/([^\n])\n(?!\n)/g, '$1 ');
-    return { text, title: '', author: '', toc: [], pages: [] };
+    return { text, title: '', author: '', toc: [], pages: [], figures: [], images: [] };
   }
   const { unzipSync, strFromU8 } = await import('https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js');
   const zip = unzipSync(new Uint8Array(await file.arrayBuffer()));
@@ -451,21 +480,38 @@ export async function readBook(file) {
     }
   } catch (e) { /* a broken contents list should not stop the text loading */ }
 
-  const raw = spine.map((path) => htmlToText(strFromU8(zip[path]), anchors.get(path))).join('\n\n');
+  const figs = [];
+  const raw = spine.map((path) => htmlToText(strFromU8(zip[path]), anchors.get(path), { path, figs })).join('\n\n');
   // Take the markers back out, noting where each one was.
-  const toc = [], pages = [];
-  let text = '', last = 0;
-  const re = /([PT])([^]*)/g;
+  const toc = [], pages = [], figures = [], images = [], imageAt = new Map();
+  let text = '', last = 0, imageBytes = 0;
+  const TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+  const re = new RegExp(MARK_OPEN + '([PTF])([^' + MARK_CLOSE + ']*)' + MARK_CLOSE, 'g');
   for (let m; (m = re.exec(raw));) {
     text += raw.slice(last, m.index); last = re.lastIndex;
-    (m[1] === 'T' ? toc : pages).push({ label: m[2], at: text.length });
+    if (m[1] !== 'F') { (m[1] === 'T' ? toc : pages).push({ label: m[2], at: text.length }); continue; }
+    const fig = figs[Number(m[2])];
+    if (!fig) continue;
+    if (fig.kind === 'table') { figures.push({ at: text.length, kind: 'table', cap: fig.cap, rows: fig.rows }); continue; }
+    // Keep real pictures: skip ornaments and rules (tiny files), anything huge,
+    // and stop once the book's pictures pass 60 MB in all.
+    const bytes = zip[fig.src], type = TYPES[(fig.src.split('.').pop() || '').toLowerCase()];
+    if (!bytes || !type || bytes.length < 4096 || bytes.length > 6 << 20) continue;
+    if (/(^|[\/_-])(cover|logo|titlepage)[^\/]*$/i.test(fig.src)) continue;   // not part of the text
+    if (!imageAt.has(fig.src)) {
+      if (imageBytes + bytes.length > 60 << 20) continue;
+      imageBytes += bytes.length;
+      imageAt.set(fig.src, images.length);
+      images.push(new Blob([bytes], { type }));
+    }
+    figures.push({ at: text.length, kind: 'image', cap: fig.cap, img: imageAt.get(fig.src) });
   }
   text += raw.slice(last);
   const dedupe = (list) => list.filter((x, k) => k === 0 || x.label !== list[k - 1].label);
   toc.sort((a, b) => a.at - b.at); pages.sort((a, b) => a.at - b.at);
   const meta = byTag(opf, 'metadata')[0] || opf;
   return {
-    text, toc: dedupe(toc), pages: dedupe(pages),
+    text, toc: dedupe(toc), pages: dedupe(pages), figures, images,
     title: clean((byTag(meta, 'title')[0] || {}).textContent),
     author: byTag(meta, 'creator').map((c) => clean(c.textContent)).filter(Boolean).join(', '),
   };
@@ -646,14 +692,34 @@ export function quoteAt(book, loc, capture) {
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/';
 
 // Text of every page of a PDF, plus the PDF's own page labels if it has any.
-export async function readPdfPages(file, onProgress = () => {}) {
+async function openPdf(file) {
   const pdfjs = await import(PDFJS + 'pdf.min.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     // A worker script must come from this site, so fetch the library's and wrap it.
     const code = await (await fetch(PDFJS + 'pdf.worker.min.mjs')).text();
     pdfjs.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
   }
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  return await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+}
+
+// One page of a PDF (counting from 1) drawn onto a canvas `width` pixels wide.
+export async function renderPdfPage(file, number, width = 1400) {
+  const doc = await openPdf(file);
+  try {
+    const page = await doc.getPage(number);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: width / base.width });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    return canvas;
+  } finally {
+    doc.destroy();
+  }
+}
+
+export async function readPdfPages(file, onProgress = () => {}) {
+  const doc = await openPdf(file);
   try {
     let labels = null;
     try { labels = await doc.getPageLabels(); } catch (e) { /* optional */ }
