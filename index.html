@@ -421,6 +421,24 @@
   #infoDlg > p { margin-bottom: 12px; }
   .subnote { color: var(--muted); font-size: 0.8rem; margin: 2px 0 0; }
   .subnote:empty { display: none; }
+  .filerow { display: grid; gap: 2px; min-width: 0; }
+  .filerow .editable { font-size: 0.9rem; }
+  .filerow a { color: var(--accent); }
+  .textfield { width: 100%; font: inherit; font-size: 16px; color: inherit; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
+  /* intro guide: one step at a time */
+  #introDlg { text-align: center; }
+  #introArt { width: 96px; height: 96px; margin: 18px auto 14px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: var(--accent); }
+  #introArt svg { width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #introTitle { margin: 0 0 8px; }
+  #introBody { margin: 0 auto; max-width: 34ch; min-height: 7.5em; color: var(--muted); }
+  #introDots { display: flex; justify-content: center; gap: 7px; margin: 14px 0 16px; }
+  #introDots span { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background 0.2s, transform 0.2s; }
+  #introDots span.on { background: var(--accent); transform: scale(1.25); }
+  #introDlg .introrow { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+  #introStep { animation: intro-in 0.25s ease-out; }
+  @keyframes intro-in { from { opacity: 0; transform: translateX(14px); } }
+  @media (prefers-reduced-motion: reduce) { #introStep { animation: none; } }
+  .citepreview { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); border-radius: 0 10px 10px 0; overflow-wrap: anywhere; }
   .linkbtn { border: none; padding: 0; color: var(--accent); font-size: inherit; }
   /* inline editing: no box, a pencil beside the value */
   .editable { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
@@ -721,6 +739,27 @@
     </section>
 
     <section>
+      <h3>Citations</h3>
+      <div class="field">
+        <div class="fieldhead"><label for="citeStyle">Style</label></div>
+        <div class="select"><select id="citeStyle"><option value="simple">Simple</option><option value="mla">MLA</option><option value="apa">APA</option><option value="chicago">Chicago</option></select></div>
+      </div>
+      <div class="field">
+        <label class="switchrow" for="citeTime"><span>Include the audio time</span><input id="citeTime" type="checkbox" class="switch"></label>
+      </div>
+      <div class="field" id="citeTimeField">
+        <div class="fieldhead"><label for="citeTimeText">Audio time wording</label></div>
+        <input id="citeTimeText" type="text" class="textfield" autocomplete="off" autocapitalize="off" enterkeyhint="done" placeholder="audiobook, {time}">
+        <p class="muted">{time} is replaced with the bookmark’s place in the audio.</p>
+      </div>
+      <div class="field">
+        <span class="fieldname">Preview</span>
+        <p id="citePreview" class="citepreview"></p>
+        <p class="muted">Added under a quote when you copy or share it. Publisher and year come from About this book. Styles are plain text, so titles are not italic.</p>
+      </div>
+    </section>
+
+    <section>
       <h3>Sounds and figures</h3>
       <div class="field">
         <label class="switchrow" for="sounds"><span>Sounds</span><input id="sounds" type="checkbox" class="switch"></label>
@@ -767,10 +806,20 @@
     <section>
       <h3>App</h3>
       <p id="appVersion" class="muted">Checking for the latest version…</p>
-      <button id="appReload">Reload app</button>
+      <div class="row"><button id="appReload">Reload app</button><button id="introShow">Show the intro guide</button></div>
       <p class="muted">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
     </section>
   </div>
+</dialog>
+
+<dialog id="introDlg" class="bottom">
+  <div id="introStep">
+    <div id="introArt"></div>
+    <h2 id="introTitle" tabindex="-1" autofocus></h2>
+    <p id="introBody"></p>
+  </div>
+  <div id="introDots" aria-hidden="true"></div>
+  <div class="introrow"><button id="introSkip">Skip</button><button id="introNext" class="primary">Next</button></div>
 </dialog>
 
 <dialog id="chapDlg" class="bottom">

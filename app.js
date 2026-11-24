@@ -3,6 +3,7 @@ import {
   readPdfPages, guessFirstNumbered, buildPageIndex, pageOf, renderPdfPage, findTextTables,
   tokenize, sentencesIn, unwrapLines,
 } from './align.js';
+import { formatCitation, STYLES } from './cite.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
@@ -19,13 +20,15 @@ try {
   if (saved && Array.isArray(saved.books)) state = saved;
 } catch (e) { /* storage unavailable: run without persistence */ }
 
-// A book's title and author can come from four places. In order of trust:
-// typed by you, the book text (EPUB), the audio file's tags, the file name.
+// A book's details can come from four places. In order of trust: typed by
+// you, the book text (EPUB), the audio file's tags, the file name.
+const META = ['title', 'author', 'publisher', 'year'];
+const fromDoc = (doc) => (doc ? Object.fromEntries(META.map((f) => [f, doc[f] || ''])) : {});
 function resolveMeta(b) {
   b.edited = b.edited || {}; b.fromText = b.fromText || {}; b.src = b.src || {};
   // Books added before sources were tracked only have the audio's values.
   b.fromAudio = b.fromAudio || { title: b.title || '', author: b.author || '' };
-  for (const f of ['title', 'author']) {
+  for (const f of META) {
     const pick = b.edited[f] ? 'you' : b.fromText[f] ? 'text' : b.fromAudio[f] ? 'audio' : 'file';
     b.src[f] = pick;
     b[f] = pick === 'you' ? b.edited[f] : pick === 'text' ? b.fromText[f] : pick === 'audio' ? b.fromAudio[f]
@@ -48,6 +51,9 @@ const DEFAULTS = {
   // What a bookmark captures: seconds of audio either side, or whole paragraphs.
   capture: { mode: 'time', before: 45, after: 15, parasBefore: 1, parasAfter: 1 },
   trimSnap: true,                // trimming: ends settle on whole sentences
+  citeStyle: 'simple',           // simple | mla | apa | chicago
+  citeTime: true,                // citations end with the place in the audio
+  citeTimeText: 'audiobook, {time}',
   markOrder: 'book',             // bookmarks list: 'book' (by chapter) or 'new' (latest first)
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
 };
@@ -365,7 +371,7 @@ $('addGo').addEventListener('click', async () => {
     }
     const book = {
       id, fromAudio: { title: src.tags.title || '', author: src.tags.author || '' },
-      fromText: doc ? { title: doc.title, author: doc.author } : {},
+      fromText: fromDoc(doc),
       audioName: af.name, kind: src.kind, duration: src.duration, chapters: src.chapters,
       hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
@@ -1605,11 +1611,11 @@ function findPages(onlyMissing) {
   return found;
 }
 
-// Author, Title, “Chapter”, p. 12 (audiobook, 1:23:45)
+// The line under a shared quote, in the style chosen in Settings.
+const citeOptions = () => ({ style: settings.citeStyle, audioTime: settings.citeTime, audioText: settings.citeTimeText });
 function citation(b, m) {
-  const c = chapterAt(b, m.t), where = m.section || (c.count > 1 ? c.title : '');
-  return [b.author, b.title, where && '“' + where + '”', m.page && 'p. ' + m.page].filter(Boolean).join(', ')
-    + ' (audiobook, ' + fmt(m.t) + ')';
+  const c = chapterAt(b, m.t), section = m.section || (c.count > 1 ? c.title : '');
+  return formatCitation({ author: b.author, title: b.title, publisher: b.publisher, year: b.year, section, page: m.page, time: fmt(m.t) }, citeOptions());
 }
 const shareText = (b, m) => (m.status === 'done' ? '“' + (m.before + m.after).trim() + '”' : m.transcript) + '\n\n— ' + citation(b, m);
 function requoteAll() {
@@ -1948,7 +1954,7 @@ function icon(d, cls) {
 // A value with a pencil beside it. Tapping the pencil turns the text into a
 // plain underlined field; Return or tapping away saves, Escape cancels.
 function editable(value, label, onSave, shown) {
-  const wrap = el('span', 'editable'), text = el('span', '', shown || value || '—');
+  const wrap = el('span', 'editable'), text = shown instanceof Node ? shown : el('span', '', shown || value || '—');
   const btn = el('button', 'pencil');
   btn.type = 'button'; btn.setAttribute('aria-label', 'Edit ' + label); btn.append(icon(PENCIL));
   btn.addEventListener('click', () => {
@@ -1978,9 +1984,9 @@ function renderInfo() {
     return dd;
   };
 
-  for (const f of ['title', 'author']) {
+  for (const f of META) {
     // Saving an empty field goes back to the value from the book text or audio file.
-    row(f === 'title' ? 'Title' : 'Author', editable(b[f], f, (typed) => {
+    row(f[0].toUpperCase() + f.slice(1), editable(b[f], f, (typed) => {
       const auto = b.fromText[f] || b.fromAudio[f] || '';
       if (!typed || typed === auto) delete b.edited[f]; else b.edited[f] = typed;
       metaChanged();
@@ -2031,8 +2037,29 @@ function renderInfo() {
     }
   }
 
+  // Each file can carry a web address: where it was bought or can be read.
+  b.links = b.links || {};
+  const fileRow = (label, name, key) => {
+    const url = b.links[key], box = el('div', 'filerow');
+    let shown = el('span', 'muted', 'Add a link');
+    if (url) {
+      shown = el('a', '', url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
+      shown.href = url; shown.target = '_blank'; shown.rel = 'noopener';
+    }
+    box.append(el('span', '', name), editable(url || '', 'link for the ' + label.toLowerCase(), (typed) => {
+      // Only web addresses; a bare "libro.fm/…" gets https:// in front.
+      const link = typed && !/^https?:\/\//i.test(typed) ? 'https://' + typed : typed;
+      let ok = false;
+      try { ok = !!link && /^https?:$/.test(new URL(link).protocol) && !/\s/.test(link); } catch (e) { /* not an address */ }
+      if (ok) b.links[key] = link; else { delete b.links[key]; if (typed) toast('That doesn’t look like a web address'); }
+      save(true); renderInfo();
+    }, shown));
+    row(label, box);
+  };
+  fileRow('Audio file', b.audioName + ' (' + b.kind + ')', 'audio');
+  if (b.hasText) fileRow('Book text', b.textName || 'added', 'text');
   if (b.pageSrcName) {
-    row('Page PDF', b.pageSrcName + (cur.pageSrc ? ' (' + cur.pageSrc.count + ' pages)' : ''));
+    fileRow('Page PDF', b.pageSrcName + (cur.pageSrc ? ' (' + cur.pageSrc.count + ' pages)' : ''), 'pdf');
     // Scans start with unnumbered front matter; this says where page 1 is.
     if (cur.pageSrc && !cur.pageSrc.labels) {
       row('Page 1 is', editable(String(b.pageFirst || 1), 'which PDF page is printed page 1', (typed) => {
@@ -2042,11 +2069,10 @@ function renderInfo() {
       }, 'PDF page ' + (b.pageFirst || 1)));
     }
   }
-  row('Audio file', b.audioName + ' (' + b.kind + ')');
   row('Added', new Date(b.added).toLocaleDateString());
   $('pageBtnLabel').textContent = b.pageSrcName ? 'Replace page PDF' : 'Add page PDF';
   $('textStatus').textContent = b.hasText
-    ? 'Text: ' + (b.textName || 'added') + '. Bookmarks quote the book’s own wording.'
+    ? 'Bookmarks quote the book’s own wording.'
     : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
   $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
 }
@@ -2120,7 +2146,7 @@ $('textFile').addEventListener('change', async (e) => {
     const doc = await readBook(f);
     await storeText(b.id, doc);
     b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
-    b.fromText = { title: doc.title, author: doc.author };
+    b.fromText = fromDoc(doc);
     // Saved positions pointed into the old text, so they can't be re-cut against the new one.
     for (const m of b.marks) { delete m.loc; delete m.figs; delete m.trim; }
     delete b.anchors;
@@ -2249,11 +2275,26 @@ function renderSettings() {
   $('capParas').hidden = settings.capture.mode !== 'paras';
   $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
   $('bgQuotes').checked = settings.bgQuotes; $('trimSnap').checked = settings.trimSnap;
+  $('citeStyle').value = settings.citeStyle; $('citeTime').checked = settings.citeTime;
+  if (document.activeElement !== $('citeTimeText')) $('citeTimeText').value = settings.citeTimeText;
+  $('citeTimeField').hidden = !settings.citeTime;
+  renderCitePreview();
   $('sounds').checked = settings.sounds; $('figAlert').checked = settings.figAlert; $('figPause').checked = settings.figPause;
   $('figPauseRow').hidden = !settings.figAlert;
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
   $('backward').setAttribute('aria-label', 'Back ' + settings.skipBack + ' seconds');
   $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
+}
+// An example in the chosen style: the open book's latest bookmark if there is one.
+const CITE_SAMPLE = { author: 'Henry Ford, Samuel Crowther', title: 'My Life and Work', publisher: 'Doubleday, Page & Company', year: '1922', section: 'Chapter V', page: '77', time: '2:14:09' };
+function renderCitePreview() {
+  const m = cur && cur.book.marks[cur.book.marks.length - 1];
+  const wording = $('citeTimeText').value.trim() || DEFAULTS.citeTimeText;
+  $('citePreview').textContent = m && cur.book.author
+    ? formatCitation({ author: cur.book.author, title: cur.book.title, publisher: cur.book.publisher, year: cur.book.year,
+      section: m.section || (chapterAt(cur.book, m.t).count > 1 ? chapterAt(cur.book, m.t).title : ''), page: m.page, time: fmt(m.t) },
+    { style: $('citeStyle').value, audioTime: $('citeTime').checked, audioText: wording })
+    : formatCitation(CITE_SAMPLE, { style: $('citeStyle').value, audioTime: $('citeTime').checked, audioText: wording });
 }
 function readSettings() {
   const was = JSON.stringify(settings.capture);
@@ -2262,6 +2303,9 @@ function readSettings() {
   settings.capture.mode = $('capMode').value;
   settings.lockSeek = $('lockSeek').value === 'skip';
   settings.bgQuotes = $('bgQuotes').checked; settings.trimSnap = $('trimSnap').checked;
+  settings.citeStyle = STYLES[$('citeStyle').value] ? $('citeStyle').value : 'simple';
+  settings.citeTime = $('citeTime').checked;
+  settings.citeTimeText = $('citeTimeText').value.trim() || DEFAULTS.citeTimeText;
   settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;
   save(true);
   renderSettings(); setMediaSession(); runQueue();
@@ -2272,6 +2316,7 @@ $('settingsDlg').addEventListener('change', readSettings);
 $('settingsDlg').addEventListener('input', (e) => {
   const row = SLIDERS.find((r) => r[0] === e.target.id);
   if (row) $(row[0] + 'Out').textContent = row[3](Number(e.target.value));
+  if (e.target.id === 'citeTimeText') renderCitePreview();
 });
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', () => { renderSettings(); $('settingsDlg').showModal(); $('settingsDlg').scrollTop = 0; });
 $('settingsClose').addEventListener('click', () => closeSheet($('settingsDlg')));
@@ -2292,7 +2337,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795537690';
+const BUILD = '1795541071';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
@@ -2338,6 +2383,41 @@ for (const b of state.books) {
 }
 save(true);
 
+// ---------- intro guide ----------
+// Shown once to someone with an empty library; Settings can show it again.
+const INTRO = [
+  { art: 'M7 4h10v16l-5-4-5 4z', title: 'Bookmark without touching your phone',
+    body: 'Bork Mark plays your audiobooks. Press a button on your headphones and it saves the passage you just heard, in the book’s own words. Everything stays on this device.' },
+  { art: 'M12 5v14M5 12h14', title: 'Add a book',
+    body: 'Pick the audio file (M4B or MP3). Add the EPUB as well to get exact quotes, and a PDF if you want the printed page numbers. Files need to be free of copy protection.' },
+  { art: 'M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z', title: 'Bookmark from anywhere',
+    body: 'Double- or triple-press your headphone button, press next track on a watch, or tap Bookmark. It works with the phone locked. Settings decides what each button does.' },
+  { art: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12', title: 'Trim, cite and share',
+    body: 'The app listens to a few seconds around each bookmark and finds them in the text. Open Bookmarks to trim a quote to the sentences you want, then copy or share it with a citation.' },
+  { art: 'M12 15V3M8 7l4-4 4 4M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', title: 'Keep it on your Home Screen',
+    body: 'In Safari, tap Share, then Add to Home Screen. The app opens full screen, works without signal, and iOS keeps your books stored.' },
+];
+let introAt = 0;
+function renderIntro() {
+  const step = INTRO[introAt], last = introAt === INTRO.length - 1;
+  $('introArt').replaceChildren(icon(step.art));
+  $('introTitle').textContent = step.title; $('introBody').textContent = step.body;
+  $('introDots').replaceChildren(...INTRO.map((_, k) => el('span', k === introAt ? 'on' : '')));
+  $('introNext').textContent = last ? (state.books.length ? 'Done' : 'Add a book') : 'Next';
+  $('introSkip').textContent = introAt ? 'Back' : 'Skip';
+  // Restart the slide-in for the new step.
+  const box = $('introStep'); box.style.animation = 'none'; void box.offsetWidth; box.style.animation = '';
+}
+function showIntro() { introAt = 0; renderIntro(); $('introDlg').showModal(); }
+$('introNext').addEventListener('click', () => {
+  if (introAt < INTRO.length - 1) { introAt++; renderIntro(); return; }
+  closeSheet($('introDlg'));
+  if (!state.books.length) setTimeout(() => $('addBtn').click(), 240);
+});
+$('introSkip').addEventListener('click', () => { if (introAt) { introAt--; renderIntro(); } else closeSheet($('introDlg')); });
+$('introDlg').addEventListener('close', () => { state.introSeen = true; save(true); });
+$('introShow').addEventListener('click', () => { closeSheet($('settingsDlg')); setTimeout(showIntro, 240); });
+
 if (lastCrash) {
   $('crashNote').hidden = false;
   $('crashText').textContent = 'Last time, the app closed unexpectedly while ' + lastCrash.stage
@@ -2356,3 +2436,4 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 renderLibrary();
+if (!state.books.length && !state.introSeen && !lastCrash) showIntro();

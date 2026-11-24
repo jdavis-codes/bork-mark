@@ -535,6 +535,9 @@ export async function readBook(file) {
     text, toc: dedupe(toc), pages: dedupe(pages), figures, images,
     title: clean((byTag(meta, 'title')[0] || {}).textContent),
     author: byTag(meta, 'creator').map((c) => clean(c.textContent)).filter(Boolean).join(', '),
+    publisher: clean((byTag(meta, 'publisher')[0] || {}).textContent),
+    // The date an EPUB records is usually that edition's, not the first printing's.
+    year: (clean((byTag(meta, 'date')[0] || {}).textContent).match(/\b\d{4}\b/) || [''])[0],
   };
 }
 

@@ -1,7 +1,7 @@
 // Lets the app open with no signal. App files: network first, cached copy as
 // fallback. Versioned CDN libraries never change, so those are cache first.
 const CACHE = 'borkmark-v2';
-const SHELL = ['./', 'app.js', 'align.js', 'align-worker.js', 'store-worker.js', 'manifest.webmanifest'];
+const SHELL = ['./', 'app.js', 'align.js', 'cite.js', 'align-worker.js', 'store-worker.js', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
