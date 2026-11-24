@@ -176,28 +176,25 @@
     0%, 25% { background: color-mix(in srgb, var(--fg) 9%, var(--rest)); }
     100% { background: var(--rest); }
   }
-  /* Alternative layout, each bookmark as its own card instead of rows split by
-     lines. Switched on by the class "cards" on the list. */
-  #marks.cards .grouphead { border-top: none; padding: 16px 2px 8px; }
-  #marks.cards .group:first-child .grouphead { padding-top: 8px; }
-  #marks.cards .mark { --rest: var(--bg); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
-  #marks.cards .mark + .mark { border-top: 1px solid var(--line); }
-  #marks.cards .trimbar { background: var(--card); }
-  #marks.cards .trimbar button:not(.primary) { background: var(--bg); }
   @media (prefers-reduced-motion: reduce) { .mark.flash { animation-duration: 0.01s; } }
   .seg { display: inline-grid; grid-auto-flow: column; flex: none; background: var(--soft); border-radius: 10px; padding: 3px; }
   .seg button { border: none; padding: 6px 12px; border-radius: 8px; font-size: 0.85rem; color: var(--muted); }
   .seg button[aria-pressed="true"] { background: var(--card); color: var(--fg); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14); }
   #marks { margin-top: 4px; }
+  /* Chapter headings: real headings, with space above them, that stay under
+     the main heading while their bookmarks scroll past. */
+  .group + .group { margin-top: 18px; }
   .grouphead {
-    display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 14px 0 6px; border-top: 1px solid var(--line);
-    font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+    position: sticky; top: 48px; z-index: 2; display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+    padding: 12px 0 8px; background: var(--card); border-bottom: 1px solid var(--line);
+    font-size: 0.98rem; font-weight: 650; color: var(--fg);
   }
-  .group:first-child .grouphead { border-top: none; padding-top: 6px; }
   .grouphead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .grouphead span:last-child { flex: none; font-size: 0.8rem; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
   /* align-content: start keeps the rows at the top while the card's height is being eased,
-     so nothing inside it shifts as it opens or closes */
-  .mark { padding: 10px 0 12px; display: grid; gap: 8px; align-content: start; --rest: transparent; }
+     so nothing inside it shifts as it opens or closes. The single column may shrink
+     (minmax(0, …)), so a long chapter name is cut with an ellipsis instead of widening the row. */
+  .mark { padding: 16px 0 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; --rest: transparent; }
   .mark + .mark { border-top: 1px solid var(--line); }
   .marktop, .markfoot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .where { font-size: 0.82rem; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -206,7 +203,7 @@
     background: var(--soft); font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums;
   }
   .playpill svg { width: 12px; height: 12px; fill: currentColor; stroke: none; }
-  .quote { font-family: Georgia, "Iowan Old Style", serif; font-size: 1.04rem; line-height: 1.58; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; }
+  .quote { font-family: Georgia, "Iowan Old Style", serif; font-size: 1.04rem; line-height: 1.62; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer; }
   .quote.clamped { display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
   .quote.heard { font-family: inherit; font-size: 0.92rem; color: var(--muted); cursor: default; }
   /* the bookmark point is a thin tick, and its sentence is lightly marked */

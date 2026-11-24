@@ -1064,7 +1064,8 @@ function easeCard(id, change, settle) {
     // is taller than that, its top line (date and time) goes just under the heading.
     const sheet = $('marksDlg'), frame = sheet.getBoundingClientRect();
     const top = card.getBoundingClientRect().top - frame.top + sheet.scrollTop;
-    const head = sheet.querySelector('.markshead'), under = head ? head.getBoundingClientRect().height : 0;
+    const head = sheet.querySelector('.markshead'), chapter = card.parentNode.querySelector('.grouphead');   // both stay pinned at the top
+    const under = (head ? head.getBoundingClientRect().height : 0) + (chapter ? chapter.getBoundingClientRect().height : 0);
     const room = sheet.clientHeight - under;
     const target = to + 24 <= room ? top - under - (room - to) / 2 : top - under - 10;
     sheet.scrollTo({ top: Math.max(0, target), behavior: calm.matches ? 'auto' : 'smooth' });
