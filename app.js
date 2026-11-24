@@ -204,6 +204,12 @@ function fitScroll(node) {
 }
 const refitScrolls = () => document.querySelectorAll('.scroller').forEach(fitScroll);
 window.addEventListener('resize', refitScrolls);
+// Re-measure whenever a line's own width changes (a cover appearing beside it,
+// a screen sliding in), so the slide distance is never based on a stale width.
+if (window.ResizeObserver) {
+  const watcher = new ResizeObserver((entries) => entries.forEach((e) => fitScroll(e.target)));
+  document.querySelectorAll('.scroller').forEach((n) => watcher.observe(n));
+}
 
 let toastTimer = null;
 function toast(msg) {
@@ -1825,7 +1831,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795510922';
+const BUILD = '1795511139';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });

@@ -72,14 +72,17 @@
   #modelNote:empty { display: none; }
   #addBtn { width: 100%; padding: 14px; }
   /* library: the title bar stays at the top, Add a book and the mini player at the bottom */
+  /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
+     down past its top, and the page is told not to bounce at all. */
+  html { overscroll-behavior-y: none; }
   .libhead {
-    position: sticky; top: 0; z-index: 1; background: var(--bg);
-    margin: calc(-14px - env(safe-area-inset-top)) -16px 0; padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
+    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 10px;
   }
-  #libFoot {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg);
-    padding-bottom: env(safe-area-inset-bottom); view-transition-name: mini;
-  }
+  #library { padding-top: 48px; }
+  #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); view-transition-name: mini; }
+  /* whichever is lowest fills the strip under the home indicator with its own color */
+  body:not(.has-mini) #addBar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   #addBar { max-width: 592px; margin: 0 auto; padding: 10px 16px; }
   #libFoot::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
   body:not(.has-bar) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
@@ -87,9 +90,9 @@
 
   /* long text slides back and forth instead of being cut off */
   .scroller { overflow: hidden; white-space: nowrap; min-width: 0; }
-  .scroller .mq { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  .scroller .mq { display: block; overflow: hidden; text-overflow: ellipsis; }
   .scroller.scrolls { text-align: left; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent); }
-  .scroller.scrolls .mq { max-width: none; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; }
+  .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; }
   @keyframes marquee { 0%, 16% { transform: translateX(0); } 50%, 66% { transform: translateX(var(--shift, 0)); } 100% { transform: translateX(0); } }
 
   /* player */
@@ -320,7 +323,7 @@
 
   /* mini player */
   body.has-mini:not(.has-bar) { padding-bottom: calc(166px + env(safe-area-inset-bottom)); }
-  #mini { position: relative; background: var(--card); border-top: 1px solid var(--line); }
+  #mini { position: relative; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
   #mini .bar { margin: 0; border-radius: 0; height: 3px; }
   .minirow { display: flex; align-items: center; gap: 6px; max-width: 560px; margin: 0 auto; padding: 8px 10px 8px 12px; }
   #miniOpen {
@@ -330,6 +333,7 @@
   .minitext { min-width: 0; display: grid; }
   #miniSub { display: flex; min-width: 0; white-space: nowrap; }
   #miniTime { flex: none; white-space: pre; font-variant-numeric: tabular-nums; }
+  #miniChap { flex: 1 1 0; }
   #miniTitle { font-weight: 600; }
   .round { border: none; border-radius: 50%; padding: 10px; line-height: 0; flex: none; }
   .round svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
