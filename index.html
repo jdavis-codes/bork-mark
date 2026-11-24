@@ -183,9 +183,21 @@
     dialog, dialog::backdrop { animation: none !important; }
     .tabs button, .transport button, #markBtn, .round { transition: none; }
   }
-  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 14px 0; }
+  #infoList { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 0; }
+  .textin {
+    font: inherit; font-size: 16px; width: 100%; min-width: 0; padding: 10px 12px; color: var(--fg);
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .linkbtn { border: none; padding: 0; color: var(--accent); font-size: 0.9rem; }
+  .filebtn.small { padding: 6px 10px; font-size: 0.85rem; }
+  #chapStatus:empty, #pageStatus:empty { display: none; }
+  #chapEditDlg { overflow-y: auto; }
+  #chapEditList { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+  #chapEditList li { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); align-items: center; gap: 10px; }
+  #chapEditList span { font-variant-numeric: tabular-nums; }
+  .cite { margin: -2px 0 8px; }
   #infoList dt { color: var(--muted); } #infoList dd { margin: 0; overflow-wrap: anywhere; }
-  #infoDlg p { margin-bottom: 12px; }
+
   /* sheets that rise from the bottom, next to the bar that opens them */
   dialog.bottom {
     margin: auto auto 0; width: 100%; max-width: 560px; border-radius: 16px 16px 0 0; border-bottom: none;
@@ -455,15 +467,44 @@
   <ol id="marks"></ol>
 </dialog>
 
-<dialog id="infoDlg" class="bottom">
+<dialog id="infoDlg" class="bottom tall">
   <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="small">Close</button></div>
-  <dl id="infoList"></dl>
-  <p id="playerError" class="warn" hidden></p>
-  <p id="textStatus" class="muted"></p>
-  <div class="row">
-    <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
-    <button id="removeBtn">Remove book</button>
+  <div class="stack" style="margin-top:16px">
+    <div class="field">
+      <div class="fieldhead"><label for="editTitle">Title</label><button id="titleReset" class="linkbtn" hidden>Reset</button></div>
+      <input id="editTitle" class="textin" type="text" autocomplete="off">
+      <p id="titleSrc" class="muted"></p>
+    </div>
+    <div class="field">
+      <div class="fieldhead"><label for="editAuthor">Author</label><button id="authorReset" class="linkbtn" hidden>Reset</button></div>
+      <input id="editAuthor" class="textin" type="text" autocomplete="off">
+      <p id="authorSrc" class="muted"></p>
+    </div>
+    <div class="field">
+      <div class="fieldhead"><span class="fieldname">Chapters</span></div>
+      <p id="chapSrc" class="muted"></p>
+      <div class="row">
+        <button id="chapEdit" class="small">Edit names</button>
+        <button id="chapAuto" class="small">Name from book text</button>
+        <button id="chapReset" class="small" hidden>Reset</button>
+      </div>
+      <p id="chapStatus" class="muted"></p>
+    </div>
+    <div class="field">
+      <div class="fieldhead"><span class="fieldname">Book text</span></div>
+      <p id="textStatus" class="muted"></p>
+      <p id="pageStatus" class="muted"></p>
+      <div class="row"><label class="filebtn small"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label></div>
+    </div>
+    <dl id="infoList"></dl>
+    <p id="playerError" class="warn" hidden></p>
+    <div class="row"><button id="removeBtn">Remove book</button></div>
   </div>
+</dialog>
+
+<dialog id="chapEditDlg" class="bottom tall">
+  <div class="row spread"><h2 tabindex="-1" autofocus>Chapter names</h2><button id="chapEditClose" class="small">Done</button></div>
+  <ol id="chapEditList"></ol>
 </dialog>
 
 <nav id="tabbar" hidden aria-label="Player options">

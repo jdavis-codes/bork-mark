@@ -345,20 +345,60 @@ export function to16kMono(ab) {
 
 // ---------- book text ----------
 const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,br,blockquote,tr,section,dt,dd';
+const MARK_OPEN = '', MARK_CLOSE = '';   // private-use characters that never occur in books
+const marker = (kind, label) => MARK_OPEN + kind + String(label).replace(/[\s]+/g, ' ').trim() + MARK_CLOSE;
+const epubType = (n) => (n.getAttribute('epub:type') || n.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || '') + ' ' + (n.getAttribute('role') || '');
 
-function htmlToText(markup) {
+// Text of one chapter file. `anchors` lists places in this file that the
+// table of contents or page list points at; a marker is left at each so its
+// position in the finished text can be found.
+function htmlToText(markup, anchors = []) {
   let doc = new DOMParser().parseFromString(markup, 'application/xhtml+xml');
   if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(markup, 'text/html');
   const body = doc.querySelector('body') || doc.documentElement;
   body.querySelectorAll('script,style').forEach((n) => n.remove());
+  const listed = new Set(anchors.filter((a) => a.kind === 'P').map((a) => a.id));
+  // Print page breaks marked in the text itself.
+  for (const n of body.querySelectorAll('*')) {
+    if (!/pagebreak/.test(epubType(n))) continue;
+    const label = n.getAttribute('title') || n.getAttribute('aria-label') || n.textContent.trim() || (n.id.match(/\d+$/) || [''])[0];
+    n.textContent = '';
+    if (label && !listed.has(n.id)) n.parentNode.insertBefore(doc.createTextNode(marker('P', label)), n);
+  }
+  for (const a of anchors) {
+    let target = null;
+    if (a.id) {
+      target = doc.getElementById(a.id);
+      if (!target) for (const n of body.querySelectorAll('[id],[name]')) if (n.id === a.id || n.getAttribute('name') === a.id) { target = n; break; }
+    }
+    const text = doc.createTextNode(marker(a.kind, a.label));
+    if (target && target.parentNode) target.parentNode.insertBefore(text, target); else body.insertBefore(text, body.firstChild);
+  }
   body.querySelectorAll(BLOCKS).forEach((n) => n.appendChild(doc.createTextNode('\n')));
   return body.textContent.replace(/[ \t ]+/g, ' ').replace(/\s*\n\s*/g, '\n').trim();
 }
 
+// "OEBPS/text/" + "../nav.xhtml#x" -> ["OEBPS/nav.xhtml", "x"]
+function resolveHref(baseDir, href) {
+  const [path, id = ''] = href.split('#');
+  const parts = baseDir.split('/').filter(Boolean);
+  for (const seg of decodeURIComponent(path).split('/')) {
+    if (seg === '..') parts.pop(); else if (seg && seg !== '.') parts.push(seg);
+  }
+  return [path ? parts.join('/') : null, decodeURIComponent(id)];
+}
+const dirOf = (path) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '');
+const byTag = (node, name) => Array.from(node.getElementsByTagNameNS('*', name));
+const clean = (str) => (str || '').replace(/\s+/g, ' ').trim();
+
+// Reads a book into {text, title, author, toc, pages}. `toc` and `pages` are
+// lists of {label, at}, where `at` is a character position in `text`; pages
+// are the print edition's page numbers when the EPUB records them.
 export async function readBook(file) {
   if (!/\.epub$/i.test(file.name)) {
     // Plain text is often hard-wrapped; join lines within a paragraph.
-    return (await file.text()).replace(/\r/g, '').replace(/([^\n])\n(?!\n)/g, '$1 ');
+    const text = (await file.text()).replace(/\r/g, '').replace(/([^\n])\n(?!\n)/g, '$1 ');
+    return { text, title: '', author: '', toc: [], pages: [] };
   }
   const { unzipSync, strFromU8 } = await import('https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js');
   const zip = unzipSync(new Uint8Array(await file.arrayBuffer()));
@@ -366,21 +406,76 @@ export async function readBook(file) {
     if (!zip[name]) throw new Error('EPUB is missing ' + name);
     return strFromU8(zip[name]);
   };
-  const xml = (s) => new DOMParser().parseFromString(s, 'application/xml');
+  const xml = (str) => new DOMParser().parseFromString(str, 'application/xml');
   const opfPath = xml(read('META-INF/container.xml')).querySelector('rootfile').getAttribute('full-path');
   const opf = xml(read(opfPath));
-  const dir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
-  const hrefs = {};
-  opf.querySelectorAll('manifest > item').forEach((it) => { hrefs[it.getAttribute('id')] = it.getAttribute('href'); });
-  const parts = [];
-  opf.querySelectorAll('spine > itemref').forEach((ref) => {
-    const href = hrefs[ref.getAttribute('idref')];
-    if (!href) return;
-    const path = dir + decodeURIComponent(href.split('#')[0]);
-    if (zip[path]) parts.push(htmlToText(strFromU8(zip[path])));
+  const dir = dirOf(opfPath);
+  const items = {};
+  let navPath = null;
+  byTag(opf, 'item').forEach((it) => {
+    const path = resolveHref(dir, it.getAttribute('href') || '')[0];
+    items[it.getAttribute('id')] = path;
+    if (/\bnav\b/.test(it.getAttribute('properties') || '')) navPath = path;
   });
-  if (!parts.length) throw new Error('No readable chapters found in EPUB');
-  return parts.join('\n\n');
+  const spineEl = byTag(opf, 'spine')[0];
+  const spine = byTag(opf, 'itemref').map((r) => items[r.getAttribute('idref')]).filter((path) => path && zip[path]);
+  if (!spine.length) throw new Error('No readable chapters found in EPUB');
+
+  // Where the contents list and page list point: file -> [{id, kind, label}].
+  const anchors = new Map();
+  const note = (base, href, kind, label) => {
+    if (!href || !clean(label)) return;
+    const [path, id] = resolveHref(base, href);
+    if (!path) return;
+    if (!anchors.has(path)) anchors.set(path, []);
+    anchors.get(path).push({ id, kind, label: clean(label) });
+  };
+  try {
+    const ncxPath = spineEl && items[spineEl.getAttribute('toc')];
+    if (navPath && zip[navPath]) {          // EPUB 3
+      const nav = new DOMParser().parseFromString(read(navPath), 'application/xhtml+xml');
+      for (const n of byTag(nav, 'nav')) {
+        const kind = /page-list/.test(epubType(n)) ? 'P' : /\btoc\b/.test(epubType(n)) ? 'T' : null;
+        if (kind) byTag(n, 'a').forEach((a) => note(dirOf(navPath), a.getAttribute('href'), kind, a.textContent));
+      }
+    }
+    if (ncxPath && zip[ncxPath]) {          // EPUB 2, and page lists some EPUB 3 files keep here
+      const ncx = xml(read(ncxPath));
+      const have = (kind) => [...anchors.values()].some((list) => list.some((a) => a.kind === kind));
+      const add = (tag, kind) => byTag(ncx, tag).forEach((pt) => {
+        const label = byTag(pt, 'text')[0], content = byTag(pt, 'content')[0];
+        if (label && content) note(dirOf(ncxPath), content.getAttribute('src'), kind, label.textContent);
+      });
+      if (!have('T')) add('navPoint', 'T');
+      if (!have('P')) add('pageTarget', 'P');
+    }
+  } catch (e) { /* a broken contents list should not stop the text loading */ }
+
+  const raw = spine.map((path) => htmlToText(strFromU8(zip[path]), anchors.get(path))).join('\n\n');
+  // Take the markers back out, noting where each one was.
+  const toc = [], pages = [];
+  let text = '', last = 0;
+  const re = /([PT])([^]*)/g;
+  for (let m; (m = re.exec(raw));) {
+    text += raw.slice(last, m.index); last = re.lastIndex;
+    (m[1] === 'T' ? toc : pages).push({ label: m[2], at: text.length });
+  }
+  text += raw.slice(last);
+  const dedupe = (list) => list.filter((x, k) => k === 0 || x.label !== list[k - 1].label);
+  toc.sort((a, b) => a.at - b.at); pages.sort((a, b) => a.at - b.at);
+  const meta = byTag(opf, 'metadata')[0] || opf;
+  return {
+    text, toc: dedupe(toc), pages: dedupe(pages),
+    title: clean((byTag(meta, 'title')[0] || {}).textContent),
+    author: byTag(meta, 'creator').map((c) => clean(c.textContent)).filter(Boolean).join(', '),
+  };
+}
+
+// The last entry of a {label, at} list at or before a character position.
+export function entryAt(list, at) {
+  let found = null;
+  for (const x of list || []) { if (x.at <= at) found = x; else break; }
+  return found;
 }
 
 // ---------- matching ----------

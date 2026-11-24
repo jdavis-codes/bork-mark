@@ -209,7 +209,7 @@ $('bookFile').addEventListener('change', async (e) => {
   status.textContent = 'Reading ' + f.name + '…';
   try {
     const t0 = performance.now();
-    const text = await readBook(f);
+    const text = (await readBook(f)).text;
     book = buildBook(text); bookName = f.name;
     status.textContent = f.name + ' · ' + book.words.length.toLocaleString() + ' words · read in ' + secs(performance.now() - t0);
   } catch (err) {

@@ -1,4 +1,4 @@
-import { openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt } from './align.js';
+import { openAudio, readBook, buildBook, transcribeAround, findInBook, quoteAt, entryAt } from './align.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
@@ -14,6 +14,22 @@ try {
   const saved = JSON.parse(localStorage.getItem(KEY));
   if (saved && Array.isArray(saved.books)) state = saved;
 } catch (e) { /* storage unavailable: run without persistence */ }
+
+// A book's title and author can come from four places. In order of trust:
+// typed by you, the book text (EPUB), the audio file's tags, the file name.
+const SOURCES = { you: 'Edited by you.', text: 'From the book text.', audio: 'From the audio file.', file: 'From the audio file’s name.' };
+function resolveMeta(b) {
+  b.edited = b.edited || {}; b.fromText = b.fromText || {}; b.src = b.src || {};
+  // Books added before sources were tracked only have the audio's values.
+  b.fromAudio = b.fromAudio || { title: b.title || '', author: b.author || '' };
+  for (const f of ['title', 'author']) {
+    const pick = b.edited[f] ? 'you' : b.fromText[f] ? 'text' : b.fromAudio[f] ? 'audio' : 'file';
+    b.src[f] = pick;
+    b[f] = pick === 'you' ? b.edited[f] : pick === 'text' ? b.fromText[f] : pick === 'audio' ? b.fromAudio[f]
+      : f === 'title' ? (b.audioName || 'Untitled').replace(/\.[^.]+$/, '') : '';
+  }
+}
+state.books.forEach(resolveMeta);
 
 // What each button does. `next` and `prev` are the track buttons a headset or
 // watch sends; an action is mark | fwd | back | nextChapter | prevChapter | none.
@@ -161,6 +177,12 @@ async function stored(dir, name) {
   } catch (e) { return null; }
 }
 
+// The book text, plus where its contents entries and print pages fall in it.
+async function storeText(id, doc) {
+  await store('write', id, 'text', new Blob([doc.text], { type: 'text/plain' }));
+  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages })], { type: 'application/json' }));
+}
+
 // ---------- library ----------
 const thumbUrls = [];
 async function renderLibrary() {
@@ -221,18 +243,21 @@ $('addGo').addEventListener('click', async () => {
   try {
     say('Reading audio…');
     const src = await openAudio(af, (p) => say('Reading audio… ' + Math.round(p * 100) + '%'));
-    let text = null;
-    if (tf) { say('Reading text…'); text = await readBook(tf); }
+    let doc = null;
+    if (tf) { say('Reading text…'); doc = await readBook(tf); }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     await store('write', id, 'audio', af, (p) => say('Copying audio… ' + Math.round(p * 100) + '%'));
     if (src.tags.cover) await store('write', id, 'cover', src.tags.cover);
-    if (text != null) await store('write', id, 'text', new Blob([text], { type: 'text/plain' }));
-    state.books.unshift({
-      id, title: src.tags.title || af.name.replace(/\.[^.]+$/, ''), author: src.tags.author || '',
+    if (doc) await storeText(id, doc);
+    const book = {
+      id, fromAudio: { title: src.tags.title || '', author: src.tags.author || '' },
+      fromText: doc ? { title: doc.title, author: doc.author } : {},
       audioName: af.name, kind: src.kind, duration: src.duration, chapters: src.chapters,
-      hasCover: !!src.tags.cover, hasText: text != null, textName: tf ? tf.name : '',
+      hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
-    });
+    };
+    resolveMeta(book);
+    state.books.unshift(book);
     save(true);
     closeSheet($('addDlg'));
     await openBook(id);
@@ -265,7 +290,7 @@ async function openBook(id) {
   const file = await stored(id, 'audio');
   if (!file) { toast('The audio for this book is missing from this device'); return; }
   closeBook();
-  cur = { book, source: null, text: null, audioUrl: null, coverUrl: null };
+  cur = { book, source: null, text: null, meta: { toc: [], pages: [] }, audioUrl: null, coverUrl: null };
   showPlayer();
   $('title').textContent = book.title;
   $('author').textContent = book.author;
@@ -290,8 +315,10 @@ async function openBook(id) {
     .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
   if (book.hasText) stored(id, 'text').then(async (f) => {
     if (!f || cur !== mine) return;
+    const meta = await stored(id, 'meta');
+    if (meta) try { mine.meta = JSON.parse(await meta.text()); } catch (e) {}
     mine.text = buildBook(await f.text());
-    rematch(); runQueue();
+    rematch(); runQueue(); renderInfo();
   });
 }
 
@@ -709,6 +736,9 @@ function renderMarks() {
       li.append(el('div', 'warn', m.error || 'Something went wrong.'));
     }
 
+    if (m.status === 'done' && (m.section || m.page)) {
+      li.append(el('div', 'muted cite', [m.section, m.page && 'p. ' + m.page].filter(Boolean).join(' · ')));
+    }
     const actions = el('div', 'row');
     if (extra) actions.append(extra);
     const play = el('button', 'small', 'Play');
@@ -717,11 +747,16 @@ function renderMarks() {
     if (m.status === 'done' || m.transcript) {
       const copy = el('button', 'small', 'Copy');
       copy.addEventListener('click', async () => {
-        const body = m.status === 'done' ? (m.before + m.after).trim() : m.transcript;
-        const where = [b.title, c.count > 1 ? c.title : '', fmt(m.t)].filter(Boolean).join(', ');
-        try { await navigator.clipboard.writeText(body + '\n\n— ' + where); toast('Copied'); } catch (e) { toast('Copy failed'); }
+        try { await navigator.clipboard.writeText(shareText(b, m)); toast('Copied'); } catch (e) { toast('Copy failed'); }
       });
       actions.append(copy);
+      if (navigator.share) {   // the system share sheet: Are.na, Notes, Messages…
+        const share = el('button', 'small', 'Share');
+        share.addEventListener('click', () => {
+          navigator.share({ text: shareText(b, m) }).catch((e) => { if (e.name !== 'AbortError') toast('Could not share'); });
+        });
+        actions.append(share);
+      }
     }
     if (m.status === 'error') {
       const retry = el('button', 'small', 'Retry');
@@ -812,7 +847,20 @@ function applyQuote(m, text) {
 function requote(m, text) {
   const q = quoteAt(text, { start: m.loc[0], split: m.loc[1], end: m.loc[2] }, settings.capture);
   m.before = q.before; m.after = q.after;
+  // Where in the book this is, for citing: its contents entry and print page.
+  if (cur && cur.text === text && text.starts.length) {
+    const at = text.starts[Math.min(m.loc[1], text.starts.length - 1)];
+    const section = entryAt(cur.meta.toc, at), page = entryAt(cur.meta.pages, at);
+    m.section = section ? section.label : ''; m.page = page ? page.label : '';
+  }
 }
+// Author, Title, “Chapter”, p. 12 (audiobook, 1:23:45)
+function citation(b, m) {
+  const c = chapterAt(b, m.t), where = m.section || (c.count > 1 ? c.title : '');
+  return [b.author, b.title, where && '“' + where + '”', m.page && 'p. ' + m.page].filter(Boolean).join(', ')
+    + ' (audiobook, ' + fmt(m.t) + ')';
+}
+const shareText = (b, m) => (m.status === 'done' ? '“' + (m.before + m.after).trim() + '”' : m.transcript) + '\n\n— ' + citation(b, m);
 function requoteAll() {
   if (!cur || !cur.text) return;
   for (const m of cur.book.marks) if (m.status === 'done' && m.loc) requote(m, cur.text);
@@ -832,7 +880,7 @@ function rematch() {
 
 let queueBusy = false;
 async function runQueue() {
-  if (queueBusy || !cur || !cur.source || !canWork()) return;
+  if (queueBusy || naming || !cur || !cur.source || !canWork()) return;
   if (cur.book.hasText && !cur.text) return;   // text still loading
   queueBusy = true;
   const mine = cur;
@@ -870,38 +918,153 @@ $('marksBtn').addEventListener('click', () => { renderMarks(); $('marksDlg').sho
 $('marksClose').addEventListener('click', () => closeSheet($('marksDlg')));
 function renderInfo() {
   if (!cur) return;
-  const b = cur.book, dl = $('infoList');
+  const b = cur.book;
+  for (const f of ['title', 'author']) {
+    const cap = f === 'title' ? 'Title' : 'Author';
+    $('edit' + cap).value = b[f];
+    // Say where the value came from, and what the other source says if it differs.
+    const notes = [SOURCES[b.src[f]]];
+    if (b.src[f] !== 'audio' && b.fromAudio[f] && b.fromAudio[f] !== b[f]) notes.push('The audio file says “' + b.fromAudio[f] + '”.');
+    if (b.src[f] === 'you' && b.fromText[f] && b.fromText[f] !== b[f]) notes.push('The book text says “' + b.fromText[f] + '”.');
+    $(f + 'Src').textContent = notes.join(' ');
+    $(f + 'Reset').hidden = b.src[f] !== 'you';
+  }
+  const ch = b.chapters || [], n = ch.length;
+  const fromText = ch.filter((c) => c.src === 'text').length, byYou = ch.filter((c) => c.src === 'you').length;
+  $('chapSrc').textContent = n < 2 ? 'This audio file has no chapters.'
+    : n + ' chapters, timed by the audio file. Names: ' + [n - fromText - byYou && (n - fromText - byYou) + ' from the audio file',
+      fromText && fromText + ' matched to the book’s contents', byYou && byYou + ' edited by you'].filter(Boolean).join(', ') + '.';
+  $('chapEdit').hidden = n < 2;
+  $('chapReset').hidden = !b.audioChapters;
+  const canName = n > 1 && cur.text && cur.meta.toc.length > 0;
+  $('chapAuto').hidden = !canName;
+  $('chapAuto').disabled = naming;
+  $('pageStatus').textContent = !b.hasText ? '' : !/\.epub$/i.test(b.textName || '') ? 'Plain text has no contents list or page numbers.'
+    : (cur.meta.toc.length ? cur.meta.toc.length + ' contents entries. ' : 'No contents list found. ')
+      + (cur.meta.pages.length ? cur.meta.pages.length + ' print page numbers, so quotes can cite pages.' : 'This EPUB has no print page numbers, so quotes cite the chapter instead.');
+  const dl = $('infoList');
   dl.textContent = '';
-  const rows = [['Title', b.title], ['Author', b.author], ['Length', fmt(b.duration)],
-    ['Chapters', b.chapters && b.chapters.length > 1 ? String(b.chapters.length) : 'none in this file'],
-    ['Audio file', b.audioName + ' (' + b.kind + ')'], ['Added', new Date(b.added).toLocaleDateString()]];
-  for (const [k, v] of rows) if (v) dl.append(el('dt', '', k), el('dd', '', v));
+  const rows = [['Length', fmt(b.duration)], ['Audio file', b.audioName + ' (' + b.kind + ')'], ['Added', new Date(b.added).toLocaleDateString()]];
+  for (const [k, v] of rows) dl.append(el('dt', '', k), el('dd', '', v));
 }
-$('infoBtn').addEventListener('click', () => { renderInfo(); renderTextStatus(); $('infoDlg').showModal(); });
+// Title and author changed: update everywhere they show.
+function metaChanged() {
+  const b = cur.book;
+  resolveMeta(b); save(true);
+  $('title').textContent = b.title; $('author').textContent = b.author;
+  setMediaSession(); renderInfo();
+}
+for (const f of ['title', 'author']) {
+  const cap = f === 'title' ? 'Title' : 'Author';
+  $('edit' + cap).addEventListener('change', (e) => {
+    const b = cur.book, typed = e.target.value.trim();
+    const auto = b.fromText[f] || b.fromAudio[f] || '';
+    if (!typed || typed === auto) delete b.edited[f]; else b.edited[f] = typed;
+    metaChanged();
+  });
+  $(f + 'Reset').addEventListener('click', () => { delete cur.book.edited[f]; metaChanged(); });
+}
+$('infoBtn').addEventListener('click', () => { renderInfo(); renderTextStatus(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
+
+// ---------- chapter names ----------
+const keepAudioChapters = (b) => { if (!b.audioChapters) b.audioChapters = b.chapters.map((c) => ({ start: c.start, title: c.title })); };
+function chaptersChanged() {
+  save(true); renderInfo();
+  renderTime(audio.currentTime || cur.book.position || 0); renderMarks();
+}
+$('chapEdit').addEventListener('click', () => {
+  const b = cur.book, ol = $('chapEditList');
+  ol.textContent = '';
+  b.chapters.forEach((ch, i) => {
+    const li = el('li'), input = el('input', 'textin');
+    input.type = 'text'; input.value = ch.title; input.setAttribute('aria-label', 'Name of chapter ' + (i + 1));
+    input.addEventListener('change', () => {
+      const typed = input.value.trim();
+      if (!typed || typed === ch.title) { input.value = ch.title; return; }
+      keepAudioChapters(b);
+      ch.title = typed; ch.src = 'you';
+      chaptersChanged();
+    });
+    li.append(el('span', 'muted', fmt(ch.start)), input);
+    ol.append(li);
+  });
+  $('chapEditDlg').showModal(); $('chapEditDlg').scrollTop = 0;
+});
+$('chapEditClose').addEventListener('click', () => closeSheet($('chapEditDlg')));
+$('chapReset').addEventListener('click', () => {
+  const b = cur.book;
+  if (!b.audioChapters || !confirm('Put back the chapter names from the audio file?')) return;
+  b.chapters = b.audioChapters; delete b.audioChapters;
+  chaptersChanged();
+});
+
+// Names chapters from the book's contents list. The audio file knows when
+// each chapter starts but often not what it is called; the EPUB knows the
+// names but not the times. Listening to the first seconds of each chapter
+// and finding those words in the text connects the two.
+let naming = false;
+const LISTEN = 25;        // seconds heard at the start of each chapter
+const NEAR_START = 1500;  // characters: how close to a contents entry counts as its beginning
+$('chapAuto').addEventListener('click', async () => {
+  if (naming || !cur || !cur.text || !cur.source) return;
+  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('chapStatus').textContent = msg; };
+  naming = true; renderInfo();
+  let named = 0;
+  try {
+    while (queueBusy) { say('Waiting for bookmarks to finish…'); await new Promise((r) => setTimeout(r, 500)); }
+    await warmModel();
+    for (let i = 0; i < b.chapters.length && cur === mine; i++) {
+      const ch = b.chapters[i];
+      if (ch.src === 'you') continue;
+      say('Listening to the start of chapter ' + (i + 1) + ' of ' + b.chapters.length + '…');
+      const r = await transcribeAround(mine.source, ch.start + LISTEN, LISTEN, 0, transcribe, crumb);
+      crumb(null);
+      const loc = findInBook(mine.text, r.words, 0);
+      if (!loc || !mine.text.starts.length) continue;
+      const at = mine.text.starts[Math.min(loc.start, mine.text.starts.length - 1)];
+      const entry = entryAt(mine.meta.toc, at + 200);
+      if (!entry || at - entry.at > NEAR_START || entry.label === ch.title) continue;
+      keepAudioChapters(b);
+      ch.title = entry.label; ch.src = 'text'; named++;
+      save(true);
+    }
+    say(named ? 'Named ' + named + (named === 1 ? ' chapter' : ' chapters') + ' from the book’s contents. The rest start partway through a section, so they keep their audio names.'
+      : 'No chapter starts lined up with the book’s contents, so nothing was changed.');
+  } catch (err) {
+    say('Stopped: ' + ((err && err.message) || err));
+  }
+  naming = false; crumb(null);
+  if (cur === mine) chaptersChanged();
+  runQueue();
+});
 
 // ---------- book text and removal ----------
 function renderTextStatus() {
   const b = cur.book;
   $('textStatus').textContent = b.hasText
-    ? 'Text: ' + (b.textName || 'added') + '. Bookmarks quote the book’s own wording.'
-    : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
+    ? (b.textName || 'Added') + '. Bookmarks quote the book’s own wording.'
+    : 'None yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
   $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
 }
 $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur;
+  const mine = cur, b = mine.book;
   try {
     $('textStatus').textContent = 'Reading ' + f.name + '…';
-    const text = await readBook(f);
-    await store('write', mine.book.id, 'text', new Blob([text], { type: 'text/plain' }));
-    mine.book.hasText = true; mine.book.textName = f.name;
-    save(true);
+    const doc = await readBook(f);
+    await storeText(b.id, doc);
+    b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
+    b.fromText = { title: doc.title, author: doc.author };
+    // Saved positions pointed into the old text, so they can't be re-cut against the new one.
+    for (const m of b.marks) delete m.loc;
+    resolveMeta(b); save(true);
     if (cur !== mine) return;
-    mine.text = buildBook(text);
-    renderTextStatus(); rematch(); runQueue();
+    mine.meta = { toc: doc.toc, pages: doc.pages };
+    mine.text = buildBook(doc.text);
+    metaChanged(); renderTextStatus(); rematch(); runQueue();
     toast('Book text added');
   } catch (err) {
     if (cur === mine) { renderTextStatus(); toast('Could not read that file'); }
