@@ -430,8 +430,23 @@
   #introArt { width: 96px; height: 96px; margin: 18px auto 14px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: var(--accent); }
   #introArt svg { width: 46px; height: 46px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   #introTitle { margin: 0 0 8px; }
-  #introBody { margin: 0 auto; max-width: 34ch; min-height: 7.5em; color: var(--muted); }
-  #introDots { display: flex; justify-content: center; gap: 7px; margin: 14px 0 16px; }
+  #introBody { margin: 0 auto; max-width: 34ch; min-height: 6em; color: var(--muted); }
+  #introStep.compact #introArt { width: 48px; height: 48px; margin: 4px auto 8px; }
+  #introStep.compact #introArt svg { width: 24px; height: 24px; }
+  #introStep.compact #introBody { min-height: 0; }
+  #introHow { list-style: none; counter-reset: how; margin: 14px auto 0; padding: 0; max-width: 34ch; text-align: left; display: grid; gap: 10px; }
+  #introHow[hidden], #introArrow[hidden] { display: none; }
+  #introHow li { counter-increment: how; display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 4px 8px; align-items: start; }
+  #introHow li::before { content: counter(how); width: 22px; height: 22px; border-radius: 50%; background: var(--tint); color: var(--accent); font-size: 0.8rem; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+  #introHow .dots, #introArrow .dots { letter-spacing: 1px; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap; }
+  /* drawn to look like the row in the iOS share sheet */
+  .sheetrow { grid-column: 2; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); font-weight: 500; }
+  .sheetrow svg { width: 24px; height: 24px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  #introArrow { display: flex; justify-content: flex-end; align-items: flex-start; gap: 6px; margin: 8px 34px -6px 0; color: var(--accent); font-size: 0.875rem; font-weight: 600; }
+  #introArrow svg { width: 44px; height: 36px; fill: none; stroke: currentColor; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; margin-top: 6px; animation: nudge 1.2s ease-in-out infinite; }
+  @keyframes nudge { 50% { transform: translate(3px, 4px); } }
+  @media (prefers-reduced-motion: reduce) { #introArrow svg { animation: none; } }
+  #introDots { display: flex; justify-content: center; gap: 7px; margin: 14px 0 14px; }
   #introDots span { width: 7px; height: 7px; border-radius: 50%; background: var(--line); transition: background 0.2s, transform 0.2s; }
   #introDots span.on { background: var(--accent); transform: scale(1.25); }
   #introDlg .introrow { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
@@ -817,9 +832,15 @@
     <div id="introArt"></div>
     <h2 id="introTitle" tabindex="-1" autofocus></h2>
     <p id="introBody"></p>
+    <ol id="introHow" hidden>
+      <li><span>Tap <b class="dots" aria-label="the three dots">•••</b> in Safari’s toolbar, then <b>Share</b>.</span></li>
+      <li><span>Tap <b>View More</b>, then:</span>
+        <div class="sheetrow" aria-label="Add to Home Screen"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></svg>Add to Home Screen</div></li>
+    </ol>
   </div>
   <div id="introDots" aria-hidden="true"></div>
   <div class="introrow"><button id="introSkip">Skip</button><button id="introNext" class="primary">Next</button></div>
+  <p id="introArrow" hidden><span><b class="dots">•••</b> is down here</span><svg viewBox="0 0 48 40" aria-hidden="true"><path d="M3 5c20-3 34 5 37 26"/><path d="M31 23l9.5 9 6-11.500"/></svg></p>
 </dialog>
 
 <dialog id="chapDlg" class="bottom">

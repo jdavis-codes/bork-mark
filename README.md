@@ -15,7 +15,7 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 
 ## Getting started
 
-1. Open the link above in Safari on your iPhone. Tap Share, then **Add to Home Screen**, so iOS keeps your books stored and the app opens full screen.
+1. Open the link above in Safari on your iPhone. Tap **•••**, then **Share**, then **Add to Home Screen** (it may be under View More). This matters: Safari clears a website's saved files after about a week without a visit, and only an app on the Home Screen is exempt. Without it, your books and bookmarks can disappear.
 2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, and a PDF of the print edition if you want printed page numbers.
 3. Press play. To bookmark, double- or triple-press your headphone button, press next track on a watch, or tap **Bookmark**. It works with the phone locked.
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
@@ -23,7 +23,7 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 Files must be free of copy protection, such as the downloads from Libro.fm. A short guide covers the same steps the first time you open the app; Settings can show it again.
 
 <p>
-  <img src="docs/img/intro.png" width="24%" alt="Intro guide step: bookmark from anywhere">
+  <img src="docs/img/intro.png" width="24%" alt="Intro guide step: why and how to add the app to the Home Screen">
 </p>
 
 ## What it does

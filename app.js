@@ -2337,7 +2337,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795541071';
+const BUILD = '1795544896';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
@@ -2394,14 +2394,22 @@ const INTRO = [
     body: 'Double- or triple-press your headphone button, press next track on a watch, or tap Bookmark. It works with the phone locked. Settings decides what each button does.' },
   { art: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12', title: 'Trim, cite and share',
     body: 'The app listens to a few seconds around each bookmark and finds them in the text. Open Bookmarks to trim a quote to the sentences you want, then copy or share it with a citation.' },
-  { art: 'M12 15V3M8 7l4-4 4 4M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', title: 'Keep it on your Home Screen',
-    body: 'In Safari, tap Share, then Add to Home Screen. The app opens full screen, works without signal, and iOS keeps your books stored.' },
+  { art: 'M12 15V3M8 7l4-4 4 4M5 11v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8', title: 'Add it to your Home Screen', home: true,
+    body: 'Safari clears a website’s saved files after about a week without a visit. An app on the Home Screen is exempt, so your books and bookmarks stay.' },
 ];
 let introAt = 0;
+const installed = () => navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+const onIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
 function renderIntro() {
   const step = INTRO[introAt], last = introAt === INTRO.length - 1;
-  $('introArt').replaceChildren(icon(step.art));
-  $('introTitle').textContent = step.title; $('introBody').textContent = step.body;
+  // The Home Screen step shows how to get there, unless that is where we are.
+  const done = step.home && installed();
+  $('introArt').replaceChildren(icon(done ? 'M5 12.5l4.5 4.500L19 7.500' : step.art));
+  $('introTitle').textContent = done ? 'You’re on the Home Screen' : step.title;
+  $('introBody').textContent = done ? 'Opened from here, iOS keeps your books and bookmarks. In Safari itself, a website’s saved files are cleared after about a week without a visit.' : step.body;
+  $('introHow').hidden = !step.home || done;
+  $('introStep').classList.toggle('compact', !!step.home && !done);
+  $('introArrow').hidden = !step.home || done || !onIOS;
   $('introDots').replaceChildren(...INTRO.map((_, k) => el('span', k === introAt ? 'on' : '')));
   $('introNext').textContent = last ? (state.books.length ? 'Done' : 'Add a book') : 'Next';
   $('introSkip').textContent = introAt ? 'Back' : 'Skip';
