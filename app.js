@@ -1,0 +1,565 @@
+import { openAudio, readBook, buildBook, transcribeAround, quoteFor } from './align.js';
+
+const $ = (id) => document.getElementById(id);
+const audio = $('audio');
+
+const KEY = 'borkmark.v1';
+const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
+const CLIP_BEFORE = 45, CLIP_AFTER = 15;   // seconds of audio transcribed around a bookmark
+const SKIP = 30;                           // seconds for the skip buttons
+const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
+
+// ---------- saved state ----------
+let state = { books: [] };
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY));
+  if (saved && Array.isArray(saved.books)) state = saved;
+} catch (e) { /* storage unavailable: run without persistence */ }
+let saveTimer = null;
+function save(now) {
+  const write = () => {
+    saveTimer = null;
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { toast('Could not save: storage is full'); }
+  };
+  if (now) { clearTimeout(saveTimer); write(); } else if (!saveTimer) saveTimer = setTimeout(write, 4000);
+}
+
+// ---------- small helpers ----------
+const fmt = (s) => {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+};
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+};
+let toastTimer = null;
+function toast(msg) {
+  $('toast').textContent = msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2200);
+}
+
+// iOS gives .m4b files no usable MIME type, and Safari won't play a blob
+// without one, so label the blob from its first bytes.
+async function playable(f) {
+  const h = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  if (String.fromCharCode(...h.subarray(4, 8)) === 'ftyp') return f.slice(0, f.size, 'audio/mp4');
+  if ((h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0)) return f.slice(0, f.size, 'audio/mpeg');
+  return f;
+}
+
+// ---------- on-device file storage ----------
+let storeWorker = null, storeSeq = 0;
+const storeJobs = new Map();
+function store(op, dir, name, blob, onProgress) {
+  if (!storeWorker) {
+    storeWorker = new Worker('./store-worker.js');
+    storeWorker.onmessage = (e) => {
+      const job = storeJobs.get(e.data.id);
+      if (!job) return;
+      if (e.data.progress != null) { if (job.onProgress) job.onProgress(e.data.progress); return; }
+      storeJobs.delete(e.data.id);
+      if (e.data.error) job.reject(new Error(e.data.error)); else job.resolve();
+    };
+  }
+  return new Promise((resolve, reject) => {
+    const id = ++storeSeq;
+    storeJobs.set(id, { resolve, reject, onProgress });
+    storeWorker.postMessage({ id, op, dir, name, blob });
+  });
+}
+async function stored(dir, name) {
+  try {
+    const root = await navigator.storage.getDirectory();
+    const d = await root.getDirectoryHandle(dir);
+    return await (await d.getFileHandle(name)).getFile();
+  } catch (e) { return null; }
+}
+
+// ---------- library ----------
+const thumbUrls = [];
+async function renderLibrary() {
+  thumbUrls.splice(0).forEach((u) => URL.revokeObjectURL(u));
+  const ul = $('books');
+  ul.textContent = '';
+  $('emptyLib').hidden = state.books.length > 0;
+  for (const b of state.books) {
+    const btn = el('button', 'book');
+    const img = el('img', 'thumb');
+    img.alt = '';
+    const info = el('div');
+    info.append(el('div', 'name', b.title));
+    const n = b.marks.length;
+    info.append(el('div', 'muted', [b.author, fmt(b.duration), n ? n + (n === 1 ? ' bookmark' : ' bookmarks') : ''].filter(Boolean).join(' · ')));
+    const bar = el('div', 'bar'), fill = el('div');
+    fill.style.width = Math.round(100 * (b.position || 0) / (b.duration || 1)) + '%';
+    bar.append(fill); info.append(bar);
+    btn.append(img, info);
+    btn.addEventListener('click', () => openBook(b.id));
+    const li = el('li'); li.append(btn); ul.append(li);
+    if (b.hasCover) stored(b.id, 'cover').then((f) => {
+      if (!f) return;
+      const u = URL.createObjectURL(f); thumbUrls.push(u); img.src = u;
+    });
+  }
+  if (navigator.storage && navigator.storage.estimate) {
+    const { usage, quota } = await navigator.storage.estimate();
+    if (usage != null && quota) $('storage').textContent = 'Using ' + (usage / 1048576).toFixed(0) + ' MB of about ' + (quota / 1073741824).toFixed(1) + ' GB available to this app.';
+  }
+}
+
+// ---------- adding a book ----------
+let adding = false;
+const addReset = () => {
+  $('addAudio').value = ''; $('addText').value = '';
+  $('addAudioName').textContent = 'Required.';
+  $('addTextName').textContent = 'Optional. Needed for exact quotes; you can add it later.';
+  $('addStatus').textContent = ''; $('addStatus').className = 'muted';
+  $('addGo').disabled = true;
+};
+$('addBtn').addEventListener('click', () => { addReset(); $('addDlg').showModal(); });
+$('addCancel').addEventListener('click', () => { if (!adding) $('addDlg').close(); });
+$('addDlg').addEventListener('cancel', (e) => { if (adding) e.preventDefault(); });
+$('addAudio').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  $('addAudioName').textContent = f ? f.name + ' · ' + (f.size / 1048576).toFixed(0) + ' MB' : 'Required.';
+  $('addGo').disabled = !f;
+});
+$('addText').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) $('addTextName').textContent = f.name;
+});
+$('addGo').addEventListener('click', async () => {
+  const af = $('addAudio').files[0], tf = $('addText').files[0];
+  if (!af || adding) return;
+  adding = true; $('addGo').disabled = true; $('addCancel').disabled = true;
+  const say = (m) => { $('addStatus').textContent = m; $('addStatus').className = 'muted'; };
+  const id = crypto.randomUUID();
+  try {
+    say('Reading audio…');
+    const src = await openAudio(af, (p) => say('Reading audio… ' + Math.round(p * 100) + '%'));
+    let text = null;
+    if (tf) { say('Reading text…'); text = await readBook(tf); }
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    await store('write', id, 'audio', af, (p) => say('Copying audio… ' + Math.round(p * 100) + '%'));
+    if (src.tags.cover) await store('write', id, 'cover', src.tags.cover);
+    if (text != null) await store('write', id, 'text', new Blob([text], { type: 'text/plain' }));
+    state.books.unshift({
+      id, title: src.tags.title || af.name.replace(/\.[^.]+$/, ''), author: src.tags.author || '',
+      audioName: af.name, kind: src.kind, duration: src.duration, chapters: src.chapters,
+      hasCover: !!src.tags.cover, hasText: text != null, textName: tf ? tf.name : '',
+      position: 0, speed: 1, added: Date.now(), marks: [],
+    });
+    save(true);
+    $('addDlg').close();
+    await openBook(id);
+  } catch (err) {
+    await store('remove', id).catch(() => {});
+    $('addStatus').textContent = 'Could not add this book: ' + ((err && err.message) || err);
+    $('addStatus').className = 'warn';
+    $('addGo').disabled = false;
+  }
+  adding = false; $('addCancel').disabled = false;
+});
+
+// ---------- player ----------
+let cur = null;   // { book, source, text, audioUrl, coverUrl }
+let scrubbing = false;
+
+const chaptersOf = (b) => (b.chapters && b.chapters.length ? b.chapters : [{ start: 0, title: '' }]);
+function chapterAt(b, t) {
+  const ch = chaptersOf(b);
+  let i = 0;
+  while (i + 1 < ch.length && ch[i + 1].start <= t + 0.25) i++;
+  return { i, start: ch[i].start, end: i + 1 < ch.length ? ch[i + 1].start : b.duration, title: ch[i].title, count: ch.length };
+}
+
+async function openBook(id) {
+  const book = state.books.find((b) => b.id === id);
+  if (!book) return;
+  const file = await stored(id, 'audio');
+  if (!file) { toast('The audio for this book is missing from this device'); return; }
+  closeBook(true);
+  cur = { book, source: null, text: null, audioUrl: null, coverUrl: null };
+  $('library').hidden = true; $('player').hidden = false;
+  window.scrollTo(0, 0);
+  $('title').textContent = book.title;
+  $('author').textContent = book.author;
+  $('playerError').hidden = true;
+  $('speed').value = String(book.speed || 1);
+  $('cover').hidden = true;
+  cur.audioUrl = URL.createObjectURL(await playable(file));
+  audio.src = cur.audioUrl;
+  audio.playbackRate = book.speed || 1;
+  renderTime(book.position || 0);
+  renderMarks(); renderTextStatus(); setMediaSession();
+
+  const mine = cur;
+  if (book.hasCover) stored(id, 'cover').then((f) => {
+    if (!f || cur !== mine) return;
+    mine.coverUrl = URL.createObjectURL(f);
+    $('cover').src = mine.coverUrl; $('cover').hidden = false;
+    setMediaSession();
+  });
+  openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
+    .catch((e) => { if (cur === mine) $('queueStatus').textContent = 'Cannot read this audio for quotes: ' + e.message; });
+  if (book.hasText) stored(id, 'text').then(async (f) => {
+    if (!f || cur !== mine) return;
+    mine.text = buildBook(await f.text());
+    rematch(); runQueue();
+  });
+}
+
+function closeBook(silent) {
+  if (!cur) return;
+  audio.pause();
+  cur.book.position = audio.currentTime || cur.book.position || 0;
+  save(true);
+  audio.removeAttribute('src'); audio.load();
+  if (cur.audioUrl) URL.revokeObjectURL(cur.audioUrl);
+  if (cur.coverUrl) URL.revokeObjectURL(cur.coverUrl);
+  cur = null;
+  if (!silent) { $('player').hidden = true; $('library').hidden = false; renderLibrary(); }
+}
+$('backBtn').addEventListener('click', () => closeBook());
+
+audio.addEventListener('loadedmetadata', () => {
+  if (!cur) return;
+  const p = cur.book.position || 0;
+  if (p > 0 && p < audio.duration - 1) audio.currentTime = p;
+  updatePositionState();
+});
+audio.addEventListener('timeupdate', () => {
+  if (!cur || audio.readyState < 1) return;
+  cur.book.position = audio.currentTime;
+  save();
+  if (!scrubbing) renderTime(audio.currentTime);
+});
+audio.addEventListener('error', () => {
+  if (!cur || !audio.getAttribute('src')) return;
+  const e = audio.error;
+  $('playerError').hidden = false;
+  $('playerError').textContent = 'This file cannot be played here (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '') + ').';
+});
+const PLAY = 'M8 5v14l11-7z', PAUSE = 'M7 5h4v14H7zM13 5h4v14h-4z';
+function syncPlayState() {
+  const playing = !audio.paused;
+  $('playIcon').setAttribute('d', playing ? PAUSE : PLAY);
+  $('playBtn').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  if (!playing && cur) save(true);
+}
+audio.addEventListener('play', syncPlayState);
+audio.addEventListener('pause', syncPlayState);
+audio.addEventListener('ratechange', updatePositionState);
+audio.addEventListener('seeked', updatePositionState);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { if (cur) save(true); } else runQueue();
+});
+
+function renderTime(t) {
+  const b = cur.book, c = chapterAt(b, t);
+  const label = c.count > 1 ? c.title : 'Whole book';
+  $('chapterBtn').textContent = c.count > 1 ? label + '  ▾' : label;
+  $('chapterBtn').disabled = c.count <= 1;
+  const s = $('scrub');
+  s.min = Math.floor(c.start); s.max = Math.max(Math.floor(c.start) + 1, Math.ceil(c.end)); s.value = t;
+  $('elapsed').textContent = fmt(t - c.start);
+  $('remaining').textContent = '−' + fmt(c.end - t);
+  $('overall').textContent = fmt(t) + ' of ' + fmt(b.duration);
+}
+function seek(t) {
+  if (!cur) return;
+  t = Math.max(0, Math.min(cur.book.duration - 0.5, t));
+  cur.book.position = t;
+  try { audio.currentTime = t; } catch (e) {}
+  renderTime(t);
+}
+$('scrub').addEventListener('input', () => {
+  scrubbing = true;
+  const t = Number($('scrub').value), c = chapterAt(cur.book, audio.currentTime);
+  $('elapsed').textContent = fmt(t - c.start);
+  $('remaining').textContent = '−' + fmt(c.end - t);
+  $('overall').textContent = fmt(t) + ' of ' + fmt(cur.book.duration);
+});
+$('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('scrub').value)); });
+$('playBtn').addEventListener('click', () => {
+  if (audio.paused) audio.play().catch((e) => toast('Cannot play: ' + e.message)); else audio.pause();
+});
+$('backward').addEventListener('click', () => seek(audio.currentTime - SKIP));
+$('forward').addEventListener('click', () => seek(audio.currentTime + SKIP));
+$('speed').addEventListener('change', () => {
+  if (!cur) return;
+  cur.book.speed = Number($('speed').value);
+  audio.playbackRate = cur.book.speed;
+  save(true);
+});
+
+// chapters
+$('chapterBtn').addEventListener('click', () => {
+  const b = cur.book, now = chapterAt(b, audio.currentTime).i, ol = $('chapList');
+  ol.textContent = '';
+  let current = null;
+  chaptersOf(b).forEach((ch, i) => {
+    const btn = el('button');
+    btn.append(el('span', '', ch.title), el('span', '', fmt(ch.start)));
+    if (i === now) { btn.setAttribute('aria-current', 'true'); current = btn; }
+    btn.addEventListener('click', () => { seek(ch.start); $('chapDlg').close(); });
+    const li = el('li'); li.append(btn); ol.append(li);
+  });
+  $('chapDlg').showModal();
+  if (current) current.scrollIntoView({ block: 'center' });
+});
+$('chapClose').addEventListener('click', () => $('chapDlg').close());
+
+// ---------- lock screen, headphone and watch buttons ----------
+function setMediaSession() {
+  if (!('mediaSession' in navigator) || !cur) return;
+  const ms = navigator.mediaSession, b = cur.book;
+  if (window.MediaMetadata) {
+    ms.metadata = new MediaMetadata({
+      title: b.title, artist: b.author, album: 'Bork Mark',
+      artwork: cur.coverUrl ? [{ src: cur.coverUrl, sizes: '512x512' }] : [],
+    });
+  }
+  const on = (action, fn) => { try { ms.setActionHandler(action, fn); } catch (e) {} };
+  on('play', () => audio.play().catch(() => {}));
+  on('pause', () => audio.pause());
+  // Seek buttons show on the lock screen; the watch and headphones still send
+  // next / previous, which is what drops a bookmark.
+  on('seekbackward', (d) => seek(audio.currentTime - ((d && d.seekOffset) || SKIP)));
+  on('seekforward', (d) => seek(audio.currentTime + ((d && d.seekOffset) || SKIP)));
+  on('nexttrack', () => addMark());
+  on('previoustrack', () => addMark());
+}
+function updatePositionState() {
+  if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return;
+  if (!isFinite(audio.duration) || !audio.duration) return;
+  try {
+    navigator.mediaSession.setPositionState({
+      duration: audio.duration, playbackRate: audio.playbackRate, position: Math.min(audio.currentTime, audio.duration),
+    });
+  } catch (e) {}
+}
+
+// ---------- bookmarks ----------
+let lastMarkAt = 0;
+function addMark() {
+  if (!cur) return;
+  const now = Date.now();
+  if (now - lastMarkAt < MERGE_WINDOW) return;
+  lastMarkAt = now;
+  const t = audio.currentTime || cur.book.position || 0;
+  cur.book.marks.unshift({ id: crypto.randomUUID(), t, created: now, status: 'pending' });
+  save(true);
+  renderMarks();
+  toast('Bookmarked ' + fmt(t));
+  $('markBtn').classList.add('flash');
+  setTimeout(() => $('markBtn').classList.remove('flash'), 180);
+  runQueue();
+}
+$('markBtn').addEventListener('click', addMark);
+
+const expanded = new Set();
+// Shorten text to roughly n characters without cutting a word.
+const tail = (str, n) => (str.length <= n ? str : '…' + str.slice(str.indexOf(' ', str.length - n) + 1));
+const head = (str, n) => (str.length <= n ? str : str.slice(0, str.lastIndexOf(' ', n)) + '…');
+
+const STATUS = {
+  pending: 'waiting', working: 'finding quote…', transcribed: 'heard, no book text',
+  nomatch: 'not found in text', error: 'failed',
+};
+
+function renderMarks() {
+  if (!cur) return;
+  const b = cur.book, ol = $('marks');
+  ol.textContent = '';
+  $('markCount').textContent = b.marks.length ? '(' + b.marks.length + ')' : '';
+  if (!b.marks.length) {
+    ol.append(el('li', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
+    return;
+  }
+  for (const m of b.marks) {
+    const li = el('li', 'mark');
+    const top = el('div');
+    top.append(el('span', 'when', fmt(m.t)));
+    const c = chapterAt(b, m.t);
+    if (c.count > 1) top.append(el('span', 'muted', '  ' + c.title));
+    if (STATUS[m.status]) top.append(el('span', 'chip', STATUS[m.status]));
+    li.append(top);
+    let extra = null;
+
+    if (m.status === 'done') {
+      // Collapsed, a card shows just the text around the bookmark point.
+      const q = el('div', 'quote');
+      const open = expanded.has(m.id);
+      const before = open ? m.before : tail(m.before, 220), after = open ? m.after : head(m.after, 120);
+      q.append(document.createTextNode(before), el('span', 'pin', '🔖'), document.createTextNode(after));
+      li.append(q);
+      if (before !== m.before || after !== m.after || open) {
+        const more = el('button', 'small', open ? 'Less' : 'More');
+        more.addEventListener('click', () => { if (open) expanded.delete(m.id); else expanded.add(m.id); renderMarks(); });
+        extra = more;
+      }
+    } else if (m.transcript) {
+      li.append(el('div', 'quote raw', m.transcript));
+    } else if (m.status === 'error') {
+      li.append(el('div', 'warn', m.error || 'Something went wrong.'));
+    }
+
+    const actions = el('div', 'row');
+    if (extra) actions.append(extra);
+    const play = el('button', 'small', 'Play');
+    play.addEventListener('click', () => { seek(m.t - 30); audio.play().catch(() => {}); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    actions.append(play);
+    if (m.status === 'done' || m.transcript) {
+      const copy = el('button', 'small', 'Copy');
+      copy.addEventListener('click', async () => {
+        const body = m.status === 'done' ? (m.before + m.after).trim() : m.transcript;
+        const where = [b.title, c.count > 1 ? c.title : '', fmt(m.t)].filter(Boolean).join(', ');
+        try { await navigator.clipboard.writeText(body + '\n\n— ' + where); toast('Copied'); } catch (e) { toast('Copy failed'); }
+      });
+      actions.append(copy);
+    }
+    if (m.status === 'error') {
+      const retry = el('button', 'small', 'Retry');
+      retry.addEventListener('click', () => { m.status = 'pending'; delete m.error; save(true); renderMarks(); runQueue(); });
+      actions.append(retry);
+    }
+    const del = el('button', 'small', 'Delete');
+    del.addEventListener('click', () => {
+      if (!confirm('Delete the bookmark at ' + fmt(m.t) + '?')) return;
+      b.marks = b.marks.filter((x) => x !== m);
+      save(true); renderMarks();
+    });
+    actions.append(del);
+    li.append(actions);
+    ol.append(li);
+  }
+}
+
+// ---------- speech-to-text worker ----------
+let asrWorker = null, asrPending = null, asrSeq = 0;
+function transcribe(pcm) {
+  if (!asrWorker) {
+    asrWorker = new Worker('./align-worker.js', { type: 'module' });
+    asrWorker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === 'progress' && m.total) {
+        $('queueStatus').textContent = 'Downloading the speech model (one time): ' + Math.round(100 * m.loaded / m.total) + '%';
+      } else if (m.type === 'stage') {
+        $('queueStatus').textContent = 'Finding quotes…';
+      } else if (asrPending && m.id === asrPending.id) {
+        const p = asrPending; asrPending = null;
+        if (m.type === 'done') p.resolve(m); else p.reject(new Error(m.message));
+      }
+    };
+    asrWorker.onerror = (e) => {
+      if (asrPending) { const p = asrPending; asrPending = null; p.reject(new Error(e.message || 'speech model failed to start')); }
+      asrWorker = null;
+    };
+  }
+  return new Promise((resolve, reject) => {
+    asrPending = { id: ++asrSeq, resolve, reject };
+    asrWorker.postMessage({ id: asrPending.id, audio: pcm, model: MODEL, device: 'wasm' }, [pcm.buffer]);
+  });
+}
+
+function applyQuote(m, text) {
+  const q = quoteFor(text, m.words, m.split);
+  if (!q) { m.status = 'nomatch'; return; }
+  m.status = 'done'; m.before = q.before; m.after = q.after; m.confidence = q.confidence;
+  delete m.words; delete m.split; delete m.transcript;
+}
+
+// Bookmarks transcribed before the book text was available can be matched
+// now without listening to the audio again.
+function rematch() {
+  if (!cur || !cur.text) return;
+  let changed = false;
+  for (const m of cur.book.marks) {
+    if ((m.status === 'transcribed' || m.status === 'nomatch') && m.words) { applyQuote(m, cur.text); changed = true; }
+  }
+  if (changed) { save(true); renderMarks(); }
+}
+
+let queueBusy = false;
+async function runQueue() {
+  if (queueBusy || !cur || !cur.source || document.visibilityState === 'hidden') return;
+  if (cur.book.hasText && !cur.text) return;   // text still loading
+  queueBusy = true;
+  const mine = cur;
+  try {
+    for (;;) {
+      if (cur !== mine || document.visibilityState === 'hidden') break;
+      const m = [...mine.book.marks].reverse().find((x) => x.status === 'pending');
+      if (!m) break;
+      m.status = 'working'; renderMarks();
+      $('queueStatus').textContent = 'Finding quotes…';
+      try {
+        const r = await transcribeAround(mine.source, m.t, CLIP_BEFORE, CLIP_AFTER, transcribe);
+        m.words = r.words; m.split = r.split; m.transcript = r.transcript;
+        if (mine.text) applyQuote(m, mine.text); else m.status = 'transcribed';
+      } catch (err) {
+        m.status = 'error'; m.error = String((err && err.message) || err);
+      }
+      save(true);
+      if (cur === mine) renderMarks();
+    }
+  } finally {
+    queueBusy = false;
+    if (cur === mine) $('queueStatus').textContent = '';
+  }
+}
+
+// ---------- book text and removal ----------
+function renderTextStatus() {
+  const b = cur.book;
+  $('textStatus').textContent = b.hasText
+    ? 'Text: ' + (b.textName || 'added') + '. Bookmarks quote the book’s own wording.'
+    : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
+  $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
+}
+$('textFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || !cur) return;
+  const mine = cur;
+  try {
+    $('textStatus').textContent = 'Reading ' + f.name + '…';
+    const text = await readBook(f);
+    await store('write', mine.book.id, 'text', new Blob([text], { type: 'text/plain' }));
+    mine.book.hasText = true; mine.book.textName = f.name;
+    save(true);
+    if (cur !== mine) return;
+    mine.text = buildBook(text);
+    renderTextStatus(); rematch(); runQueue();
+    toast('Book text added');
+  } catch (err) {
+    if (cur === mine) { renderTextStatus(); toast('Could not read that file'); }
+  }
+});
+$('removeBtn').addEventListener('click', async () => {
+  if (!cur) return;
+  const b = cur.book, n = b.marks.length;
+  if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return;
+  closeBook(true);
+  state.books = state.books.filter((x) => x !== b);
+  save(true);
+  await store('remove', b.id).catch(() => {});
+  $('player').hidden = true; $('library').hidden = false;
+  renderLibrary();
+});
+
+// A bookmark interrupted mid-transcription goes back in the queue.
+for (const b of state.books) for (const m of b.marks) if (m.status === 'working') m.status = 'pending';
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+renderLibrary();
