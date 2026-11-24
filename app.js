@@ -1059,10 +1059,15 @@ function easeCard(id, change, settle) {
   if (!card) return;
   const to = card.getBoundingClientRect().height;
   if (settle) {
-    // After an edit: bring this bookmark to the middle of the sheet and light it up briefly.
+    // After an edit: bring this bookmark back into view and light it up briefly.
+    // If it fits, it sits in the middle of the space under the heading; if it
+    // is taller than that, its top line (date and time) goes just under the heading.
     const sheet = $('marksDlg'), frame = sheet.getBoundingClientRect();
     const top = card.getBoundingClientRect().top - frame.top + sheet.scrollTop;
-    sheet.scrollTo({ top: Math.max(0, top + to / 2 - sheet.clientHeight / 2), behavior: calm.matches ? 'auto' : 'smooth' });
+    const head = sheet.querySelector('.markshead'), under = head ? head.getBoundingClientRect().height : 0;
+    const room = sheet.clientHeight - under;
+    const target = to + 24 <= room ? top - under - (room - to) / 2 : top - under - 10;
+    sheet.scrollTo({ top: Math.max(0, target), behavior: calm.matches ? 'auto' : 'smooth' });
     card.classList.add('flash');
     setTimeout(() => card.classList.remove('flash'), 1700);
   }
