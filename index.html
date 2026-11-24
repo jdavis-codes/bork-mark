@@ -67,6 +67,7 @@
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   .bar > div { height: 100%; background: var(--accent); }
   #emptyLib { margin-top: 24px; }
+  #library .iconbtn { margin-right: -8px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
   #modelNote:empty { display: none; }
   #addBtn { width: 100%; margin-top: 16px; padding: 14px; }
@@ -164,6 +165,30 @@
     html { min-height: calc(100% + env(safe-area-inset-top)); }
   }
 
+  /* add a book: one tappable row per file */
+  .picks { display: grid; gap: 10px; }
+  .pick {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; cursor: pointer;
+    padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+    transition: border-color 0.15s, opacity 0.12s, transform 0.12s;
+  }
+  .pick:active { opacity: 0.6; transform: scale(0.98); }
+  .pick svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .pickicon { color: var(--muted); padding: 8px; border-radius: 10px; background: var(--soft); }
+  .picktext { display: grid; min-width: 0; }
+  .pickname { font-weight: 600; }
+  .pickdesc { color: var(--muted); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pickstate { color: var(--muted); }
+  .pickstate .tick, .pick.chosen .pickstate .plus { display: none; }
+  .pick.chosen { border-color: var(--accent); }
+  .pick.chosen .pickstate { color: var(--accent); }
+  .pick.chosen .pickstate .tick { display: inline; }
+  .pick.chosen .pickicon { color: var(--accent); }
+  #addDlg.busy .pick { opacity: 0.5; pointer-events: none; }
+  #addProgress { margin-top: 16px; height: 6px; border-radius: 3px; }
+  #addStatus { margin-top: 8px; min-height: 1.4em; }
+  #addGo { width: 100%; margin-top: 8px; padding: 16px; font-size: 1.05rem; }
+
   /* a grab handle shows that sheets can be pulled down */
   dialog.bottom, #settingsDlg { overscroll-behavior: none; }
   dialog.bottom::before {
@@ -182,8 +207,6 @@
   @keyframes fade-out { to { opacity: 0; } }
   dialog.bottom[open], #settingsDlg[open] { animation: sheet-up 0.32s cubic-bezier(0.2, 0.9, 0.25, 1); }
   dialog.bottom.closing, #settingsDlg.closing { animation: sheet-down 0.2s ease-in forwards; }
-  #addDlg[open] { animation: pop-in 0.2s ease-out; }
-  #addDlg.closing { animation: fade-out 0.2s forwards; }
   dialog[open]::backdrop { animation: fade-in 0.25s; }
   dialog.closing::backdrop { animation: fade-out 0.2s forwards; }
   .tabs button, .transport button, #markBtn, .round { transition: transform 0.12s, opacity 0.12s; }
@@ -322,7 +345,7 @@
 <body>
 
 <main id="library">
-  <div class="row spread"><h1>Bork Mark</h1><button id="settingsBtn" class="small">Settings</button></div>
+  <div class="row spread"><h1>Bork Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
   <p class="muted">Bookmark audiobooks from your headphones or watch.</p>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
@@ -336,7 +359,6 @@
   <button id="addBtn" class="primary">Add a book</button>
   <p id="modelNote" class="muted" style="margin-top:18px"></p>
   <p id="storage" class="muted" style="margin-top:4px"></p>
-  <p class="muted" style="margin-top:6px">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
 </main>
 
 <main id="player" hidden>
@@ -369,18 +391,32 @@
   <button id="markBtn" class="primary">Bookmark</button>
 </main>
 
-<dialog id="addDlg">
-  <h2 tabindex="-1" autofocus>Add a book</h2>
+<dialog id="addDlg" class="bottom">
+  <div class="row spread"><h2 tabindex="-1" autofocus>Add a book</h2><button id="addCancel" class="small">Cancel</button></div>
   <p class="muted" style="margin:6px 0 14px">Files are copied into this app on your device. Nothing is uploaded.</p>
-  <label class="filebtn">Choose audio (M4B or MP3)<input id="addAudio" type="file"></label>
-  <p id="addAudioName" class="muted picked">Required.</p>
-  <label class="filebtn">Choose text (EPUB or TXT)<input id="addText" type="file"></label>
-  <p id="addTextName" class="muted picked">Optional. Needed for exact quotes; you can add it later.</p>
-  <p id="addStatus" class="muted" style="min-height:1.4em"></p>
-  <div class="row" style="justify-content:flex-end; margin-top:10px">
-    <button id="addCancel">Cancel</button>
-    <button id="addGo" class="primary" disabled>Add</button>
+  <div class="picks">
+    <label class="pick" id="pickAudio">
+      <input id="addAudio" type="file">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H6a2 2 0 0 1-2-2zM20 14h-3v6h1a2 2 0 0 0 2-2z"/></svg></span>
+      <span class="picktext"><span class="pickname">Audiobook</span><span id="addAudioName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
+    <label class="pick" id="pickText">
+      <input id="addText" type="file">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4M9 8h6"/></svg></span>
+      <span class="picktext"><span class="pickname">Book text</span><span id="addTextName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
+    <label class="pick" id="pickPdf">
+      <input id="addPdf" type="file">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg></span>
+      <span class="picktext"><span class="pickname">Page scan</span><span id="addPdfName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
   </div>
+  <div id="addProgress" class="bar" style="visibility:hidden"><div id="addFill"></div></div>
+  <p id="addStatus" class="muted"></p>
+  <button id="addGo" class="primary" disabled>Add book</button>
 </dialog>
 
 <dialog id="settingsDlg">
@@ -484,6 +520,7 @@
       <h3>App</h3>
       <p id="appVersion" class="muted">Checking for the latest version…</p>
       <button id="appReload">Reload app</button>
+      <p class="muted">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
     </section>
   </div>
 </dialog>

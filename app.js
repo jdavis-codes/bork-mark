@@ -115,7 +115,7 @@ let byTouch = false;
 document.addEventListener('pointerdown', () => { byTouch = true; }, true);
 document.addEventListener('keydown', () => { byTouch = false; }, true);
 function closeSheet(d) {
-  if (!d.open || d.classList.contains('closing')) return;
+  if (!d.open || d.classList.contains('closing') || (d.id === 'addDlg' && adding)) return;
   const finish = () => {
     d.classList.remove('closing'); d.close();
     d.style.transform = ''; d.style.transition = '';
@@ -271,39 +271,59 @@ async function renderLibrary() {
 }
 
 // ---------- adding a book ----------
-const addReset = () => {
-  $('addAudio').value = ''; $('addText').value = '';
-  $('addAudioName').textContent = 'Required.';
-  $('addTextName').textContent = 'Optional. Needed for exact quotes; you can add it later.';
-  $('addStatus').textContent = ''; $('addStatus').className = 'muted';
-  $('addGo').disabled = true;
-};
-$('addBtn').addEventListener('click', () => { addReset(); $('addDlg').showModal(); });
-$('addCancel').addEventListener('click', () => { if (!adding) closeSheet($('addDlg')); });
-$('addAudio').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  $('addAudioName').textContent = f ? f.name + ' · ' + (f.size / 1048576).toFixed(0) + ' MB' : 'Required.';
-  $('addGo').disabled = !f;
+// The three files a book can have. Only the audio is required.
+const PICKS = [
+  { key: 'Audio', hint: 'M4B or MP3 · required' },
+  { key: 'Text', hint: 'EPUB or TXT · for exact quotes' },
+  { key: 'Pdf', hint: 'PDF of the print edition · page numbers' },
+];
+function renderPick({ key, hint }) {
+  const f = $('add' + key).files[0];
+  $('add' + key + 'Name').textContent = f ? f.name + ' · ' + (f.size < 1048576 ? Math.max(1, Math.round(f.size / 1024)) + ' KB' : (f.size / 1048576).toFixed(0) + ' MB') : hint;
+  $('pick' + key).classList.toggle('chosen', !!f);
+}
+// Progress while a book is being added: a message, and how far along (0 to 1).
+function addSay(msg, frac) {
+  $('addStatus').textContent = msg; $('addStatus').className = 'muted';
+  $('addProgress').style.visibility = frac == null ? 'hidden' : 'visible';   // keeps its space, so the sheet doesn't jump
+  if (frac != null) $('addFill').style.width = Math.round(frac * 100) + '%';
+}
+function addBusy(on) {
+  adding = on;
+  $('addGo').disabled = on || !$('addAudio').files[0];
+  $('addCancel').disabled = on;
+  for (const { key } of PICKS) $('add' + key).disabled = on;
+  $('addDlg').classList.toggle('busy', on);
+}
+$('addBtn').addEventListener('click', () => {
+  for (const pick of PICKS) { $('add' + pick.key).value = ''; renderPick(pick); }
+  addSay(''); addBusy(false);
+  $('addDlg').showModal();
 });
-$('addText').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) $('addTextName').textContent = f.name;
-});
+$('addCancel').addEventListener('click', () => closeSheet($('addDlg')));
+for (const pick of PICKS) $('add' + pick.key).addEventListener('change', () => { renderPick(pick); addBusy(false); });
 $('addGo').addEventListener('click', async () => {
-  const af = $('addAudio').files[0], tf = $('addText').files[0];
+  const af = $('addAudio').files[0], tf = $('addText').files[0], pf = $('addPdf').files[0];
   if (!af || adding) return;
-  adding = true; $('addGo').disabled = true; $('addCancel').disabled = true;
-  const say = (m) => { $('addStatus').textContent = m; $('addStatus').className = 'muted'; };
+  addBusy(true);
   const id = crypto.randomUUID();
   try {
-    say('Reading audio…');
-    const src = await openAudio(af, (p) => say('Reading audio… ' + Math.round(p * 100) + '%'));
+    addSay('Reading the audiobook…', 0);
+    const src = await openAudio(af, (p) => addSay('Reading the audiobook…', p * 0.1));
     let doc = null;
-    if (tf) { say('Reading text…'); doc = await readBook(tf); }
+    if (tf) { addSay('Reading the book text…', 0.1); doc = await readBook(tf); }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    await store('write', id, 'audio', af, (p) => say('Copying audio… ' + Math.round(p * 100) + '%'));
+    await store('write', id, 'audio', af, (p) => addSay('Copying the audiobook… ' + Math.round(p * 100) + '%', 0.15 + p * 0.7));
     if (src.tags.cover) await store('write', id, 'cover', src.tags.cover);
     if (doc) await storeText(id, doc);
+    // A page scan that can't be used shouldn't stop the book being added.
+    let pdf = null, pdfProblem = '';
+    if (pf) {
+      try {
+        pdf = await readPdfPages(pf, (p) => addSay('Reading the page scan… ' + Math.round(p * 100) + '%', 0.85 + p * 0.15));
+        await store('write', id, 'pagesrc', new Blob([JSON.stringify(pdf)], { type: 'application/json' }));
+      } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
+    }
     const book = {
       id, fromAudio: { title: src.tags.title || '', author: src.tags.author || '' },
       fromText: doc ? { title: doc.title, author: doc.author } : {},
@@ -311,19 +331,21 @@ $('addGo').addEventListener('click', async () => {
       hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
     };
+    if (pdf) { book.pageSrcName = pf.name; book.pageFirst = guessFirstNumbered(pdf.pages) || 1; }
     resolveMeta(book);
     state.books.unshift(book);
     save(true);
+    addBusy(false);
     closeSheet($('addDlg'));
     await openBook(id);
+    if (pdfProblem) toast('Book added, but not the page scan: ' + pdfProblem);
     warmModel().catch(() => {});
   } catch (err) {
     await store('remove', id).catch(() => {});
-    $('addStatus').textContent = 'Could not add this book: ' + ((err && err.message) || err);
+    addBusy(false);
+    addSay('Could not add this book: ' + ((err && err.message) || err));
     $('addStatus').className = 'warn';
-    $('addGo').disabled = false;
   }
-  adding = false; $('addCancel').disabled = false;
 });
 
 // ---------- player ----------
@@ -1353,7 +1375,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795508520';
+const BUILD = '1795508811';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
