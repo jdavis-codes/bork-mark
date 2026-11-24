@@ -182,6 +182,29 @@ for (const d of document.querySelectorAll('dialog.bottom, #settingsDlg')) {
   d.addEventListener('touchcancel', release);
 }
 
+// Text that is too long for its line slides back and forth so it can be
+// read. `node` is the fixed-width line; its text lives in an inner span.
+function setScroll(node, text) {
+  if (node.dataset.text === text) return;      // unchanged: leave any animation running
+  node.dataset.text = text;
+  let inner = node.firstElementChild;
+  if (!inner || !inner.classList.contains('mq')) { inner = el('span', 'mq'); node.replaceChildren(inner); }
+  inner.textContent = text;
+  fitScroll(node);
+}
+function fitScroll(node) {
+  const inner = node.firstElementChild;
+  if (!inner || !node.clientWidth) return;     // not on screen yet; refitted when it is
+  node.classList.remove('scrolls');
+  const over = inner.scrollWidth - node.clientWidth;
+  if (over <= 6 || calm.matches) return;
+  inner.style.setProperty('--shift', -over + 'px');
+  inner.style.setProperty('--dur', Math.max(7, 5 + over / 16) + 's');   // about 30 pixels a second, with pauses
+  node.classList.add('scrolls');
+}
+const refitScrolls = () => document.querySelectorAll('.scroller').forEach(fitScroll);
+window.addEventListener('resize', refitScrolls);
+
 let toastTimer = null;
 function toast(msg) {
   const t = $('toast');
@@ -376,7 +399,7 @@ async function openBook(id, coverNow) {
   closeBook();
   cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: null };
   showPlayer();
-  $('title').textContent = book.title;
+  setScroll($('title'), book.title);
   $('author').textContent = book.author;
   $('playerError').hidden = true;
   renderInfo();
@@ -434,15 +457,17 @@ function morph(update, fromCover) {
 // with a mini player along the bottom.
 function showPlayer() {
   $('library').hidden = true; $('player').hidden = false;
-  $('tabbar').hidden = false; document.body.classList.add('has-bar');
+  $('tabbar').hidden = false; $('libFoot').hidden = true; document.body.classList.add('has-bar');
   renderMini();
   window.scrollTo(0, 0);
+  refitScrolls();
 }
 function showLibrary() {
   $('player').hidden = true; $('library').hidden = false;
-  $('tabbar').hidden = true; document.body.classList.remove('has-bar');
+  $('tabbar').hidden = true; $('libFoot').hidden = false; document.body.classList.remove('has-bar');
   renderLibrary(); renderMini();
   window.scrollTo(0, 0);
+  refitScrolls();
 }
 
 function closeBook() {
@@ -462,6 +487,46 @@ function closeBook() {
 }
 $('backBtn').addEventListener('click', () => morph(showLibrary));
 
+// Swipe down on the player to return to the library. The player follows the
+// finger a little; past a third of the screen, or with a quick flick, it goes
+// back, otherwise it settles. The scrubber and other sliders are left alone.
+{
+  const player = $('player');
+  let g = null;
+  const settle = () => { player.style.transition = 'transform 0.2s, opacity 0.2s'; player.style.transform = ''; player.style.opacity = ''; setTimeout(() => { player.style.transition = ''; }, 220); };
+  player.addEventListener('touchstart', (e) => {
+    g = null;
+    if (e.touches.length !== 1 || window.scrollY > 0 || e.target.closest('input, select, textarea')) return;
+    g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };
+  }, { passive: true });
+  player.addEventListener('touchmove', (e) => {
+    if (!g) return;
+    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
+    if (!g.dragging) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }
+      g.dragging = true;
+      player.style.transition = 'none';
+    }
+    if (e.cancelable) e.preventDefault();
+    g.dy = Math.max(0, dy);
+    player.style.transform = 'translateY(' + g.dy * 0.6 + 'px)';
+    player.style.opacity = String(Math.max(0.4, 1 - g.dy / 500));
+  }, { passive: false });
+  const release = (e) => {
+    const was = g;
+    g = null;
+    if (!was || !was.dragging) return;
+    const speed = was.dy / Math.max(1, e.timeStamp - was.at);
+    if (e.type === 'touchend' && (was.dy > window.innerHeight / 3 || (speed > 0.5 && was.dy > 40))) {
+      player.style.transition = '';
+      morph(() => { player.style.transform = ''; player.style.opacity = ''; showLibrary(); });
+    } else settle();
+  };
+  player.addEventListener('touchend', release);
+  player.addEventListener('touchcancel', release);
+}
+
 // ---------- mini player (library screen) ----------
 function renderMini() {
   const show = !!cur && !$('library').hidden;
@@ -469,8 +534,9 @@ function renderMini() {
   document.body.classList.toggle('has-mini', show);
   if (!show) return;
   const b = cur.book, t = audio.currentTime || b.position || 0, c = chapterAt(b, t);
-  $('miniTitle').textContent = b.title;
-  $('miniSub').textContent = fmt(t) + (c.count > 1 ? ' · ' + c.title : '');
+  setScroll($('miniTitle'), b.title);
+  $('miniTime').textContent = fmt(t) + (c.count > 1 ? ' · ' : '');
+  setScroll($('miniChap'), c.count > 1 ? c.title : '');
   $('miniCover').hidden = !cur.coverUrl;
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
   $('miniFill').style.width = (100 * t / (b.duration || 1)) + '%';
@@ -591,7 +657,7 @@ function renderOverall(t) {
 function renderTime(t) {
   const b = cur.book, c = chapterAt(b, t);
   const label = c.count > 1 ? c.title : 'Whole book';
-  $('chapterBtn').textContent = c.count > 1 ? label + '  ▾' : label;
+  setScroll($('chapterText'), label);
   $('chapterBtn').disabled = c.count <= 1;
   const s = $('scrub');
   s.min = Math.floor(c.start); s.max = Math.max(Math.floor(c.start) + 1, Math.ceil(c.end)); s.value = t; fillRange(s);
@@ -1419,7 +1485,7 @@ function renderInfo() {
 function metaChanged() {
   const b = cur.book;
   resolveMeta(b); save(true);
-  $('title').textContent = b.title; $('author').textContent = b.author;
+  setScroll($('title'), b.title); $('author').textContent = b.author;
   setMediaSession(); renderInfo();
 }
 $('infoBtn').addEventListener('click', () => { chaptersOpen = false; figuresOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
@@ -1656,7 +1722,7 @@ $('appReload').addEventListener('click', async () => {
 });
 // Every published build has a number, here and in version.json. When the
 // server's number differs from this one, a newer version is waiting.
-const BUILD = '1795510228';
+const BUILD = '1795510490';
 const buildDate = (b) => new Date(Number(b) * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
