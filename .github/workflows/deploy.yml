@@ -96,7 +96,7 @@ jobs:
           fi
           touch "$site/.nojekyll"
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: ${{ runner.temp }}/site
 
