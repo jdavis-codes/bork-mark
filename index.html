@@ -91,9 +91,14 @@
   html { overscroll-behavior-y: none; }
   .libhead {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
-    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 10px;
+    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 6px;
   }
-  #library { padding-top: 94px; }
+  #library { padding-top: 100px; }
+  /* Room is always kept for it, so the books don't move when it appears. */
+  #modelFail { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 28px; margin-top: 6px; padding: 0 4px 0 10px; border: 1px solid var(--warn); border-radius: 9px; font-size: 0.82rem; }
+  #modelFail[hidden] { display: none; }
+  #modelNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #modelAgain { flex: none; border: none; padding: 2px 8px; font-size: 0.82rem; font-weight: 600; color: var(--accent); }
   /* how much of this app's storage is used: a small pie and two numbers, under the title */
   #storage { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
   #storagePie { flex: none; width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(var(--accent) var(--used, 0%), var(--line) 0); }
@@ -715,13 +720,24 @@
     padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--bg); border-bottom: 1px solid var(--line);
   }
   .sheethead h2 { font-size: 1.15rem; }
-  .sheet { padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
-  .sheet section, .stack { display: grid; gap: 18px; }
-  .sheet section { margin-top: 28px; }
-  .sheet h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 -4px; }
-  .field { display: grid; gap: 8px; min-width: 0; }
+  .sheet { padding: 0 12px calc(40px + env(safe-area-inset-bottom)); }
+  /* Each section is a card. Its title leads: the largest and heaviest thing in it. Settings'
+     names are medium weight, their values and the notes under them are quieter and smaller. */
+  .sheet section, .stack { display: grid; gap: 0; }
+  .sheet section { margin-top: 16px; padding: 16px 16px 4px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .sheet h3 { font-size: 1.06rem; font-weight: 700; color: var(--fg); margin: 0 0 2px; }
+  .field { display: grid; gap: 9px; min-width: 0; padding: 13px 0; }
+  .sheet .field + .field, .sheet .field + .stack > .field:first-child, .sheet .stack + .field, .sheet .stack + .stack > .field:first-child { border-top: 1px solid var(--line); }
+  .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0 0 12px; }
+  .sheet section > h3 + p, .sheet section > h3 + button { margin-top: 10px; }
+  .sheet .muted { font-size: 0.82rem; line-height: 1.4; margin: 0; }
+  .sheet section > p.muted { margin: 8px 0 12px; }
+  .sheet section > .field + p.muted { margin-top: 0; }
+  .sheet .select select, .sheet .textfield { background: var(--bg); }
+  /* A field brought into view above the keyboard keeps a little room around it, clear of the heading that stays in place. */
+  dialog input, dialog textarea { scroll-margin: 72px 0 16px; }
   .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  .fieldhead label, .fieldname, .switchrow span { font-weight: 600; }
+  .fieldhead label, .fieldname, .switchrow span { font-weight: 500; }
   .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
   .swatch {
     width: 40px; height: 40px; border-radius: 50%; padding: 0; border: 3px solid var(--bg); cursor: pointer;
@@ -775,6 +791,7 @@
   <div class="libhead">
     <div class="row spread"><h1 aria-label="Bork Mark">Bork<br>Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
     <p id="storage" hidden><span id="storagePie" aria-hidden="true"></span><span id="storageText"></span></p>
+    <div id="modelFail" hidden><span id="modelNote"></span><button id="modelAgain">Try again</button></div>
   </div>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
@@ -782,10 +799,6 @@
       <button id="modelRetry" class="small" hidden>Load speech model</button>
       <button id="crashDismiss" class="small">Dismiss</button>
     </div>
-  </div>
-  <div id="modelFail" class="note" hidden>
-    <p id="modelNote"></p>
-    <div class="row" style="margin-top:8px"><button id="modelAgain" class="small">Try again</button></div>
   </div>
   <ul id="books"></ul>
   <div id="addZone">
@@ -987,24 +1000,26 @@
       <h3>Sounds and figures</h3>
       <div class="field">
         <label class="switchrow" for="sounds"><span>Sounds</span><input id="sounds" type="checkbox" class="switch"></label>
-        <p class="muted">A short tone when you bookmark, skip from your headphones or watch, or reach a picture.</p>
+        <p class="muted">Short tones that confirm what happened when the phone is out of sight.</p>
       </div>
       <div id="soundOptions" class="stack">
         <div class="field">
-          <div class="fieldhead"><label for="soundStyle">Sound</label></div>
-          <div class="select"><select id="soundStyle"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option></select></div>
-        </div>
-        <div class="field">
           <div class="fieldhead"><label for="soundVolume">Loudness</label><output id="soundVolumeOut" for="soundVolume"></output></div>
           <input id="soundVolume" type="range" min="10" max="100" step="5">
-          <p class="muted">Compared with the book. Changing either plays the bookmark sound.</p>
         </div>
         <div class="field">
-          <label class="switchrow" for="soundMark"><span>When you bookmark</span><input id="soundMark" type="checkbox" class="switch"></label>
+          <div class="fieldhead"><label for="soundMark">A bookmark</label></div>
+          <div class="select"><select id="soundMark"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
         </div>
         <div class="field">
-          <label class="switchrow" for="soundSkip"><span>When you skip</span><input id="soundSkip" type="checkbox" class="switch"></label>
+          <div class="fieldhead"><label for="soundSkip">A skip</label></div>
+          <div class="select"><select id="soundSkip"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
           <p class="muted">From your headphones, watch or the lock screen.</p>
+        </div>
+        <div class="field">
+          <div class="fieldhead"><label for="soundFigure">A picture or table</label></div>
+          <div class="select"><select id="soundFigure"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
+          <p class="muted">Choosing a sound plays it.</p>
         </div>
       </div>
       <div class="field">

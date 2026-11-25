@@ -69,8 +69,17 @@ const VOICES = {
   bell: { pitch: 1, stretch: 2.2, wave: (x) => (sine(x) + 0.5 * sine(2 * x) + 0.25 * sine(3 * x)) / 1.75, fade: (k, len) => Math.min(1, k / 60) * Math.exp(-4 * k / len) },
   click: { pitch: 1.6, stretch: 0.28, wave: (x) => (sine(x) > 0 ? 0.6 : -0.6), fade: (k, len) => Math.min(1, k / 20, (len - k) / 60) },
 };
-function toneWav(notes) {
-  const rate = 22050, gap = 0.03, voice = VOICES[settings.soundStyle] || VOICES.chime;
+// Which setting names each sound's voice.
+const WHEN = { mark: 'soundMark', fwd: 'soundSkip', back: 'soundSkip', figure: 'soundFigure' };
+// The voice chosen for a sound, or 'none'. Settings saved when there was one
+// style for everything, and a switch per event, are read as they were meant.
+function voiceOf(key) {
+  const v = settings[WHEN[key]];
+  if (v === false) return 'none';
+  return typeof v === 'string' ? v : settings.soundStyle || 'chime';
+}
+function toneWav(notes, name) {
+  const rate = 22050, gap = 0.03, voice = VOICES[name] || VOICES.chime;
   // Loudness 50 is the level the tones always had.
   const level = 0.6 * Math.max(10, Math.min(100, settings.soundVolume || 50)) / 100;
   const lengths = notes.map(([, ms]) => Math.max(1, Math.floor(rate * ms * voice.stretch / 1000)));
@@ -91,28 +100,26 @@ export function primeSounds() {
   if (fxReady || !settings.sounds) return;
   fxReady = true;
   for (const key of Object.keys(SOUNDS)) {
-    const a = fx[key] || (fx[key] = new Audio(URL.createObjectURL(toneWav(SOUNDS[key]))));
+    const a = fx[key] || (fx[key] = new Audio(URL.createObjectURL(toneWav(SOUNDS[key], voiceOf(key)))));
     a.preload = 'auto'; a.muted = true;
     a.play().then(() => { a.pause(); a.currentTime = 0; a.muted = false; }, () => { a.muted = false; fxReady = false; });
   }
 }
-// The style or loudness changed: make the tones again, and play one to hear it.
+// A sound or the loudness changed: make the tones again, and play one to hear it.
 // Called from a tap in Settings, which is also what lets iOS play them later.
 export function retuneSounds(preview) {
   for (const key of Object.keys(SOUNDS)) {
     const a = fx[key] || (fx[key] = new Audio());
     if (a.src) URL.revokeObjectURL(a.src);
-    a.src = URL.createObjectURL(toneWav(SOUNDS[key]));
+    a.src = URL.createObjectURL(toneWav(SOUNDS[key], voiceOf(key)));
     a.preload = 'auto'; a.muted = false;
   }
   fxReady = false;   // the silent first play happens again at the next press of play
-  if (preview && fx[preview]) fx[preview].play().catch(() => {});
+  if (preview && fx[preview] && voiceOf(preview) !== 'none') fx[preview].play().catch(() => {});
 }
-// Which setting switches each sound on; a picture's chime follows "Notice pictures and tables".
-const WHEN = { mark: 'soundMark', fwd: 'soundSkip', back: 'soundSkip' };
 export function sound(key) {
   const a = fx[key];
-  if (!settings.sounds || !a || (WHEN[key] && settings[WHEN[key]] === false)) return;
+  if (!settings.sounds || !a || voiceOf(key) === 'none') return;
   try { a.currentTime = 0; } catch (e) {}
   const p = a.play();
   if (p) p.catch((e) => log('sound "' + key + '" did not play: ' + e.name));

@@ -41,10 +41,11 @@ export const DEFAULTS = {
   lockSeek: true,                // lock screen shows skip buttons rather than track buttons
   bgQuotes: false,               // find quotes while the phone is locked
   sounds: true,                  // short tones for bookmark, skip and figures
-  soundStyle: 'chime',           // chime | soft | bell | click
   soundVolume: 50,               // loudness of the tones, 10 to 100
-  soundMark: true,               // a tone for a bookmark
-  soundSkip: true,               // a tone for a skip from the headphones, watch or lock screen
+  // The sound for each event: chime | soft | bell | click | none.
+  soundMark: 'chime',            // a bookmark
+  soundSkip: 'chime',            // a skip from the headphones, watch or lock screen
+  soundFigure: 'chime',          // reaching a picture or table
   figAlert: true,                // chime when the narration reaches a picture or table
   figPause: false,               // …and pause there
   // What a bookmark captures: seconds of audio either side, or whole paragraphs.

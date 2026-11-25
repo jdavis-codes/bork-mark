@@ -119,9 +119,7 @@ export function warmModel() {
     modelState = 'ready';
   }, (err) => {
     modelState = 'failed';
-    failText = /network|load failed|fetch/i.test(err.message)
-      ? 'The speech model didn’t download. Bookmarks are still saved; their quotes will be found once it loads.'
-      : 'The speech model could not load: ' + err.message;
+    failText = 'Speech model didn’t load';   // the log has the reason
     throw err;
   }).finally(() => {
     warming = null; crumb(null);

@@ -23,6 +23,9 @@ const SLIDERS = [
   ['soundVolume', settings, 'soundVolume', percent],
 ];
 const isSkip = (a) => a === 'fwd' || a === 'back';
+// The sound chosen for each event. Older settings had one style for all and a switch for each.
+const EVENT_SOUNDS = ['soundMark', 'soundSkip', 'soundFigure'];
+const soundChoice = (id) => (settings[id] === false ? 'none' : typeof settings[id] === 'string' ? settings[id] : settings.soundStyle || 'chime');
 export function renderSettings() {
   for (const [id, obj, key, show] of SLIDERS) {
     const input = $(id);
@@ -46,7 +49,7 @@ export function renderSettings() {
   $('sounds').checked = settings.sounds; $('figAlert').checked = settings.figAlert; $('figPause').checked = settings.figPause;
   $('figPauseRow').hidden = !settings.figAlert;
   $('soundOptions').hidden = !settings.sounds;
-  $('soundStyle').value = settings.soundStyle; $('soundMark').checked = settings.soundMark; $('soundSkip').checked = settings.soundSkip;
+  for (const id of EVENT_SOUNDS) $(id).value = soundChoice(id);
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
   $('backward').setAttribute('aria-label', 'Back ' + settings.skipBack + ' seconds');
   $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
@@ -63,7 +66,7 @@ function renderCitePreview() {
     : formatCitation(CITE_SAMPLE, { style: $('citeStyle').value, audioTime: $('citeTime').checked, audioText: wording });
 }
 function readSettings() {
-  const was = JSON.stringify(settings.capture), voice = settings.soundStyle + settings.soundVolume;
+  const was = JSON.stringify(settings.capture), heard = EVENT_SOUNDS.map(soundChoice), loud = settings.soundVolume;
   for (const [id, obj, key] of SLIDERS) obj[key] = Number($(id).value);
   settings.next.action = $('nextAction').value; settings.prev.action = $('prevAction').value;
   settings.capture.mode = $('capMode').value;
@@ -73,8 +76,10 @@ function readSettings() {
   settings.citeTime = $('citeTime').checked;
   settings.citeTimeText = $('citeTimeText').value.trim() || DEFAULTS.citeTimeText;
   settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;
-  settings.soundStyle = $('soundStyle').value; settings.soundMark = $('soundMark').checked; settings.soundSkip = $('soundSkip').checked;
-  if (settings.sounds && settings.soundStyle + settings.soundVolume !== voice) retuneSounds('mark');
+  for (const id of EVENT_SOUNDS) settings[id] = $(id).value;
+  // Play the sound that was changed; after a change of loudness, the bookmark's.
+  const changed = EVENT_SOUNDS.findIndex((id, k) => settings[id] !== heard[k]);
+  if (settings.sounds && (changed >= 0 || settings.soundVolume !== loud)) retuneSounds(['mark', 'fwd', 'figure'][Math.max(0, changed)]);
   save(true);
   renderSettings(); setMediaSession(); runQueue();
   if (JSON.stringify(settings.capture) !== was) requoteAll();
