@@ -745,6 +745,13 @@
   .sheet h3 { margin-bottom: -16px; }
   .field { display: grid; gap: 8px; min-width: 0; }
   .field > .muted { margin-top: -2px; }
+  /* A setting chosen from a short list: its name and note on the left, the list beside them, no wider than it needs. */
+  .field.beside { grid-template-columns: minmax(0, 1fr) fit-content(54%); column-gap: 14px; row-gap: 0; align-items: center; }
+  .field.beside > .fieldhead { grid-column: 1; }
+  .field.beside > .select { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-width: 0; }
+  .field.beside > .muted { grid-column: 1; margin-top: 3px; }
+  .field.beside select { width: 100%; padding: 9px 34px 9px 12px; font-size: 0.95rem; }
+  .field.beside .select::after { right: 13px; }
   .sheet .muted { font-size: 0.82rem; line-height: 1.4; margin: 0; }
   .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0; }
   .sheet section > h3 + p.muted, .stack > p.muted:first-child { margin-bottom: -12px; }
@@ -919,7 +926,7 @@
   <div class="sheet">
     <section>
       <h3>Headphone and watch buttons</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="nextAction">Next track</label></div>
         <div class="select"><select id="nextAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
         <p class="muted">Usually a double-press on headphones.</p>
@@ -928,7 +935,7 @@
         <div class="fieldhead"><label for="nextSecs">Skip by</label><output id="nextSecsOut" for="nextSecs"></output></div>
         <input id="nextSecs" type="range" min="5" max="120" step="5">
       </div>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="prevAction">Previous track</label></div>
         <div class="select"><select id="prevAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
         <p class="muted">Usually a triple-press on headphones.</p>
@@ -954,7 +961,7 @@
 
     <section>
       <h3>What a bookmark captures</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="capMode">Measure by</label></div>
         <div class="select"><select id="capMode"><option value="time">Time</option><option value="paras">Paragraphs</option></select></div>
       </div>
@@ -992,7 +999,7 @@
 
     <section>
       <h3>Citations</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="citeStyle">Style</label></div>
         <div class="select"><select id="citeStyle"><option value="simple">Simple</option><option value="mla">MLA</option><option value="apa">APA</option><option value="chicago">Chicago</option></select></div>
       </div>
@@ -1022,16 +1029,16 @@
           <div class="fieldhead"><label for="soundVolume">Loudness</label><output id="soundVolumeOut" for="soundVolume"></output></div>
           <input id="soundVolume" type="range" min="10" max="100" step="5">
         </div>
-        <div class="field">
+        <div class="field beside">
           <div class="fieldhead"><label for="soundMark">A bookmark</label></div>
           <div class="select"><select id="soundMark"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
         </div>
-        <div class="field">
+        <div class="field beside">
           <div class="fieldhead"><label for="soundSkip">A skip</label></div>
           <div class="select"><select id="soundSkip"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
           <p class="muted">From your headphones, watch or the lock screen.</p>
         </div>
-        <div class="field">
+        <div class="field beside">
           <div class="fieldhead"><label for="soundFigure">A picture or table</label></div>
           <div class="select"><select id="soundFigure"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
           <p class="muted">Choosing a sound plays it.</p>
@@ -1048,9 +1055,9 @@
 
     <section>
       <h3>Lock screen</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="lockSeek">Buttons shown</label></div>
-        <div class="select"><select id="lockSeek"><option value="skip">Skip back / forward</option><option value="track">Previous / next track (same as headphones)</option></select></div>
+        <div class="select"><select id="lockSeek"><option value="skip">Skip back / forward</option><option value="track">Previous / next track</option></select></div>
       </div>
       <div class="field">
         <label class="switchrow" for="bgQuotes"><span>Find quotes while locked</span><input id="bgQuotes" type="checkbox" class="switch"></label>
