@@ -29,6 +29,10 @@
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   [hidden] { display: none !important; }
+  /* iOS Safari enlarges text in blocks it judges too small to read on a phone,
+     one block at a time, which blew up single search results. The sizes here
+     are already meant for a phone, so it's told not to. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -412,8 +416,10 @@
   .recent span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* a result: chapter and page over two lines of text, with play and bookmark beside */
   .hit { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); }
-  .hitmain { flex: 1; min-width: 0; display: grid; gap: 4px; text-align: left; border: none; border-radius: 0; padding: 14px 2px; }
-  .hithead { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; font-weight: 650; }
+  /* one column that can't grow past the result's width: a long chapter title, kept to one line, would
+     otherwise stretch it, cutting off the text and (on iOS) setting off Safari's text enlarging */
+  .hitmain { flex: 1; min-width: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; text-align: left; border: none; border-radius: 0; padding: 14px 2px; }
+  .hithead { display: flex; justify-content: space-between; gap: 10px; min-width: 0; font-size: 0.85rem; font-weight: 650; }
   .hithead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hithead .muted { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; }
   .hittext { font-family: Georgia, "Iowan Old Style", serif; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere;

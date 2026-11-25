@@ -4,7 +4,7 @@
 // the title, chapters, a link), speed, sleep timer, chapters, skipping,
 // settings and citations, reopening, bookmarking, removing the book, the
 // service worker and the alignment test page.
-const { BASE, FIX, open, check, done } = require('./lib');
+const { BASE, FIX, open, addBook, check, done } = require('./lib');
 
 (async () => {
   const { browser, page } = await open({ sw: true });
@@ -99,5 +99,14 @@ const { BASE, FIX, open, check, done } = require('./lib');
   check('service worker installed (every file in its list exists)', sw);
   await page.goto(BASE + 'align.html'); await page.waitForTimeout(800);
   check('alignment test page loads', /alignment/.test(await page.title()));
+
+  // Search results in a book with long chapter titles and "page 62."-style page labels.
+  await addBook(page, 'book.m4b', 'pages.epub'); await page.waitForTimeout(1000);
+  await page.click('#searchBtn'); await page.keyboard.type('test'); await page.waitForTimeout(600);
+  const hit = await page.$eval('#searchResults .hit', (h) => ({ page: h.querySelector('.hithead .muted').textContent,
+    fits: h.querySelector('.hitmain').scrollWidth <= h.querySelector('.hitmain').clientWidth + 1
+      && h.querySelector('.hitmain').getBoundingClientRect().right <= h.querySelector('.acts').getBoundingClientRect().left + 1 }));
+  check('a result with a long chapter title fits beside its buttons', hit.fits);
+  check('page labels read “p. 60”, not “page 60.”', hit.page === 'p. 60', hit.page);
   done(page); await browser.close();
 })();
