@@ -365,6 +365,16 @@
   dialog.bottom::before {
     content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: -6px auto 10px;
   }
+  /* A sheet's heading (and Search's field) stays at the top while the rest scrolls, with the grab
+     handle drawn in it and the content fading out underneath, as in the Bookmarks sheet. Its top
+     is measured from inside the sheet's 16px padding, which the negative margin cancels. */
+  dialog.pinhead::before { display: none; }
+  .sheethd { position: sticky; top: -16px; z-index: 3; margin: -16px -16px 0; padding: 20px 16px 10px; background: var(--card); }
+  .sheethd::before { content: ""; position: absolute; left: 50%; top: 6px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
+  .sheethd::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
+    background: linear-gradient(var(--card), color-mix(in srgb, var(--card) 0%, transparent));
+  }
   .sheethead::before {
     content: ""; position: absolute; left: 50%; top: calc(5px + env(safe-area-inset-top)); width: 38px; height: 4px;
     margin-left: -19px; border-radius: 2px; background: var(--line);
@@ -743,8 +753,8 @@
   </nav>
 </main>
 
-<dialog id="addDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Add a book</h2><button id="addCancel" class="small">Cancel</button></div>
+<dialog id="addDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Add a book</h2><button id="addCancel" class="small">Cancel</button></div>
   <p class="muted" style="margin:6px 0 14px">Files are copied into this app on your device. Nothing is uploaded.</p>
   <div class="picks">
     <label class="pick" id="pickAudio">
@@ -949,8 +959,8 @@
   <p id="introArrow" hidden><span><b class="dots">•••</b> is down here</span><svg viewBox="0 0 48 40" aria-hidden="true"><path d="M3 5c20-3 34 5 37 26"/><path d="M31 23l9.5 9 6-11.500"/></svg></p>
 </dialog>
 
-<dialog id="chapDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="chapDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="chapList" class="picklist"></ol>
 </dialog>
 
@@ -980,8 +990,8 @@
   <div id="marks"></div>
 </dialog>
 
-<dialog id="infoDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="infoDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <dl id="infoList"></dl>
   <p id="playerError" class="warn" hidden></p>
   <p id="textStatus" class="muted"></p>
@@ -1008,25 +1018,27 @@
   <ol id="extrasGrid" hidden></ol>
 </dialog>
 
-<dialog id="figsDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="figsDlg" class="bottom tall pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <p class="muted" style="margin-top:6px">Tap one to see it, or the arrow to move the audio there.</p>
   <p id="figStatus" class="muted"></p>
   <ol id="figList"></ol>
 </dialog>
 
-<dialog id="viewDlg" class="bottom tall">
-  <div class="row spread" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="viewDlg" class="bottom tall pinhead">
+  <div class="row spread sheethd" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div id="viewTools" class="row"></div>
   <p id="viewStatus" class="muted"></p>
   <div id="viewBody"></div>
 </dialog>
 
-<dialog id="searchDlg" class="bottom tall">
+<dialog id="searchDlg" class="bottom tall pinhead">
+  <div class="sheethd">
   <div class="row spread"><h2 tabindex="-1">Search book</h2><button id="searchClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="searchfield wide">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
     <input id="searchInput" type="search" placeholder="In this book" aria-label="Search the book" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+  </div>
   </div>
   <p id="searchStatus" class="muted"></p>
   <div id="searchRecent" hidden>
@@ -1037,13 +1049,13 @@
   <button id="searchMore" class="small" hidden>Show more</button>
 </dialog>
 
-<dialog id="speedDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="speedDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="speedList" class="picklist"></ol>
 </dialog>
 
-<dialog id="sleepDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<dialog id="sleepDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="sleepList" class="picklist"></ol>
 </dialog>
 

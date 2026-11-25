@@ -35,6 +35,13 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#searchBtn'); await page.waitForTimeout(300);
   await page.keyboard.type('lazy d'); await page.waitForTimeout(500);
   say('search', await page.textContent('#searchStatus'), '|', (await page.innerText('#searchResults .hit')).replace(/\s+/g, ' '));
+  const pinned = await page.evaluate(() => {
+    const d = document.getElementById('searchDlg'), h = d.querySelector('.sheethd');
+    d.scrollTop = 400;
+    return d.scrollTop > 0 && Math.abs(h.getBoundingClientRect().top - d.getBoundingClientRect().top) < 3;
+  });
+  check('the heading and search field stay at the top while results scroll', pinned);
+  await page.evaluate(() => { document.getElementById('searchDlg').scrollTop = 0; });
   await page.click('#searchResults .hitmain'); await page.waitForTimeout(200);
   say('search result opened', await page.$eval('#searchResults .hit', (n) => n.classList.contains('open')));
   await page.fill('#searchInput', ''); await page.waitForTimeout(400);
