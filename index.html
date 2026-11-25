@@ -171,6 +171,14 @@
   }
   .markshead h2 { flex: 1; min-width: 0; white-space: nowrap; }
   .markshead .iconbtn { margin: -8px -8px -8px 0; }
+  .markshead .iconbtn + .iconbtn { margin-left: 4px; }
+  /* the order menu: a sort icon over an invisible select, so tapping it opens the system's own menu */
+  .sortpick { position: relative; cursor: pointer; }
+  .sortpick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+  .sortpick.on { color: var(--accent); }   /* an order other than the book's */
+  #markSort[hidden] { display: none; }
+  /* ✕ to close a sheet, at the end of its heading */
+  .row > .iconbtn.close { flex: none; margin: -8px -8px -8px 0; }
   /* a bookmark that was just edited glows briefly */
   /* fills the bookmark's own strip, from the divider above it to the one below */
   .mark.flash { animation: justEdited 1.6s ease-out; }
@@ -387,7 +395,7 @@
   .searchfield input::-webkit-search-decoration { -webkit-appearance: none; }
   .searchfield.wide { margin-top: 12px; }
   #marksSearch, #marksSearchCancel { display: none; }
-  #marksDlg.searching .markshead > h2, #marksDlg.searching #markOrder, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksClose { display: none; }
+  #marksDlg.searching .markshead > h2, #marksDlg.searching #markSort, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksClose { display: none; }
   #marksDlg.searching #marksSearch { display: flex; flex: 1; }
   #marksDlg.searching #marksSearchCancel { display: block; flex: none; }
   /* search matches: find-in-page yellow, a different colour from the accent tint that marks a bookmarked sentence */
@@ -901,17 +909,24 @@
 </dialog>
 
 <dialog id="chapDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="chapList" class="picklist"></ol>
 </dialog>
 
 <dialog id="marksDlg" class="bottom tall">
   <div class="markshead">
     <h2 tabindex="-1" autofocus>Bookmarks <span id="markCount" class="muted"></span></h2>
-    <div id="markOrder" class="seg" role="group" aria-label="Order of bookmarks">
-      <button id="orderBook" aria-pressed="true">Book order</button>
-      <button id="orderNew" aria-pressed="false">Newest</button>
-    </div>
+    <label id="markSort" class="iconbtn sortpick">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5"/></svg>
+      <select id="markOrder" aria-label="Order of bookmarks">
+        <option value="book">Book order</option>
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="long">Longest quote</option>
+        <option value="short">Shortest quote</option>
+        <option value="attention">Needs attention</option>
+      </select>
+    </label>
     <button id="marksSearchBtn" class="iconbtn" aria-label="Search bookmarks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button>
     <button id="marksClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div id="marksSearch" class="searchfield">
@@ -925,7 +940,7 @@
 </dialog>
 
 <dialog id="infoDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <dl id="infoList"></dl>
   <p id="playerError" class="warn" hidden></p>
   <p id="textStatus" class="muted"></p>
@@ -939,21 +954,21 @@
 
 
 <dialog id="figsDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <p class="muted" style="margin-top:6px">Tap one to see it, or the arrow to move the audio there.</p>
   <p id="figStatus" class="muted"></p>
   <ol id="figList"></ol>
 </dialog>
 
 <dialog id="viewDlg" class="bottom tall">
-  <div class="row spread" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="small">Close</button></div>
+  <div class="row spread" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div id="viewTools" class="row"></div>
   <p id="viewStatus" class="muted"></p>
   <div id="viewBody"></div>
 </dialog>
 
 <dialog id="searchDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1">Search book</h2><button id="searchClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1">Search book</h2><button id="searchClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="searchfield wide">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
     <input id="searchInput" type="search" placeholder="In this book" aria-label="Search the book" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
@@ -968,12 +983,12 @@
 </dialog>
 
 <dialog id="speedDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="speedList" class="picklist"></ol>
 </dialog>
 
 <dialog id="sleepDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="small">Close</button></div>
+  <div class="row spread"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="sleepList" class="picklist"></ol>
 </dialog>
 

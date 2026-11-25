@@ -46,6 +46,11 @@ const { ENGINE, BASE, OUT, open, addBook, check, done } = require('./lib');
 
   await page.click('#marksBtn'); await page.waitForTimeout(500);
   check('four cards under two chapter headings', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks .grouphead')).length === 2);
+  // the sort menu: other orders are one list, book order brings the chapter headings back
+  await page.selectOption('#markOrder', 'old'); await page.waitForTimeout(200);
+  check('sorting oldest first: one list, oldest on top', !(await page.$$('#marks .grouphead')).length && (await page.$eval('#marks .mark', (n) => n.dataset.id)) === 'm3');
+  await page.selectOption('#markOrder', 'book'); await page.waitForTimeout(200);
+  check('book order: chapter headings again', (await page.$$('#marks .grouphead')).length === 2);
   // the magnifier filters the cards and marks the words
   await page.click('#marksSearchBtn'); await page.keyboard.type('follows');
   await page.waitForTimeout(200);

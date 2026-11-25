@@ -127,6 +127,23 @@ function markWords(nodes) {
   }
 }
 
+// The orders the list can be in. Book order (by place in the book) puts the
+// cards under chapter headings; the rest are one list, each card naming its
+// chapter. Lengths are of the quote, or of what was heard; bookmarks with
+// neither yet go last. Needs attention puts first the ones to retry or check:
+// failed, not found in the text, heard only, still waiting.
+const quoteLength = (m) => ((m.before || '') + (m.after || '') || m.transcript || '').length;
+const byLength = (dir) => (x, y) => (!quoteLength(x) - !quoteLength(y)) || dir * (quoteLength(x) - quoteLength(y));
+const ATTENTION = { error: 0, nomatch: 1, transcribed: 2, pending: 3, working: 3, done: 4 };
+const ORDERS = {
+  book: (x, y) => x.t - y.t,
+  new: (x, y) => y.created - x.created,
+  old: (x, y) => x.created - y.created,
+  long: byLength(-1),
+  short: byLength(1),
+  attention: (x, y) => (ATTENTION[x.status] ?? 4) - (ATTENTION[y.status] ?? 4) || y.created - x.created,
+};
+
 export function renderMarks() {
   if (!cur) return;
   const b = cur.book, list = $('marks');
@@ -136,8 +153,10 @@ export function renderMarks() {
   $('marksLabel').textContent = n ? String(n) : '';
   $('marksBtn').setAttribute('aria-label', 'Bookmarks' + (n ? ', ' + n : '') + (waiting ? ', ' + waiting + ' still being processed' : ''));
   $('marksBtn').classList.toggle('on', waiting > 0);
-  const newest = settings.markOrder === 'new';
-  $('orderBook').setAttribute('aria-pressed', String(!newest)); $('orderNew').setAttribute('aria-pressed', String(newest));
+  const order = ORDERS[settings.markOrder] ? settings.markOrder : 'book';
+  $('markOrder').value = order;
+  $('markSort').classList.toggle('on', order !== 'book');
+  $('markSort').hidden = n < 2;   // nothing to put in order
   // The cards are only built while the sheet is open (opening it renders them),
   // so quotes arriving during playback just update the counts.
   if (!$('marksDlg').open) { list.textContent = ''; return; }
@@ -150,9 +169,9 @@ export function renderMarks() {
     list.append(el('p', 'muted', 'No bookmarks match “' + filter.trim() + '”.'));
     return;
   }
-  if (newest) {
+  if (order !== 'book') {
     const group = el('div', 'group');
-    [...shown].sort((x, y) => y.created - x.created).forEach((m) => group.append(markCard(b, m, true)));
+    [...shown].sort(ORDERS[order]).forEach((m) => group.append(markCard(b, m, true)));
     list.append(group);
   } else {
     // In book order, under a heading for each chapter that has bookmarks.
@@ -186,9 +205,7 @@ $('marksSearchInput').addEventListener('input', (e) => setFilter(e.target.value)
 $('marksSearchInput').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); $('marksSearchCancel').click(); } });
 $('marksSearchCancel').addEventListener('click', () => { $('marksSearchInput').value = ''; $('marksDlg').classList.remove('searching'); setFilter(''); });
 $('marksDlg').addEventListener('close', () => { if (filter) $('marksSearchCancel').click(); });
-for (const [id, value] of [['orderBook', 'book'], ['orderNew', 'new']]) {
-  $(id).addEventListener('click', () => { settings.markOrder = value; save(true); renderMarks(); });
-}
+$('markOrder').addEventListener('change', (e) => { settings.markOrder = e.target.value; save(true); renderMarks(); });
 
 // ---- motion in the list ----
 const cardFor = (id) => Array.from(document.querySelectorAll('#marks .mark')).find((n) => n.dataset.id === id);
