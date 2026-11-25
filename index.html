@@ -723,8 +723,12 @@
   /* Notifications drop in at the top, under the status bar, where they don't
      cover the controls. */
   /* background work: a notice with a spinner, in the same place and shape as the notifications */
+  /* Notices and notifications line up with the middle of the icons in the top row: the settings
+     icon in the library, the back and info buttons over the player. */
+  html { --notice-top: calc(18px + env(safe-area-inset-top)); }
+  html.has-bar { --notice-top: calc(13.5px + env(safe-area-inset-top)); }
   #busy {
-    position: fixed; z-index: 6; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%);
+    position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(-50%);
     max-width: calc(100vw - 150px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
     background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
   }
@@ -734,12 +738,12 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
   /* a notification that arrives meanwhile sits just under it */
-  html.is-busy #toast { top: calc(58px + env(safe-area-inset-top)); }
+  html.is-busy #toast { top: calc(var(--notice-top) + 48px); }
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
     max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
-    position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translate(-50%, -12px);
+    position: fixed; left: 50%; top: var(--notice-top); transform: translate(-50%, -12px);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap;
