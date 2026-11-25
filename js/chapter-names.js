@@ -62,7 +62,7 @@ export function autoNameChapters() {
 }
 
 // The whole pass shows the background notice.
-function run(auto) { return busyWhile('Naming chapters from the book…', namingPass(auto)); }
+function run(auto) { return busyWhile('Naming chapters', namingPass(auto)); }
 async function namingPass(auto) {
   const mine = cur, b = mine.book;
   const say = (msg) => { if (cur === mine) setChapStatus(msg); };

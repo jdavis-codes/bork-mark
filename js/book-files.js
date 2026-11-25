@@ -106,7 +106,7 @@ $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, b = mine.book, done = busy('Adding the book text…');
+  const mine = cur, b = mine.book, done = busy('Adding text');
   try {
     toast('Reading ' + f.name + '…');
     const doc = await readBook(f);
@@ -132,7 +132,7 @@ $('pageFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding the page scan…');
+  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding pages');
   try {
     say('Reading ' + f.name + '…');
     const pdf = await readPdfPages(f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));

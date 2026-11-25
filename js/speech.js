@@ -111,7 +111,7 @@ export function warmModel() {
   modelState = 'loading';
   crumb('loading the speech model');
   setQueueStatus('Getting the speech model ready…');
-  warming = busyWhile('Loading the speech model…', loadModel()).then(() => {
+  warming = busyWhile('Loading model', loadModel()).then(() => {
     modelState = 'ready';
   }, (err) => {
     modelState = 'failed';

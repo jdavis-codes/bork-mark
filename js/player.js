@@ -102,10 +102,10 @@ function showBook(book, file, blob, coverAt) {
   const mine = cur;
   afterMotion(() => {
     if (cur !== mine) return;
-    busyWhile('Reading the audio…', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
+    busyWhile('Reading audio', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
       .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
-    if (book.hasText) busyWhile('Loading the book text…', loadBookText(mine));
-    if (book.pageSrcName) busyWhile('Loading the page scan…', loadPageScan(mine));
+    if (book.hasText) busyWhile('Loading text', loadBookText(mine));
+    if (book.pageSrcName) busyWhile('Loading pages', loadPageScan(mine));
     if (book.hasExtras) loadExtras(mine);
   });
 }

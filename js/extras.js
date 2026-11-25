@@ -234,7 +234,7 @@ $('extrasFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding the extras…');
+  const mine = cur, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding extras');
   try {
     say('Reading ' + f.name + '…');
     const info = await storeExtras(mine.book, f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));

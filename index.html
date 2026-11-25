@@ -729,10 +729,12 @@
   html.has-bar { --notice-top: calc(13.5px + env(safe-area-inset-top)); }
   #busy {
     position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(-50%);
-    max-width: calc(100vw - 150px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
+    max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
     background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
   }
   #busy[hidden] { display: none; }
+  html.has-bar #busy { max-width: calc(100vw - 120px); }   /* over the player only the two icons flank it */
+  @media (max-width: 350px) { #busy { font-size: 0.8rem; gap: 7px; padding: 10px 12px 10px 10px; } }
   #busyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .spin { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--bg) 30%, transparent); border-top-color: var(--bg); animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
