@@ -96,9 +96,10 @@
   html { overscroll-behavior-y: none; touch-action: manipulation; }   /* no double-tap zoom (pinch: see app.js) */
   .libhead {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
-    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 6px;
+    /* 3.5px less than the player's, so the middle of the top row is at the same height on both */
+    padding: calc(10.5px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 6px;
   }
-  #library { padding-top: 100px; }
+  #library { padding-top: 96.5px; }
   /* Room is always kept for it, so the books don't move when it appears. */
   #modelFail { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 28px; margin-top: 6px; padding: 0 4px 0 10px; border: 1px solid var(--warn); border-radius: 9px; font-size: 0.82rem; }
   #modelFail[hidden] { display: none; }
@@ -785,16 +786,21 @@
   /* background work: a notice with a spinner, in the same place and shape as the notifications */
   /* Notices and notifications line up with the middle of the icons in the top row: the settings
      icon in the library, the back and info buttons over the player. */
-  html { --notice-top: calc(18px + env(safe-area-inset-top)); }
-  html.has-bar { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
+  html { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
+  /* In the library they sit in the space between Borky and the settings icon (--notice-x), and
+     spring across when the screen changes. A transition of their own variable, so only they restyle. */
+  @property --notice-x { syntax: '<length>'; inherits: true; initial-value: 0px; }
+  #busy, #toast { --notice-x: 36px; }
+  html.has-bar #busy, html.has-bar #toast { --notice-x: 0px; }
+  :root { --spring: linear(0, 0.037, 0.13, 0.259, 0.405, 0.553, 0.692, 0.815, 0.917, 0.998, 1.057, 1.096, 1.118, 1.126, 1.123, 1.112, 1.097, 1.078, 1.06, 1.042, 1.026, 1.012, 1.002, 0.994, 0.988, 0.985, 0.984, 0.984, 1); }
   #busy {
-    position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(-50%);
+    position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(calc(-50% + var(--notice-x)));
+    transition: --notice-x 0.7s var(--spring);
     max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
     background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
   }
   #busy[hidden] { display: none; }
-  /* in the library it sits in the space between Borky and the settings icon */
-  html:not(.has-bar) #busy { left: calc(50% + 36px); max-width: calc(min(100vw, 560px) - 210px); }
+  html:not(.has-bar) #busy { max-width: calc(min(100vw, 560px) - 210px); }
   html.has-bar #busy { max-width: calc(100vw - 120px); }   /* over the player only the two icons flank it */
   @media (max-width: 350px) { #busy { font-size: 0.8rem; gap: 7px; padding: 10px 12px 10px 10px; } }
   #busyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -806,14 +812,14 @@
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
-    max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
-    position: fixed; left: 50%; top: var(--notice-top); transform: translate(-50%, -12px);
+    max-width: calc(100vw - 32px - 2 * var(--notice-x)); overflow: hidden; text-overflow: ellipsis;
+    position: fixed; left: 50%; top: var(--notice-top); transform: translate(calc(-50% + var(--notice-x)), -12px);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s, --notice-x 0.7s var(--spring); pointer-events: none; white-space: nowrap;
   }
-  #toast.show { opacity: 1; transform: translate(-50%, 0); }
-  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(-50%, 0); } }
+  #toast.show { opacity: 1; transform: translate(calc(-50% + var(--notice-x)), 0); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(calc(-50% + var(--notice-x)), 0); } #busy { transition: none; } }
 </style>
 </head>
 <body>
