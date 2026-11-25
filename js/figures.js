@@ -91,27 +91,42 @@ async function findInAudio(at, say) {
   }
   return null;
 }
-export async function jumpToFigure(i) {
-  if (!cur || !cur.text || !cur.source || probing || queueBusy || naming) { toast('Busy with something else; try again in a moment'); return; }
-  const mine = cur, f = mine.meta.figures[i];
-  const say = (msg) => { $('viewStatus').textContent = msg; $('figStatus').textContent = msg; };
+// Where in the audio a place in the text is read, found by listening (see
+// findInAudio): the time, or null when it can't be found or other listening
+// is under way. `say` reports progress. Used for figures and search results.
+export async function placeInAudio(at, say) {
+  if (!cur || !cur.text || !cur.source || probing || queueBusy || naming) { toast('Busy with something else; try again in a moment'); return null; }
+  const mine = cur;
   probing = true;
   try {
     await warmModel();
-    const t = await findInAudio(f.at, say);
-    if (cur !== mine) return;
-    if (t == null) { say('Could not find this place in the audio.'); return; }
-    say('');
-    reached.set(i, t);          // arriving here is not "reaching" it
-    seek(t);
-    for (const id of ['viewDlg', 'figsDlg']) closeSheet($(id));
-    toast('Moved to ' + fmt(t));
+    const t = await findInAudio(at, say);
+    if (cur !== mine) return null;
+    say(t == null ? 'Could not find this place in the audio.' : '');
+    return t;
   } catch (err) {
     say('Stopped: ' + ((err && err.message) || err));
+    return null;
   } finally {
     probing = false; crumb(null);
     runQueue();
   }
+}
+// A guess at the time, from the places already known (no listening).
+export function estimateTime(at) {
+  const list = anchorList();
+  return list.length ? Math.max(0, timeAt(at, list)) : cur.book.duration * at / cur.text.text.length;
+}
+export async function jumpToFigure(i) {
+  const mine = cur, f = mine && mine.meta.figures[i];
+  if (!f) return;
+  const say = (msg) => { $('viewStatus').textContent = msg; $('figStatus').textContent = msg; };
+  const t = await placeInAudio(f.at, say);
+  if (t == null || cur !== mine) return;
+  reached.set(i, t);          // arriving here is not "reaching" it
+  seek(t);
+  for (const id of ['viewDlg', 'figsDlg']) closeSheet($(id));
+  toast('Moved to ' + fmt(t));
 }
 
 // ---------- figures tab ----------

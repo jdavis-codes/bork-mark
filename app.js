@@ -19,6 +19,7 @@ import './js/info.js';
 import './js/marks.js';
 import './js/player.js';
 import './js/screens.js';
+import './js/search.js';
 import './js/sleep.js';
 import './js/theme.js';
 import './js/trim.js';

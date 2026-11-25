@@ -35,6 +35,7 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Trimming** | Tap a sentence, drag the handles, or press and hold to cut a quote down. Ends can snap to whole sentences. |
 | **Citations** | Quotes are copied and shared with a citation in a simple style, MLA, APA or Chicago, with or without the place in the audio. |
 | **Page numbers** | Taken from the EPUB when it records them, or found in a PDF of the print edition. |
+| **Search** | Search the book's text: each result shows its chapter and two lines, opens to its paragraph, and can play from there or become a bookmark. Recent searches are kept per book. The bookmarks list can be searched too. |
 | **Figures** | Pictures and tables in the book text are listed, and the app can chime when the reading reaches one. |
 | **Extras** | The PDF of figures, tables or notes that comes with many audiobooks: browse it page by page, or by the figures, tables and chapters found in it, starting at the chapter you are listening to. |
 | **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |

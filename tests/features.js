@@ -32,6 +32,14 @@ const { BASE, FIX, open, check, done } = require('./lib');
   say('table', await page.textContent('#viewTitle'), await page.$$eval('#viewBody tr', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')).join(' / ')));
   await page.click('#viewClose'); await page.waitForTimeout(300); await page.click('#figsClose'); await page.waitForTimeout(300);
 
+  await page.click('#searchBtn'); await page.waitForTimeout(300);
+  await page.keyboard.type('lazy d'); await page.waitForTimeout(500);
+  say('search', await page.textContent('#searchStatus'), '|', (await page.innerText('#searchResults .hit')).replace(/\s+/g, ' '));
+  await page.click('#searchResults .hitmain'); await page.waitForTimeout(200);
+  say('search result opened', await page.$eval('#searchResults .hit', (n) => n.classList.contains('open')));
+  await page.fill('#searchInput', ''); await page.waitForTimeout(400);
+  say('recent searches', await page.innerText('#searchHistory'));
+  await page.click('#searchClose'); await page.waitForTimeout(300);
   await page.click('#infoBtn'); await page.waitForTimeout(400);
   say('info', (await text('#infoList')).replace(/Added \S+/, 'Added (date)'));
   await page.click('#infoList .disclose'); await page.waitForTimeout(200);

@@ -49,7 +49,7 @@ export const DEFAULTS = {
   citeStyle: 'simple',           // simple | mla | apa | chicago
   citeTime: true,                // citations end with the place in the audio
   citeTimeText: 'audiobook, {time}',
-  markOrder: 'book',             // bookmarks list: 'book' (by chapter) or 'new' (latest first)
+  markOrder: 'book',             // bookmarks list: book | new | old | long | short | attention (see ORDERS in marks.js)
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
 };
 export const settings = state.settings = {

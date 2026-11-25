@@ -2,7 +2,7 @@
 
 import { chapterAt, cur, play, seek } from './player.js';
 import { runQueue } from './queue.js';
-import { shareText } from './quotes.js';
+import { requote, shareText } from './quotes.js';
 import { sound } from './sounds.js';
 import { save, settings } from './state.js';
 import { endTrim, paintTrim, pinIcon, startTrim, trim, trimEditor } from './trim.js';
@@ -32,6 +32,22 @@ export function addMark() {
   runQueue();
 }
 $('markBtn').addEventListener('click', addMark);
+
+// A bookmark made from the text rather than the audio, from a search result:
+// characters [at, end) of the book text, read at time t. Its quote is cut
+// from the text straight away; no listening needed.
+export function addTextMark(at, end, t) {
+  if (!cur || !cur.text) return;
+  const starts = cur.text.starts, word = (pos) => { let lo = 0, hi = starts.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (starts[mid] < pos) lo = mid + 1; else hi = mid; } return lo; };
+  const i = Math.min(word(at), starts.length - 1), j = Math.max(i + 1, Math.min(word(end), starts.length));
+  const m = { id: crypto.randomUUID(), t, created: Date.now(), status: 'done', loc: [i, i, j], confidence: 1 };
+  requote(m, cur.text);
+  cur.book.marks.unshift(m);
+  log('bookmark from search at ' + fmt(t));
+  sound('mark');
+  save(true);
+  renderMarks();
+}
 
 // ---------- bookmarks list ----------
 export const expanded = new Set();
@@ -74,6 +90,60 @@ function leadIn(text) {
   return '… ' + (i >= 0 ? cut.slice(i + 2) : cut.slice(cut.indexOf(' ') + 1));
 }
 
+// What the search field in the sheet's heading holds: cards are shown only if
+// every word typed appears in the quote (or what was heard), the chapter or
+// the section, and those words are marked in the cards.
+let filter = '';
+const fold = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+function matches(b, m) {
+  const words = fold(filter).split(/\s+/).filter(Boolean);
+  const c = chapterAt(b, m.t), hay = fold([m.before, m.after, m.transcript, c.count > 1 ? c.title : '', m.section].filter(Boolean).join(' '));
+  return words.every((w) => hay.includes(w));
+}
+// Wraps the filter's words in <mark> inside the given elements.
+function markWords(nodes) {
+  const words = fold(filter).split(/\s+/).filter(Boolean);
+  if (!words.length) return;
+  for (const root of nodes) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), texts = [];
+    for (let n; (n = walker.nextNode());) texts.push(n);
+    for (const t of texts) {
+      const s = t.data, f = fold(s);
+      if (f.length !== s.length) continue;   // folding changed the length: leave this piece unmarked
+      const hits = [];
+      for (const w of words) for (let k = f.indexOf(w); k >= 0; k = f.indexOf(w, k + w.length)) hits.push([k, k + w.length]);
+      if (!hits.length) continue;
+      hits.sort((x, y) => x[0] - y[0]);
+      const frag = document.createDocumentFragment();
+      let pos = 0;
+      for (const [a, z] of hits) {
+        if (a < pos) continue;
+        frag.append(s.slice(pos, a), el('mark', '', s.slice(a, z)));
+        pos = z;
+      }
+      frag.append(s.slice(pos));
+      t.replaceWith(frag);
+    }
+  }
+}
+
+// The orders the list can be in. Book order (by place in the book) puts the
+// cards under chapter headings; the rest are one list, each card naming its
+// chapter. Lengths are of the quote, or of what was heard; bookmarks with
+// neither yet go last. Needs attention puts first the ones to retry or check:
+// failed, not found in the text, heard only, still waiting.
+const quoteLength = (m) => ((m.before || '') + (m.after || '') || m.transcript || '').length;
+const byLength = (dir) => (x, y) => (!quoteLength(x) - !quoteLength(y)) || dir * (quoteLength(x) - quoteLength(y));
+const ATTENTION = { error: 0, nomatch: 1, transcribed: 2, pending: 3, working: 3, done: 4 };
+const ORDERS = {
+  book: (x, y) => x.t - y.t,
+  new: (x, y) => y.created - x.created,
+  old: (x, y) => x.created - y.created,
+  long: byLength(-1),
+  short: byLength(1),
+  attention: (x, y) => (ATTENTION[x.status] ?? 4) - (ATTENTION[y.status] ?? 4) || y.created - x.created,
+};
+
 export function renderMarks() {
   if (!cur) return;
   const b = cur.book, list = $('marks');
@@ -83,8 +153,10 @@ export function renderMarks() {
   $('marksLabel').textContent = n ? String(n) : '';
   $('marksBtn').setAttribute('aria-label', 'Bookmarks' + (n ? ', ' + n : '') + (waiting ? ', ' + waiting + ' still being processed' : ''));
   $('marksBtn').classList.toggle('on', waiting > 0);
-  const newest = settings.markOrder === 'new';
-  $('orderBook').setAttribute('aria-pressed', String(!newest)); $('orderNew').setAttribute('aria-pressed', String(newest));
+  const order = ORDERS[settings.markOrder] ? settings.markOrder : 'book';
+  $('markOrder').value = order;
+  $('markSort').classList.toggle('on', order !== 'book');
+  $('markSort').hidden = n < 2;   // nothing to put in order
   // The cards are only built while the sheet is open (opening it renders them),
   // so quotes arriving during playback just update the counts.
   if (!$('marksDlg').open) { list.textContent = ''; return; }
@@ -92,14 +164,19 @@ export function renderMarks() {
     list.append(el('p', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
     return;
   }
-  if (newest) {
+  const shown = filter.trim() ? b.marks.filter((m) => matches(b, m)) : b.marks;
+  if (!shown.length) {
+    list.append(el('p', 'muted', 'No bookmarks match “' + filter.trim() + '”.'));
+    return;
+  }
+  if (order !== 'book') {
     const group = el('div', 'group');
-    [...b.marks].sort((x, y) => y.created - x.created).forEach((m) => group.append(markCard(b, m, true)));
+    [...shown].sort(ORDERS[order]).forEach((m) => group.append(markCard(b, m, true)));
     list.append(group);
   } else {
     // In book order, under a heading for each chapter that has bookmarks.
     let group = null, last = null, count = null, inGroup = 0;
-    for (const m of [...b.marks].sort((x, y) => x.t - y.t)) {
+    for (const m of [...shown].sort((x, y) => x.t - y.t)) {
       const c = chapterAt(b, m.t);
       if (c.i !== last) {
         if (count) count.textContent = String(inGroup);
@@ -114,11 +191,21 @@ export function renderMarks() {
     }
     if (count) count.textContent = String(inGroup);
   }
+  if (filter.trim()) markWords(list.querySelectorAll('.quote, .where, .grouphead span:first-child'));
   if (trim) paintTrim();
 }
-for (const [id, value] of [['orderBook', 'book'], ['orderNew', 'new']]) {
-  $(id).addEventListener('click', () => { settings.markOrder = value; save(true); renderMarks(); });
-}
+// The magnifier in the heading swaps the title for a search field; Cancel (or
+// closing the sheet) clears it and shows every bookmark again.
+function setFilter(value) { filter = value; renderMarks(); }
+$('marksSearchBtn').addEventListener('click', () => {
+  $('marksDlg').classList.add('searching');
+  $('marksSearchInput').value = filter; $('marksSearchInput').focus();
+});
+$('marksSearchInput').addEventListener('input', (e) => setFilter(e.target.value));
+$('marksSearchInput').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); $('marksSearchCancel').click(); } });
+$('marksSearchCancel').addEventListener('click', () => { $('marksSearchInput').value = ''; $('marksDlg').classList.remove('searching'); setFilter(''); });
+$('marksDlg').addEventListener('close', () => { if (filter) $('marksSearchCancel').click(); });
+$('markOrder').addEventListener('change', (e) => { settings.markOrder = e.target.value; save(true); renderMarks(); });
 
 // ---- motion in the list ----
 const cardFor = (id) => Array.from(document.querySelectorAll('#marks .mark')).find((n) => n.dataset.id === id);
@@ -223,7 +310,7 @@ function markCard(b, m, showChapter) {
 
   // The quote, with a tick at the bookmark point and that sentence lightly
   // marked. Closed, it opens on the lead-in to that sentence; tap for all of it.
-  const open = expanded.has(m.id);
+  const open = expanded.has(m.id) || !!filter.trim();
   const [lead, sentStart] = splitBefore(m.before), [sentEnd, rest] = splitAfter(m.after);
   const quote = el('p', 'quote' + (open ? '' : ' clamped'));
   // Closed, at most about 170 characters come before the bookmark icon, so it is always among the lines shown.

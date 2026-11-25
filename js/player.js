@@ -18,6 +18,7 @@ import { stored } from './storage.js';
 import { $, audio, el, fillRange, fmt, setAttr, setText, toast } from './ui/dom.js';
 import { setScroll } from './ui/marquee.js';
 import { closeSheet } from './ui/sheets.js';
+import { renderSearchTab } from './search.js';
 
 // ---------- player ----------
 // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
@@ -61,7 +62,7 @@ export async function openBook(id, coverNow) {
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
-  renderMarks(); setMediaSession(); renderFigTab(); renderExtrasTab();
+  renderMarks(); setMediaSession(); renderFigTab(); renderExtrasTab(); renderSearchTab();
 
   const mine = cur;
   if (book.hasCover) stored(id, 'cover').then((f) => {

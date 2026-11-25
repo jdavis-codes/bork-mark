@@ -2,7 +2,7 @@
 // player, the bookmarks list (open, trim by dragging, save, delete), and every
 // sheet. Also prints layout counts during playback, to compare after
 // rendering changes. Screenshots go to tests/out/.
-const { BASE, OUT, open, addBook, check, done } = require('./lib');
+const { ENGINE, BASE, OUT, open, addBook, check, done } = require('./lib');
 
 (async () => {
   require('fs').mkdirSync(OUT, { recursive: true });
@@ -20,10 +20,12 @@ const { BASE, OUT, open, addBook, check, done } = require('./lib');
   await page.goto(BASE); await page.waitForSelector('.book'); await page.click('.book');
   await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(800);
 
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send('Performance.enable');
+  // Layout counts come from Chromium's own tools; in WebKit the time just passes.
+  const cdp = ENGINE === 'chromium' ? await ctx.newCDPSession(page) : null;
+  if (cdp) await cdp.send('Performance.enable');
   const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
   const measure = async (label, ms) => {
+    if (!cdp) { await page.waitForTimeout(ms); return; }
     const a = await metrics(); await page.waitForTimeout(ms); const z = await metrics();
     console.log('  info ' + label + ': ' + (z.LayoutCount - a.LayoutCount) + ' layouts, ' + (z.RecalcStyleCount - a.RecalcStyleCount) + ' style recalcs, '
       + Math.round((z.LayoutDuration - a.LayoutDuration) * 1000) + ' ms layout');
@@ -44,6 +46,19 @@ const { BASE, OUT, open, addBook, check, done } = require('./lib');
 
   await page.click('#marksBtn'); await page.waitForTimeout(500);
   check('four cards under two chapter headings', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks .grouphead')).length === 2);
+  // the sort menu: other orders are one list, book order brings the chapter headings back
+  await page.selectOption('#markOrder', 'old'); await page.waitForTimeout(200);
+  check('sorting oldest first: one list, oldest on top', !(await page.$$('#marks .grouphead')).length && (await page.$eval('#marks .mark', (n) => n.dataset.id)) === 'm3');
+  await page.selectOption('#markOrder', 'book'); await page.waitForTimeout(200);
+  check('book order: chapter headings again', (await page.$$('#marks .grouphead')).length === 2);
+  // the magnifier filters the cards and marks the words
+  await page.click('#marksSearchBtn'); await page.keyboard.type('follows');
+  await page.waitForTimeout(200);
+  check('filter keeps matching cards and marks the word', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks mark')).length === 4);
+  await page.fill('#marksSearchInput', 'nothing like this');
+  check('filter with no match says so', /No bookmarks match/.test(await page.textContent('#marks')));
+  await page.click('#marksSearchCancel'); await page.waitForTimeout(200);
+  check('cancel shows every card again', (await page.$$('#marks .mark')).length === 4 && !(await page.$$('#marks mark')).length);
   await page.click('#marks .mark .quote'); await page.waitForTimeout(400);
   await page.click('#marks .mark button[aria-label="Trim quote"]'); await page.waitForTimeout(600);
   const before = await page.textContent('#trimCount');
