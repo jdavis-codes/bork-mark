@@ -9,6 +9,12 @@ export function entryAt(list, at) {
   return found;
 }
 
+// A print page's number from an EPUB's page list, which often labels them
+// "page 62." or "p. 62": just "62", ready for "p. 62" in the app and citations.
+export function pageNumber(label) {
+  return String(label || '').trim().replace(/^(?:page|pg|p)\b\.?\s*/i, '').replace(/[.:,;]+$/, '');
+}
+
 // ---------- matching ----------
 const WORD = /[\p{L}\p{N}]+(?:['’][\p{L}]+)*/gu;
 const norm = (w) => w.toLowerCase().replace(/['’]/g, '');

@@ -7,6 +7,7 @@ cd "$(dirname "$0")"
 mkdir -p fixtures && cd fixtures
 if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
   [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
+  [ -f pages.epub ] || python3 ../make-pages-epub.py pages.epub
   exit 0
 fi
 
@@ -25,3 +26,4 @@ ffmpeg -loglevel error -y -f lavfi -t 15 -i anullsrc=r=8000:cl=mono -i osr.wav -
   -filter_complex "[0][1][2]concat=n=3:v=0:a=1,aresample=44100,pan=stereo|c0=c0|c1=c0[a]" -map "[a]" -map_metadata 3 -map_chapters 3 -c:a aac -b:a 96k chapters.m4b
 
 python3 ../make-texts.py
+python3 ../make-pages-epub.py pages.epub

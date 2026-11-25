@@ -5,7 +5,7 @@ import { renderMarks } from './marks.js';
 import { chapterAt, cur } from './player.js';
 import { pageOf } from './sources/pdf.js';
 import { save, settings } from './state.js';
-import { entryAt, findInBook } from './text/book.js';
+import { entryAt, findInBook, pageNumber } from './text/book.js';
 import { quoteAt } from './text/quote.js';
 import { fmt } from './ui/dom.js';
 
@@ -28,7 +28,7 @@ export function requote(m, text) {
   if (cur && cur.text === text && text.starts.length) {
     // Where in the book this is, for citing: its contents entry and print page.
     const section = entryAt(cur.meta.toc, point), page = entryAt(cur.meta.pages, point);
-    m.section = section ? section.label : ''; m.page = page ? page.label : '';
+    m.section = section ? section.label : ''; m.page = page ? pageNumber(page.label) : '';
     // Pictures and tables that fall inside the quote.
     const from = point - m.before.length - 40, to = point + m.after.length + 40;
     m.figs = cur.meta.figures.map((f, i) => (f.at >= from && f.at <= to ? i : -1)).filter((i) => i >= 0).slice(0, 6);

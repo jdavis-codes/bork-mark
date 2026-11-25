@@ -60,4 +60,30 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   await named(page, 'done'); await page.waitForTimeout(1500);
   check('resumes from chapter 2', (await logLines(page, /naming chapters from the contents, from chapter 2/)).length === 1);
   done(page); await browser.close();
+
+  // 4. Searching bookmarks finds the ones related by meaning, sharing no words.
+  ({ browser, page } = await open({ model: true }));
+  await addBook(page, 'book.m4b', 'book.txt');
+  await page.goto(BASE + 'buttons.html');
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('borkmark.v1'));
+    s.books[0].marks = ['The birch canoe slid on the smooth planks.', 'Rice is often served in round bowls.', 'These days a chicken leg is a rare dish.',
+      'The box was thrown beside the parked truck.'].map((q, i) => ({ id: 'q' + i, t: 10 + i * 20, created: i, status: 'done', loc: [100, 110, 125], before: '', after: q }));
+    localStorage.setItem('borkmark.v1', JSON.stringify(s));
+  });
+  await page.goto(BASE); await page.click('.book'); await page.waitForTimeout(800);
+  await page.click('#marksBtn'); await page.click('#marksSearchBtn');
+  const related = async (q) => {
+    await page.fill('#marksSearchInput', q);
+    await page.waitForFunction(() => { const n = document.querySelector('#marks .related'); return n && !/Looking/.test(n.textContent); }, null, { timeout: 180000 });
+    return page.$$eval('#marks .related .mark', (l) => l.map((n) => n.dataset.id).join(','));
+  };
+  let r = await related('boat');
+  check('“boat” finds the canoe, by meaning', r === 'q0', r);
+  r = await related('food');
+  check('“food” finds the rice and the chicken', r.split(',').sort().join(',') === 'q1,q2', r);
+  r = await related('zebra');
+  check('“zebra” finds nothing', r === '', r || '(none)');
+  check('each quote’s meaning is kept', (await saved(page)).books[0].marks.every((m) => m.vec && m.vec.v.length === 512));
+  done(page); await browser.close();
 })();

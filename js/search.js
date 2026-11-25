@@ -8,7 +8,7 @@ import { estimateTime, placeInAudio } from './figures.js';
 import { addTextMark } from './marks.js';
 import { cur, play, seek } from './player.js';
 import { save } from './state.js';
-import { entryAt } from './text/book.js';
+import { entryAt, pageNumber } from './text/book.js';
 import { findMatches, paragraphAround, snippet } from './text/search.js';
 import { $, el, fmt, icon, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
@@ -76,7 +76,7 @@ function result(text, h) {
   const section = entryAt(cur.meta.toc, h.at), page = entryAt(cur.meta.pages, h.at);
   const main = el('button', 'hitmain'), head = el('span', 'hithead'), body = el('span', 'hittext');
   main.type = 'button';
-  head.append(el('span', '', section ? section.label : ''), el('span', 'muted', page ? page.label : ''));
+  head.append(el('span', '', section ? section.label : ''), el('span', 'muted', page && pageNumber(page.label) ? 'p. ' + pageNumber(page.label) : ''));
   const fill = (open) => {
     const s = open ? (() => { const p = paragraphAround(text, h.at); return { pre: text.slice(p.a, h.at), hit: text.slice(h.at, h.end), post: text.slice(h.end, p.z) }; })()
       : snippet(text, h.at, h.end);

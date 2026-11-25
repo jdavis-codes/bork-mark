@@ -11,7 +11,7 @@ import { readBook } from './sources/index.js';
 import { buildPageIndex, guessFirstNumbered, readPdfPages } from './sources/pdf.js';
 import { fromDoc, resolveMeta, save } from './state.js';
 import { store, stored } from './storage.js';
-import { buildBook, findInBook, tokenize } from './text/book.js';
+import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
 import { $, toast } from './ui/dom.js';
 import { detail } from './log.js';
@@ -65,6 +65,8 @@ export async function loadBookText(mine) {
     for (const m of book.marks) delete m.figs;   // figure numbers have shifted
     store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
   }
+  // Bookmarks made before page labels were cleaned up kept "page 62." as their page.
+  for (const m of book.marks) if (m.page && m.page !== pageNumber(m.page)) m.page = pageNumber(m.page);
   renderFigTab(); renderSearchTab();
   rematch(); runQueue(); renderInfo();
 }
