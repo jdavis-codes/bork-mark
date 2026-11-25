@@ -41,7 +41,6 @@ $('addBtn').addEventListener('click', () => {
   addSay(''); addBusy(false);
   $('addDlg').showModal();
 });
-$('addBig').addEventListener('click', () => $('addBtn').click());
 $('addCancel').addEventListener('click', () => closeSheet($('addDlg')));
 for (const pick of PICKS) $('add' + pick.key).addEventListener('change', () => { renderPick(pick); addBusy(false); });
 $('addGo').addEventListener('click', async () => {

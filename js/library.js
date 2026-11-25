@@ -75,7 +75,6 @@ function libRow(b) {
 export async function renderLibrary() {
   const ul = $('books');
   $('emptyLib').hidden = state.books.length > 0;
-  document.body.classList.toggle('no-books', !state.books.length);   // the large plus stands in for the small one
   for (const [id, r] of libRows) {
     if (state.books.some((b) => b.id === id)) continue;
     r.li.remove(); forgetCover(id); libRows.delete(id);

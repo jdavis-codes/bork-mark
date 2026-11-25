@@ -97,27 +97,21 @@
   /* how much of this app's storage is used: a small pie and two numbers, under the title */
   #storage { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
   #storagePie { flex: none; width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(var(--accent) var(--used, 0%), var(--line) 0); }
-  /* no books yet: a large plus in the middle of the empty screen */
-  #emptyLib { min-height: calc(100dvh - 300px); display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; }
-  #emptyLib p { max-width: 30ch; margin: 0; }
-  #addBig {
+  /* Add a book: a large plus in the middle of whatever room is left under the books. With a
+     long list it follows the last book and scrolls with it. */
+  #library:not([hidden]) { display: flex; flex-direction: column; min-height: calc(100dvh - 54px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body.has-mini #library:not([hidden]) { min-height: calc(100dvh - 124px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  #addZone { flex: 1; min-height: 190px; display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; padding: 24px 0; }
+  #emptyLib { max-width: 30ch; margin: 0; }
+  #addBtn {
     width: 104px; height: 104px; padding: 0; border: none; border-radius: 50%; display: grid; place-items: center;
     background: var(--soft); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); color: var(--accent);
   }
-  #addBig svg { width: 50px; height: 50px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
-  body.no-books #addBar { display: none; }
+  #addBtn svg { width: 50px; height: 50px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
   #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); }
   /* whichever is lowest fills the strip under the home indicator with its own color */
-  /* Add a book: a round plus that floats at the bottom right, above the mini player when there is one */
-  #addBar { position: absolute; right: max(16px, calc((100vw - 560px) / 2)); bottom: calc(100% + 14px); }
-  body:not(.has-mini) #addBar { bottom: calc(100% + 16px + env(safe-area-inset-bottom)); }
-  #addBtn {
-    width: 58px; height: 58px; padding: 0; border: none; border-radius: 50%; display: grid; place-items: center;
-    background: color-mix(in srgb, var(--accent) 16%, var(--bg)); color: var(--accent); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
-  }
-  #addBtn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   #libFoot::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
-  body:not(.has-bar) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  body:not(.has-bar) { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 
   /* long text slides back and forth instead of being cut off */
   .scroller { overflow: hidden; white-space: nowrap; min-width: 0; }
@@ -661,7 +655,7 @@
   }
 
   /* mini player */
-  body.has-mini:not(.has-bar) { padding-bottom: calc(166px + env(safe-area-inset-bottom)); }
+  body.has-mini:not(.has-bar) { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
   #mini { position: relative; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
   #mini .bar { margin: 0; border-radius: 0; height: 3px; }
   .minirow { display: flex; align-items: center; gap: 6px; max-width: 560px; margin: 0 auto; padding: 8px 10px 8px 12px; }
@@ -790,12 +784,12 @@
     </div>
   </div>
   <ul id="books"></ul>
-  <div id="emptyLib" hidden>
-    <button id="addBig" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-    <p class="muted">No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
-  </div>
   <p id="modelNote" class="muted" style="margin-top:18px"></p>
   <button id="modelAgain" class="small" hidden>Try again</button>
+  <div id="addZone">
+    <button id="addBtn" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <p id="emptyLib" class="muted" hidden>No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
+  </div>
 </main>
 
 <main id="player" hidden>
@@ -1180,7 +1174,6 @@
 </dialog>
 
 <div id="libFoot">
-  <div id="addBar"><button id="addBtn" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
 <div id="mini" hidden>
   <div class="bar"><div id="miniFill"></div></div>
   <div class="minirow">
