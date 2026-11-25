@@ -39,6 +39,8 @@ export function setChapStatus(msg) {
   const p = $('chapStatus');
   if (p) p.textContent = msg;
 }
+// The files whose names are shown in full, until the sheet is opened for another book.
+const openNames = new Set();
 export function renderInfo() {
   if (!cur) return;
   const b = cur.book, dl = $('infoList');
@@ -114,7 +116,11 @@ export function renderInfo() {
       shown = el('a', '', url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
       shown.href = url; shown.target = '_blank'; shown.rel = 'noopener';
     }
-    box.append(el('span', '', name), editable(url || '', 'link for the ' + label.toLowerCase(), (typed) => {
+    // A long file name is cut to one line; tapping it shows the whole of it, and again cuts it.
+    const file = el('button', 'filename' + (openNames.has(key) ? ' open' : ''), name);
+    file.setAttribute('aria-expanded', String(openNames.has(key)));
+    file.addEventListener('click', () => { if (!openNames.delete(key)) openNames.add(key); const open = file.classList.toggle('open'); file.setAttribute('aria-expanded', String(open)); });
+    box.append(file, editable(url || '', 'link for the ' + label.toLowerCase(), (typed) => {
       // Only web addresses; a bare "libro.fm/…" gets https:// in front.
       const link = typed && !/^https?:\/\//i.test(typed) ? 'https://' + typed : typed;
       let ok = false;
@@ -153,7 +159,7 @@ export function metaChanged() {
   setScroll($('title'), b.title); $('author').textContent = b.author;
   setMediaSession(); renderInfo();
 }
-$('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
+$('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; openNames.clear(); renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 $('removeBtn').addEventListener('click', async () => {
   if (!cur) return;

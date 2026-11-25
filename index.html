@@ -597,6 +597,9 @@
   .subnote { color: var(--muted); font-size: 0.8rem; margin: 2px 0 0; }
   .subnote:empty { display: none; }
   .filerow { display: grid; gap: 2px; min-width: 0; }
+  .filename { border: none; border-radius: 4px; padding: 0; min-width: 0; text-align: left; font: inherit; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .filename.open { white-space: normal; overflow-wrap: anywhere; }
+  .filename:active { transform: none; }
   .filerow .editable { font-size: 0.9rem; }
   .filerow a { color: var(--accent); }
   .textfield { width: 100%; font: inherit; font-size: 16px; color: inherit; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
