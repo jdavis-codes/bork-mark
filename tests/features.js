@@ -35,13 +35,16 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#searchBtn'); await page.waitForTimeout(300);
   await page.keyboard.type('lazy d'); await page.waitForTimeout(500);
   say('search', await page.textContent('#searchStatus'), '|', (await page.innerText('#searchResults .hit')).replace(/\s+/g, ' '));
+  // a search with enough results to scroll: the heading and field stay put
+  await page.fill('#searchInput', 'the'); await page.waitForTimeout(500);
   const pinned = await page.evaluate(() => {
     const d = document.getElementById('searchDlg'), h = d.querySelector('.sheethd');
     d.scrollTop = 400;
-    return d.scrollTop > 0 && Math.abs(h.getBoundingClientRect().top - d.getBoundingClientRect().top) < 3;
+    return { scrolled: d.scrollTop, off: Math.round(h.getBoundingClientRect().top - d.getBoundingClientRect().top) };
   });
-  check('the heading and search field stay at the top while results scroll', pinned);
+  check('the heading and search field stay at the top while results scroll', pinned.scrolled > 0 && Math.abs(pinned.off) < 3, 'scrolled ' + pinned.scrolled + ', heading ' + pinned.off + ' px from the top');
   await page.evaluate(() => { document.getElementById('searchDlg').scrollTop = 0; });
+  await page.fill('#searchInput', 'lazy d'); await page.waitForTimeout(500);
   await page.click('#searchResults .hitmain'); await page.waitForTimeout(200);
   say('search result opened', await page.$eval('#searchResults .hit', (n) => n.classList.contains('open')));
   await page.fill('#searchInput', ''); await page.waitForTimeout(400);
