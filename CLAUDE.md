@@ -12,7 +12,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 - `stamp.sh` writes the version into `js/version.js` at deploy time. Leave its stamped `export const` lines (VERSION, CHANNEL, BUILD, COMMIT) as they are.
 - The on-screen keyboard: `fitSheet` in `js/ui/sheets.js` fits an open sheet to the visible area while the keyboard is up. Sheets with text fields rely on it.
 - Rendering: the player redraws on every `timeupdate`. Write to the DOM only when a value changes (`setText`, `setAttr`, `setFill` in `js/ui/dom.js`), and animate with `transform` and `opacity`.
-- Memory: iOS ends the app without warning when it uses too much memory, and the speech model is most of it (about 340 MB at rest, 600–770 MB while loading and transcribing, measured in Chromium). Heavy steps call `crumb(stage)` so the next launch can say what happened and avoid repeating it. Keep heavy steps from overlapping.
+- Memory: iOS ends the app without warning when it uses too much memory, and the speech model is most of it (about 340 MB at rest, 600–770 MB while loading and transcribing, measured in Chromium). A small sentence model (MiniLM, in `js/meaning.js`) shares Whisper's worker for related-bookmark search; it loads only when bookmarks are searched and adds about 140 MB from then on. Heavy steps call `crumb(stage)` so the next launch can say what happened and avoid repeating it. Keep heavy steps from overlapping.
 - Logging: `log()` always records, while `detail()` records only in the dev and local copies. Users copy the log from Settings → Diagnostics.
 
 ## Branches and deploying

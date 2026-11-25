@@ -56,7 +56,7 @@ const { ENGINE, BASE, OUT, open, addBook, check, done } = require('./lib');
   await page.waitForTimeout(200);
   check('filter keeps matching cards and marks the word', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks mark')).length === 4);
   await page.fill('#marksSearchInput', 'nothing like this');
-  check('filter with no match says so', /No bookmarks match/.test(await page.textContent('#marks')));
+  check('filter with no match says so', /No bookmarks contain/.test(await page.textContent('#marks')));
   await page.click('#marksSearchCancel'); await page.waitForTimeout(200);
   check('cancel shows every card again', (await page.$$('#marks .mark')).length === 4 && !(await page.$$('#marks mark')).length);
   await page.click('#marks .mark .quote'); await page.waitForTimeout(400);

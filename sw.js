@@ -5,7 +5,7 @@ const SHELL = [
   './', 'app.js', 'js/add-book.js', 'js/audio/container.js',
   'js/audio/listen.js', 'js/book-files.js', 'js/chapter-names.js', 'js/cite.js',
   'js/figures.js', 'js/info.js', 'js/intro.js', 'js/library.js',
-  'js/log.js', 'js/marks.js', 'js/player.js', 'js/queue.js',
+  'js/log.js', 'js/marks.js', 'js/meaning.js', 'js/player.js', 'js/queue.js',
   'js/quotes.js', 'js/screens.js', 'js/search.js', 'js/settings-sheet.js', 'js/sleep.js',
   'js/sounds.js', 'js/sources/epub.js', 'js/sources/index.js', 'js/sources/pdf.js',
   'js/sources/plain-text.js', 'js/speech-worker.js', 'js/speech.js', 'js/state.js',

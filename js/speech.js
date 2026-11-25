@@ -13,6 +13,10 @@ let altRuntime = false;   // fetch the model's runtime from the second host
 export let asrWorker = null, asrSeq = 0, modelState = 'idle';   // idle | loading | ready | failed
 const asrJobs = new Map();
 function asrRequest(pcm) {
+  return ask({ audio: pcm || null, model: MODEL, device: 'wasm', alt: altRuntime }, pcm ? [pcm.buffer] : []);
+}
+// Sends one request to the worker; the reply resolves it.
+function ask(message, transfer = []) {
   if (!asrWorker) {
     asrWorker = new Worker(new URL('./speech-worker.js', import.meta.url), { type: 'module' });
     asrWorker.onmessage = (e) => {
@@ -36,8 +40,21 @@ function asrRequest(pcm) {
   return new Promise((resolve, reject) => {
     const id = ++asrSeq;
     asrJobs.set(id, { resolve, reject });
-    asrWorker.postMessage({ id, audio: pcm || null, model: MODEL, device: 'wasm', alt: altRuntime }, pcm ? [pcm.buffer] : []);
+    asrWorker.postMessage({ id, ...message }, transfer);
   });
+}
+// Embeddings for some texts: one Float32Array of `size` numbers per text,
+// each a direction standing for the text's meaning (unit length, so the dot
+// product of two is how alike they are, from -1 to 1).
+//
+// The sentence model shares Whisper's worker. A worker of its own, ended after
+// each search, was tried: two copies of the model runtime pushed the peak
+// higher (about 820 MB against 740 in Chromium) and ending it gave little
+// back. Sharing also means the two never run at the same time.
+export async function embed(texts) {
+  const r = await ask({ type: 'embed', texts });
+  detail('meaning of ' + texts.length + (texts.length === 1 ? ' text' : ' texts') + ' in ' + Math.round(r.runMs) + ' ms' + (r.loadMs > 50 ? ', model loaded in ' + Math.round(r.loadMs) + ' ms' : ''));
+  return texts.map((_, i) => r.vectors.subarray(i * r.size, (i + 1) * r.size));
 }
 export async function transcribe(pcm) {
   const secs = Math.round(pcm.length / 16000);   // read now: sending the audio to the worker empties it here

@@ -10,6 +10,7 @@ import { $, audio, calm, el, fmt, icon, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { openFigure, showPdfPage } from './viewer.js';
 import { log } from './log.js';
+import { relatedMarks } from './meaning.js';
 
 const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
 
@@ -166,10 +167,8 @@ export function renderMarks() {
   }
   const shown = filter.trim() ? b.marks.filter((m) => matches(b, m)) : b.marks;
   if (!shown.length) {
-    list.append(el('p', 'muted', 'No bookmarks match “' + filter.trim() + '”.'));
-    return;
-  }
-  if (order !== 'book') {
+    list.append(el('p', 'muted', 'No bookmarks contain “' + filter.trim() + '”.'));
+  } else if (order !== 'book') {
     const group = el('div', 'group');
     [...shown].sort(ORDERS[order]).forEach((m) => group.append(markCard(b, m, true)));
     list.append(group);
@@ -191,12 +190,49 @@ export function renderMarks() {
     }
     if (count) count.textContent = String(inGroup);
   }
-  if (filter.trim()) markWords(list.querySelectorAll('.quote, .where, .grouphead span:first-child'));
+  if (filter.trim()) {
+    showRelated(b, list, new Set(shown.map((m) => m.id)));
+    markWords(list.querySelectorAll('.quote, .where, .grouphead span:first-child'));   // any word typed, in related ones too
+  }
   if (trim) paintTrim();
+}
+
+// ---- related by meaning ----
+// Below the bookmarks that contain the words, the ones about the same thing
+// (see meaning.js), found a moment after typing stops. The first search loads
+// the sentence model, so it can take a few seconds.
+let related = null, relatedTimer = null;   // related: { query, list, busy, error }
+function findRelated() {
+  clearTimeout(relatedTimer);
+  const q = filter.trim();
+  if (related && related.query !== q) related = null;
+  if (q.length < 3 || !cur || (related && related.query === q)) return;
+  relatedTimer = setTimeout(async () => {
+    const mine = cur, skip = new Set(mine.book.marks.filter((m) => matches(mine.book, m)).map((m) => m.id));
+    related = { query: q, list: [], busy: true };
+    renderMarks();
+    let found = [], error = '';
+    try { found = await relatedMarks(mine.book, q, skip); } catch (err) { error = (err && err.message) || String(err); }
+    if (cur !== mine || filter.trim() !== q) return;
+    related = { query: q, list: found, error };
+    renderMarks();
+  }, 450);
+}
+function showRelated(b, list, skip) {
+  if (!related || related.query !== filter.trim()) return;
+  const group = el('div', 'group related'), head = el('div', 'grouphead');
+  const items = related.list.filter((r) => !skip.has(r.m.id) && b.marks.includes(r.m));
+  head.append(el('span', '', 'Related by meaning'), el('span', '', related.busy ? '' : String(items.length)));
+  group.append(head);
+  if (related.busy) group.append(el('p', 'muted relatednote', 'Looking for bookmarks about the same thing…'));
+  else if (related.error) group.append(el('p', 'muted relatednote', 'Couldn’t look for related bookmarks: ' + related.error));
+  else if (!items.length) group.append(el('p', 'muted relatednote', 'Nothing else about this.'));
+  for (const r of items) group.append(markCard(b, r.m, true));
+  list.append(group);
 }
 // The magnifier in the heading swaps the title for a search field; Cancel (or
 // closing the sheet) clears it and shows every bookmark again.
-function setFilter(value) { filter = value; renderMarks(); }
+function setFilter(value) { filter = value; renderMarks(); findRelated(); }
 $('marksSearchBtn').addEventListener('click', () => {
   $('marksDlg').classList.add('searching');
   $('marksSearchInput').value = filter; $('marksSearchInput').focus();
