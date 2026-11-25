@@ -6,7 +6,7 @@ import { clearFigures, renderFigGrid, renderFigList, renderFigTab } from './figu
 import { renderInfo } from './info.js';
 import { crumb, detail, log } from './log.js';
 import { chapterAt, cur } from './player.js';
-import { chapterNumber, readExtras } from './sources/extras.js';
+import { readExtras, sameChapter } from './sources/extras.js';
 import { browsePdf } from './sources/pdf.js';
 import { save } from './state.js';
 import { store, stored } from './storage.js';
@@ -35,10 +35,10 @@ export async function loadExtras(mine) {
   renderFigTab();
 }
 
-// The chapter being listened to, when the audio's chapters are numbered.
+// The name of the audio chapter being listened to, when the audio has chapters.
 function chapterNow() {
   const c = chapterAt(cur.book, audio.currentTime || cur.book.position || 0);
-  return c.count > 1 ? chapterNumber(c.title) : null;
+  return c.count > 1 ? c.title : '';
 }
 // Entries in the order of the PDF, gathered under the chapter they belong to.
 function groups(entries) {
@@ -88,7 +88,7 @@ function renderContents() {
     const section = el('section', 'exgroup'), head = el('button', 'exhead');
     const name = g.ch != null ? 'Chapter ' + g.ch : k === 0 ? 'Before the chapters' : 'After the chapters';
     head.append(el('span', '', name + (g.head && g.head.title ? ' · ' + g.head.title : '')));
-    if (g.ch != null && g.ch === now) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); current = current || section; }
+    if (!current && g.ch != null && now && sameChapter(now, 'Chapter ' + g.ch + (g.head && g.head.title ? ': ' + g.head.title : ''))) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); current = current || section; }
     head.addEventListener('click', () => showPage(g.page));
     section.append(head);
     for (const e of g.rows) {

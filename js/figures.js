@@ -8,7 +8,7 @@ import { chapterAt, cur, pause, seek } from './player.js';
 import { queueBusy, runQueue } from './queue.js';
 import { sound } from './sounds.js';
 import { modelState, transcribe, warmModel } from './speech.js';
-import { chapterNumber } from './sources/extras.js';
+import { chapterNumber, sameChapter } from './sources/extras.js';
 import { canWork, save, settings } from './state.js';
 import { stored } from './storage.js';
 import { entryAt, findInBook } from './text/book.js';
@@ -140,27 +140,35 @@ export function renderFigTab() {
   $('figsLabel').textContent = String(n || pages || '');
   $('figsBtn').setAttribute('aria-label', 'Figures' + (n ? ', ' + n + ' in the book' : '') + (pages ? ', ' + pages + ' pages of extras' : ''));
 }
+// A contents list often names sections inside the chapters too. When it
+// numbers its chapters, figures are gathered under those; otherwise under
+// whichever entry comes before them.
+function chapterEntries() {
+  const numbered = cur.meta.toc.filter((e) => chapterNumber(e.label) != null);
+  return numbered.length >= 3 ? numbered : cur.meta.toc;
+}
+const chapterOf = (at, list) => entryAt(list, at) || entryAt(cur.meta.toc, at);
 // The part of the book being listened to, as its contents entry's name: from
-// the place in the text when that is known, otherwise from the audio
-// chapter's number.
-function sectionNow() {
-  const toc = cur.meta.toc, est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
-  if (est != null) { const sec = entryAt(toc, est); return sec ? sec.label : null; }
-  const c = chapterAt(cur.book, audio.currentTime || cur.book.position || 0), n = c.count > 1 ? chapterNumber(c.title) : null;
-  const match = n == null ? null : toc.find((e) => chapterNumber(e.label) === n);
+// the place in the text when that is known, otherwise by matching the audio
+// chapter's name to the contents.
+function sectionNow(list) {
+  const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
+  if (est != null) { const sec = chapterOf(est, list); return sec ? sec.label : null; }
+  const c = chapterAt(cur.book, audio.currentTime || cur.book.position || 0);
+  const match = c.count > 1 ? list.find((e) => sameChapter(c.title, e.label)) : null;
   return match ? match.label : null;
 }
 // Fills the list of the book's figures, gathered under their chapters.
 // Returns where to scroll to: the next figure coming up, or failing that the
 // chapter being listened to.
 export function renderFigList() {
-  const box = $('figList'), figs = cur.meta.figures, now = sectionNow();
+  const box = $('figList'), figs = cur.meta.figures, chapters = chapterEntries(), now = sectionNow(chapters);
   box.textContent = '';
   $('figStatus').textContent = '';
   const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
   let nextOne = null, listening = null, group = null, name = null;
   figs.forEach((f, i) => {
-    const sec = entryAt(cur.meta.toc, f.at), label = sec ? sec.label : 'Before the contents';
+    const sec = chapterOf(f.at, chapters), label = sec ? sec.label : 'Before the contents';
     if (!group || label !== name) {
       name = label;
       const section = el('section', 'exgroup'), head = el('div', 'exhead');
