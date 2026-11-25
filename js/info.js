@@ -135,8 +135,10 @@ export function renderInfo() {
       }, 'PDF page ' + (b.pageFirst || 1)));
     }
   }
+  if (b.hasExtras) fileRow('Extras', b.extrasName + ' (' + b.extrasPages + ' pages)', 'extras');
   row('Added', new Date(b.added).toLocaleDateString());
   $('pageBtnLabel').textContent = b.pageSrcName ? 'Replace page PDF' : 'Add page PDF';
+  $('extrasBtnLabel').textContent = b.hasExtras ? 'Replace extras' : 'Add extras';
   $('textStatus').textContent = b.hasText
     ? 'Bookmarks quote the book’s own wording.'
     : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';

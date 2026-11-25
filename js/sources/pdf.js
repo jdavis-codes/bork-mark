@@ -9,7 +9,7 @@ import { buildBook, locate, tokenize } from '../text/book.js';
 const PDFJS = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/';
 
 // Text of every page of a PDF, plus the PDF's own page labels if it has any.
-async function openPdf(file) {
+export async function openPdf(file) {
   const pdfjs = await import(PDFJS + 'pdf.min.mjs');
   if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     // A worker script must come from this site, so fetch the library's and wrap it.
@@ -33,6 +33,26 @@ export async function renderPdfPage(file, number, width = 1400) {
   } finally {
     doc.destroy();
   }
+}
+
+// A PDF kept open for looking through page after page, which is much quicker
+// than opening it again for each one. Call close() when done with it.
+export async function browsePdf(file) {
+  const doc = await openPdf(file);
+  return {
+    count: doc.numPages,
+    async draw(number, width) {
+      const page = await doc.getPage(number);
+      const base = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({ scale: width / base.width });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      page.cleanup();
+      return canvas;
+    },
+    close() { doc.destroy(); },
+  };
 }
 
 export async function readPdfPages(file, onProgress = () => {}) {

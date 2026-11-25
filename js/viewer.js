@@ -9,17 +9,20 @@ import { $, el, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 
 let viewUrl = null;
-function showViewer(title, node, figure) {
+// `tools` are extra buttons for the row under the title.
+export function showViewer(title, node, figure, tools = []) {
   if (viewUrl) { URL.revokeObjectURL(viewUrl); viewUrl = null; }
   $('viewTitle').textContent = title;
   $('viewBody').replaceChildren(node);
   // For a figure from the book text: jump the audio to it, or see it on the scanned page.
-  const tools = $('viewTools');
-  tools.textContent = '';
+  const bar = $('viewTools');
+  bar.textContent = '';
+  bar.classList.remove('pager');
+  bar.append(...tools);
   if (figure != null) {
     const go = el('button', 'small', 'Go to this in the audio');
     go.addEventListener('click', () => jumpToFigure(figure));
-    tools.append(go);
+    bar.append(go);
     if (cur.pageSrc && cur.book.hasPagePdf) {
       const scan = el('button', 'small', 'Scanned page');
       scan.addEventListener('click', () => {
@@ -27,7 +30,7 @@ function showViewer(title, node, figure) {
         const i = pageOf(cur.pageSrc.index, t.slice(Math.max(0, f.at - 500), f.at), t.slice(f.at, f.at + 400));
         if (i == null) toast('Could not find this in the page scan'); else showPdfPage(i);
       });
-      tools.append(scan);
+      bar.append(scan);
     }
   }
   $('viewStatus').textContent = '';

@@ -13,6 +13,7 @@ import { autoUpdate } from './js/updates.js';
 // The screens and sheets: importing each one wires up its buttons.
 import './js/add-book.js';
 import './js/book-files.js';
+import './js/extras.js';
 import './js/figures.js';
 import './js/info.js';
 import './js/marks.js';

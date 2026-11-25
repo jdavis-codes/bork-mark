@@ -78,6 +78,19 @@ const { BASE, FIX, open, check, done } = require('./lib');
   await page.click('#markBtn'); await page.waitForTimeout(300); say('bookmarks', await page.textContent('#marksLabel'));
   await page.click('#marksBtn'); await page.waitForTimeout(300); say('card', (await text('#marks')).replace(/\d+:\d\d/g, 'T'));
   await page.click('#marksClose'); await page.waitForTimeout(300);
+  // Extras: add the PDF from About this book, then the sheet, a page and the page grid.
+  await page.click('#infoBtn'); await page.waitForTimeout(300);
+  await page.setInputFiles('#extrasFile', FIX + '/extras.pdf'); await page.waitForFunction(() => !document.getElementById('extrasBtn').hidden);
+  say('extras row', (await text('#infoList')).match(/Extras.*?pages\)/)[0], '| tab', await page.textContent('#extrasLabel'), '| button', await page.textContent('#extrasBtnLabel'));
+  await page.click('#infoClose'); await page.waitForTimeout(300); await page.click('#extrasBtn'); await page.waitForTimeout(400);
+  say('extras groups', (await page.$$eval('.exhead', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
+  say('extras rows', (await page.$$eval('.exrow', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
+  await page.click('.exrow'); await page.waitForSelector('#viewBody canvas');
+  say('extras page', await page.textContent('#viewTitle'), '|', await text('#viewTools'), '| previous off', await page.$eval('#viewTools button', (n) => n.disabled));
+  await page.click('#viewTools button:last-child'); await page.waitForTimeout(500); say('extras next', await page.textContent('#viewTitle'), '|', await page.textContent('#viewTools .muted'));
+  await page.click('#viewClose'); await page.waitForTimeout(300); await page.click('#exPages'); await page.waitForSelector('.exthumb img');
+  say('extras grid', (await page.$$('.excell')).length, 'cells'); await page.click('#extrasClose'); await page.waitForTimeout(300);
+
   await page.click('#infoBtn'); await page.waitForTimeout(300); await page.click('#removeBtn'); await page.waitForTimeout(800);
   say('after removing', 'library shown', !(await page.$eval('#library', (n) => n.hidden)), 'books', (await page.$$('.book')).length);
 

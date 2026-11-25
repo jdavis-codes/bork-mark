@@ -163,7 +163,7 @@
   /* The grab handle is drawn in the heading itself, so the heading sits in the
      same place whether or not the list is scrolled, and the list fades out
      under it instead of being cut off. */
-  #marksDlg::before { display: none; }
+  #marksDlg::before, #extrasDlg::before { display: none; }
   .markshead::before { content: ""; position: absolute; left: 50%; top: 6px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
   .markshead::after {
     content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; pointer-events: none;
@@ -322,7 +322,7 @@
   .tabs button.on { color: var(--accent); }
   body.has-bar { padding-bottom: 0; }
   dialog.tall { height: 82dvh; max-height: 82dvh; }
-  #marksDlg, #infoDlg { overflow-y: auto; }
+  #marksDlg, #infoDlg, #extrasDlg { overflow-y: auto; }
   dialog { overflow-x: hidden; }
   #infoDlg p, #infoDlg dd, #addDlg p { overflow-wrap: anywhere; }
 
@@ -333,7 +333,7 @@
   }
 
   /* add a book: one tappable row per file */
-  .picks { display: grid; gap: 10px; }
+  .picks { display: grid; gap: 8px; }
   .pick {
     display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; cursor: pointer;
     padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
@@ -441,6 +441,30 @@
   #figStatus:empty, #viewStatus:empty, #viewTools:empty { display: none; }
   #viewTools { margin-top: 10px; }
   #viewStatus { margin-top: 8px; }
+
+  /* extras: what was found in the PDF, chapter by chapter, or every page */
+  .exgroup + .exgroup { margin-top: 14px; }
+  .exhead {
+    position: sticky; top: 48px; z-index: 2; width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    border: none; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 0 8px; background: var(--card);
+    text-align: left; font-size: 0.98rem; font-weight: 650;
+  }
+  .exhead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .exnow { flex: none; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: var(--tint); border-radius: 999px; padding: 2px 8px; }
+  .exrow { width: 100%; display: flex; align-items: center; gap: 10px; border: none; border-radius: 0; padding: 11px 2px; text-align: left; }
+  .exrow + .exrow { border-top: 1px solid var(--line); }
+  .exrow .figtext { flex: 1; }
+  .exrow .muted:empty { display: none; }
+  .expage { flex: none; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #extrasGrid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+  #extrasGrid[hidden], #extrasList[hidden], #extrasView[hidden] { display: none; }
+  .excell { border: none; padding: 0; border-radius: 6px; display: grid; gap: 4px; justify-items: center; font-variant-numeric: tabular-nums; }
+  .exthumb { display: block; width: 100%; border-radius: 6px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); }
+  .exthumb img { display: block; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+  #viewTools.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
+  .pagezoom { overflow: auto; border-radius: 8px; cursor: zoom-in; }
+  .pagezoom.big { cursor: zoom-out; }
+  .pagezoom.big canvas { width: 240%; max-width: none; }
 
   /* pictures, tables and scanned pages */
   #viewDlg { overflow-y: auto; }
@@ -693,6 +717,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5"/><circle cx="15.5" cy="9.5" r="1.3"/></svg>
         <span id="figsLabel"></span>
       </button>
+      <button id="extrasBtn" aria-label="Extras" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4"/><path d="M8 8H4v12h12"/><path d="M11 16v-3M14 16v-5M17 16v-2"/></svg>
+        <span id="extrasLabel"></span>
+      </button>
       <button id="speedBtn" aria-label="Playback speed">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 17a8.5 8.5 0 1 1 14.8 0"/><path d="M12 14.5l4-5.5"/><circle cx="12" cy="14.5" r="1.2" fill="currentColor"/></svg>
         <span id="speedLabel">1×</span>
@@ -729,6 +757,12 @@
       <input id="addPdf" type="file">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg></span>
       <span class="picktext"><span class="pickname">Page scan</span><span id="addPdfName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
+    <label class="pick" id="pickExtras">
+      <input id="addExtras" type="file">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4"/><path d="M8 8H4v12h12"/><path d="M11 16v-3M14 16v-5M17 16v-2"/></svg></span>
+      <span class="picktext"><span class="pickname">Extras</span><span id="addExtrasName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
   </div>
@@ -948,11 +982,25 @@
   <div class="row">
     <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
     <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
+    <label class="filebtn"><span id="extrasBtnLabel">Add extras</span><input id="extrasFile" type="file"></label>
     <button id="removeBtn">Remove book</button>
   </div>
 </dialog>
 
 
+
+<dialog id="extrasDlg" class="bottom tall">
+  <div class="markshead">
+    <h2 tabindex="-1" autofocus>Extras <span id="extrasCount" class="muted"></span></h2>
+    <div id="extrasView" class="seg" role="group" aria-label="How to list the extras">
+      <button id="exContents" aria-pressed="true">Contents</button>
+      <button id="exPages" aria-pressed="false">Pages</button>
+    </div>
+    <button id="extrasClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div id="extrasList"></div>
+  <ol id="extrasGrid" hidden></ol>
+</dialog>
 
 <dialog id="figsDlg" class="bottom tall">
   <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>

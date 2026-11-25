@@ -6,25 +6,29 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 
 **Open it:** https://jdavis-codes.github.io/bork-mark/
 
-<p>
-  <img src="docs/img/library.png" width="24%" alt="Library with one book and its progress">
-  <img src="docs/img/player.png" width="24%" alt="Player with cover, chapter, progress and a large Bookmark button">
-  <img src="docs/img/bookmarks.png" width="24%" alt="Bookmarks grouped by chapter, each with its quote">
-  <img src="docs/img/trim.png" width="24%" alt="Trimming a quote by dragging handles over the text">
-</p>
+<table>
+  <tr>
+    <td width="25%"><img src="docs/img/player.png" alt="The player: cover, chapter, progress and one large Bookmark button"></td>
+    <td width="25%"><img src="docs/img/bookmarks.png" alt="Bookmarks grouped by chapter, each showing the passage from the book"></td>
+    <td width="25%"><img src="docs/img/trim.png" alt="Trimming a quote by dragging handles over the text"></td>
+    <td width="25%"><img src="docs/img/extras.png" alt="Extras: the figures that came with the audiobook, listed by chapter"></td>
+  </tr>
+  <tr>
+    <td><b>Listen.</b> One big button, or the one on your headphones.</td>
+    <td><b>Get the words back.</b> Each bookmark becomes the passage, in the book’s own wording.</td>
+    <td><b>Keep what matters.</b> Drag to the sentences you want, then copy or share with a citation.</td>
+    <td><b>See what you’re hearing.</b> The figures that came with the audiobook, by chapter.</td>
+  </tr>
+</table>
 
 ## Getting started
 
 1. Open the link above in Safari on your iPhone. Tap **•••**, then **Share**, then **Add to Home Screen** (it may be under View More). This matters: Safari clears a website's saved files after about a week without a visit, and only an app on the Home Screen is exempt. Without it, your books and bookmarks can disappear.
-2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, and a PDF of the print edition if you want printed page numbers.
+2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, a PDF of the print edition if you want printed page numbers, and the extras PDF if the audiobook came with one.
 3. Press play. To bookmark, double- or triple-press your headphone button, press next track on a watch, or tap **Bookmark**. It works with the phone locked.
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
 
 Files must be free of copy protection, such as the downloads from Libro.fm. A short guide covers the same steps the first time you open the app; Settings can show it again.
-
-<p>
-  <img src="docs/img/intro.png" width="24%" alt="Intro guide step: why and how to add the app to the Home Screen">
-</p>
 
 ## What it does
 
@@ -37,12 +41,8 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Page numbers** | Taken from the EPUB when it records them, or found in a PDF of the print edition. |
 | **Search** | Search the book's text: each result shows its chapter and two lines, opens to its paragraph, and can play from there or become a bookmark. Recent searches are kept per book. The bookmarks list can be searched too, and also shows bookmarks related by meaning: “boat” finds a quote about a canoe. |
 | **Figures** | Pictures and tables in the book text are listed, and the app can chime when the reading reaches one. |
+| **Extras** | The PDF of figures, tables or notes that comes with many audiobooks: browse it page by page, or by the figures, tables and chapters found in it, starting at the chapter you are listening to. |
 | **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |
-
-<p>
-  <img src="docs/img/citations.png" width="24%" alt="Citation settings with style, audio time and a preview">
-  <img src="docs/img/info.png" width="24%" alt="About this book: title, author, publisher, year and file links">
-</p>
 
 ### Citations
 
@@ -79,10 +79,10 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `index.html` | Markup and styles |
 | `app.js` | Starts the app: loads the modules below, then what runs at launch |
 | `js/text/` | The book text, whatever file it came from: the word index used to find heard words (`book.js`), cutting quotes and sentences (`quote.js`), tidying tables and wrapped lines (`cleanup.js`) |
-| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, and PDF page scans. `index.js` describes the shape they all return |
+| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, PDF page scans, and the extras PDF. `index.js` describes the shape they all return |
 | `js/audio/` | Reading M4B and MP3 files and cutting clips (`container.js`), and decoding and transcribing a clip (`listen.js`) |
 | `js/ui/` | Shared interface pieces: DOM helpers, sheets and the swipe-down gesture, scrolling titles |
-| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
+| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `extras`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
 | `js/version.js` | The version and build number, written by `stamp.sh` |
 | `js/speech-worker.js` | The speech model, in a worker |
 | `js/store-worker.js` | Saving files to the browser's private storage |
