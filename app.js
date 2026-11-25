@@ -2457,6 +2457,35 @@ async function showVersion() {
   }
 }
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showVersion);
+
+// The released copy and the development copy are published side by side, the
+// development one in dev/ inside the released site. Settings offers a switch
+// to the other, showing the version that is published there now. They keep
+// separate books, bookmarks and settings (see NS), so nothing carries across.
+const OTHER = CHANNEL === 'release' ? { dir: 'dev/', name: 'development',
+  note: 'Try new features before they are released. It keeps its own books, bookmarks and settings, so books added here are not there.' }
+  : CHANNEL === 'dev' ? { dir: '../', name: 'released',
+    note: 'The released version has its own books, bookmarks and settings, separate from these.' }
+  : null;   // a local copy has no other version beside it
+async function showChannelSwitch() {
+  if (!OTHER) return;
+  $('channelRow').hidden = false;
+  $('channelName').textContent = 'Switch to the ' + OTHER.name + ' version';
+  $('channelNote').textContent = OTHER.note;
+  try {
+    const res = await fetch(OTHER.dir + 'version.json', { cache: 'no-store' });
+    const v = await res.json();
+    $('channelVersion').textContent = 'Version ' + v.version + ', published ' + buildDate(v.build);
+  } catch (e) {
+    $('channelVersion').textContent = '';   // offline: the switch still works if that copy was opened before
+  }
+}
+for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showChannelSwitch);
+$('channelSwitch').addEventListener('click', () => {
+  if (cur) { cur.book.position = audio.currentTime || cur.book.position; save(true); }
+  flushLog();
+  location.href = OTHER.dir;
+});
 // On launch and whenever the app comes back to the screen: if a newer build
 // is published and nothing is playing or open, switch to it straight away.
 // Remembering the build it reloaded for stops this from looping.
