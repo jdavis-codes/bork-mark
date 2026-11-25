@@ -8,6 +8,7 @@ let seq = 0;
 function render() {
   const labels = [...jobs.values()];
   $('busy').hidden = !labels.length;
+  document.documentElement.classList.toggle('is-busy', labels.length > 0);   // notifications move down to make room
   // The newest job names the notice; a count says when others are running too.
   $('busyText').textContent = labels.length ? labels[labels.length - 1] + (labels.length > 1 ? ' (+' + (labels.length - 1) + ')' : '') : '';
 }
