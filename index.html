@@ -723,12 +723,18 @@
     padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--bg); border-bottom: 1px solid var(--line);
   }
   .sheethead h2 { font-size: 1.15rem; }
-  .sheet { padding: 0 12px calc(40px + env(safe-area-inset-bottom)); }
-  /* Each section is a card. Its title leads: the largest and heaviest thing in it. Settings'
-     names are medium weight, their values and the notes under them are quieter and smaller. */
+  .sheet { padding: 0 0 calc(40px + env(safe-area-inset-bottom)); }
+  /* Sections run the full width, with a band of shade between one and the next. A section's
+     title leads: the largest and heaviest thing in it, and it stays under the sheet's heading
+     while its settings scroll by. Settings' names are medium weight, their values and the
+     notes under them quieter and smaller. */
   .sheet section, .stack { display: grid; gap: 0; }
-  .sheet section { margin-top: 16px; padding: 16px 16px 4px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
-  .sheet h3 { font-size: 1.06rem; font-weight: 700; color: var(--fg); margin: 0 0 2px; }
+  .sheet section { padding: 0 16px 6px; border-top: 10px solid var(--soft); }
+  .sheet section:first-child { border-top: none; }
+  .sheet h3 {
+    position: sticky; top: calc(57px + env(safe-area-inset-top)); z-index: 1; margin: 0 -16px; padding: 16px 16px 8px;
+    background: var(--bg); font-size: 1.12rem; font-weight: 750; color: var(--fg);
+  }
   .field { display: grid; gap: 9px; min-width: 0; padding: 13px 0; }
   .sheet .field + .field, .sheet .field + .stack > .field:first-child, .sheet .stack + .field, .sheet .stack + .stack > .field:first-child { border-top: 1px solid var(--line); }
   .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0 0 12px; }
@@ -736,9 +742,8 @@
   .sheet .muted { font-size: 0.82rem; line-height: 1.4; margin: 0; }
   .sheet section > p.muted { margin: 8px 0 12px; }
   .sheet section > .field + p.muted { margin-top: 0; }
-  .sheet .select select, .sheet .textfield { background: var(--bg); }
   /* A field brought into view above the keyboard keeps a little room around it, clear of the heading that stays in place. */
-  dialog input, dialog textarea { scroll-margin: 72px 0 16px; }
+  dialog input, dialog textarea { scroll-margin: 112px 0 16px; }
   .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
   .fieldhead label, .fieldname, .switchrow span { font-weight: 500; }
   .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
