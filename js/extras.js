@@ -1,6 +1,8 @@
-// Extras: the PDF of figures, notes or worksheets that comes with an audiobook. Storing it, the
-// Extras sheet (what was found in it, chapter by chapter, or every page) and looking at a page.
+// Extras: the PDF of figures, notes or worksheets that comes with an audiobook. Storing it, looking
+// at a page, and the Figures sheet: the book's own figures or the extras, and for the extras
+// either what was found in them chapter by chapter or every page.
 
+import { clearFigures, renderFigGrid, renderFigList, renderFigTab } from './figures.js';
 import { renderInfo } from './info.js';
 import { crumb, detail, log } from './log.js';
 import { chapterAt, cur } from './player.js';
@@ -30,13 +32,7 @@ export async function loadExtras(mine) {
   const f = await stored(mine.book.id, 'extras');
   if (!f || cur !== mine) return;
   try { mine.extras = JSON.parse(await f.text()); } catch (e) { return; }
-  renderExtrasTab();
-}
-export function renderExtrasTab() {
-  const n = cur && cur.book.hasExtras ? cur.book.extrasPages || 0 : 0;
-  $('extrasBtn').hidden = !n;
-  $('extrasLabel').textContent = n ? String(n) : '';
-  $('extrasBtn').setAttribute('aria-label', 'Extras, ' + n + ' pages');
+  renderFigTab();
 }
 
 // The chapter being listened to, when the audio's chapters are numbered.
@@ -56,7 +52,9 @@ function groups(entries) {
 }
 
 // While the sheet is open the PDF stays open, so pages draw quickly.
-let pdf = null, opening = null, thumbs = null, urls = [], view = 'contents', showing = 0;
+let pdf = null, opening = null, thumbs = null, urls = [], showing = 0;
+// Which list the sheet shows. It opens on the extras when a book has them; list or grid is remembered per book.
+let source = null, grid = { book: false, extras: false }, forBook = null;
 function openPdfOnce() {
   if (pdf) return Promise.resolve(pdf);
   if (!opening) {
@@ -64,7 +62,7 @@ function openPdfOnce() {
     opening = stored(mine.book.id, 'extraspdf').then(async (f) => {
       if (!f) throw new Error('the extras PDF is not stored on this device');
       const doc = await browsePdf(f);
-      if (cur !== mine || !$('extrasDlg').open) { doc.close(); throw new Error('closed'); }
+      if (cur !== mine || !$('figsDlg').open) { doc.close(); throw new Error('closed'); }
       pdf = doc;
       return doc;
     }).finally(() => { opening = null; });
@@ -79,6 +77,7 @@ function closePdf() {
   for (const u of urls) URL.revokeObjectURL(u);
   urls = [];
   $('extrasGrid').textContent = ''; $('extrasList').textContent = '';
+  clearFigures();
 }
 
 function renderContents() {
@@ -130,7 +129,7 @@ function renderGrid() {
   thumbs = new IntersectionObserver((seen) => {
     for (const s of seen) if (s.isIntersecting) { thumbs.unobserve(s.target); queue.push(s.target); }
     next();
-  }, { root: $('extrasDlg'), rootMargin: '300px' });
+  }, { root: $('figsDlg'), rootMargin: '300px' });
   for (let p = 1; p <= n; p++) {
     const cell = el('button', 'excell'), frame = el('span', 'exthumb');
     frame.style.aspectRatio = '1 / ' + (cur.extras.ratio || 1.4);
@@ -140,15 +139,24 @@ function renderGrid() {
     grid.append(cell); thumbs.observe(cell);
   }
 }
-function setView(which) {
-  view = which;
-  const has = cur.extras.entries.length > 0;
-  if (!has) view = 'pages';
-  $('extrasView').hidden = !has;
-  $('exContents').setAttribute('aria-pressed', String(view === 'contents'));
-  $('exPages').setAttribute('aria-pressed', String(view === 'pages'));
-  $('extrasList').hidden = view !== 'contents'; $('extrasGrid').hidden = view !== 'pages';
-  if (view === 'pages') renderGrid();
+// The switch chooses where the figures come from: the book's text or the
+// extras. The grid button swaps the list by chapter for small pictures of
+// everything. Extras in which nothing was found have only their pages.
+function setView(from, asGrid) {
+  const figs = cur.meta.figures.length, ex = cur.extras, found = ex ? ex.entries.length : 0;
+  source = from === 'book' && figs ? 'book' : ex ? 'extras' : 'book';
+  if (asGrid != null) grid[source] = asGrid;
+  const book = source === 'book', tiles = book ? grid.book : grid.extras || !found;
+  $('figsView').hidden = !(figs && ex);
+  $('exBook').setAttribute('aria-pressed', String(book));
+  $('exExtras').setAttribute('aria-pressed', String(!book));
+  $('exGrid').hidden = !book && !found;
+  $('exGrid').setAttribute('aria-pressed', String(tiles));
+  $('exGrid').setAttribute('aria-label', tiles ? 'Show the list by chapter' : book ? 'Show every figure' : 'Show every page');
+  $('figBook').hidden = !book; $('figList').hidden = tiles; $('figGrid').hidden = !tiles;
+  $('extrasList').hidden = book || tiles; $('extrasGrid').hidden = book || !tiles;
+  if (tiles) { if (book) renderFigGrid(); else renderGrid(); }
+  $('figsDlg').scrollTop = 0;
 }
 
 // One page, large, with the entries on it named and buttons to the pages either side.
@@ -181,21 +189,31 @@ async function showPage(n, label) {
   }
 }
 
-$('extrasBtn').addEventListener('click', () => {
-  if (!cur || !cur.extras) return;
-  $('extrasCount').textContent = '(' + cur.extras.count + (cur.extras.count === 1 ? ' page)' : ' pages)');
-  const current = renderContents();
-  setView(current || view === 'contents' ? 'contents' : view);
-  $('extrasDlg').showModal();
-  $('extrasDlg').scrollTop = 0;
-  // Start at the chapter being listened to.
-  if (current && view === 'contents') current.scrollIntoView({ block: 'start' });
-  openPdfOnce().catch(() => {});
+// Where each list should open: the figure coming up or the chapter being listened to.
+let bookSpot = null, extrasSpot = null;
+function goToSpot() {
+  const tiles = source === 'book' ? grid.book : grid.extras;
+  if (tiles) return;
+  if (source === 'book' && bookSpot) bookSpot.scrollIntoView({ block: bookSpot.tagName === 'LI' ? 'center' : 'start' });
+  if (source === 'extras' && extrasSpot) extrasSpot.scrollIntoView({ block: 'start' });
+}
+$('figsBtn').addEventListener('click', () => {
+  if (!cur) return;
+  if (forBook !== cur.book.id) { forBook = cur.book.id; grid = { book: false, extras: false }; }
+  source = null;   // each time: the extras when there are any
+  bookSpot = cur.meta.figures.length ? renderFigList() : null;
+  extrasSpot = cur.extras ? renderContents() : null;
+  setView(source);
+  $('figsDlg').showModal();
+  $('figsDlg').scrollTop = 0;
+  goToSpot();
+  if (cur.extras) openPdfOnce().catch(() => {});
 });
-$('exContents').addEventListener('click', () => { setView('contents'); $('extrasDlg').scrollTop = 0; });
-$('exPages').addEventListener('click', () => { setView('pages'); $('extrasDlg').scrollTop = 0; });
-$('extrasClose').addEventListener('click', () => closeSheet($('extrasDlg')));
-$('extrasDlg').addEventListener('close', closePdf);
+$('exBook').addEventListener('click', () => { setView('book'); goToSpot(); });
+$('exExtras').addEventListener('click', () => { setView('extras'); goToSpot(); });
+$('exGrid').addEventListener('click', () => { setView(source, !(source === 'book' ? grid.book : grid.extras)); goToSpot(); });
+$('figsClose').addEventListener('click', () => closeSheet($('figsDlg')));
+$('figsDlg').addEventListener('close', closePdf);
 $('viewDlg').addEventListener('close', () => { showing = 0; $('viewTools').classList.remove('pager'); });
 
 // Adding or replacing the extras from About this book.
@@ -210,7 +228,7 @@ $('extrasFile').addEventListener('change', async (e) => {
     save(true);
     if (cur !== mine) return;
     mine.extras = info;
-    renderExtrasTab(); renderInfo();
+    renderFigTab(); renderInfo();
     toast(info.entries.length ? 'Extras added: ' + info.entries.length + ' things found in ' + info.count + ' pages' : 'Extras added: ' + info.count + ' pages');
   } catch (err) {
     log('extras failed: ' + ((err && err.message) || err));

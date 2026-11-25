@@ -3,7 +3,7 @@
 
 import { openAudio } from './audio/container.js';
 import { loadBookText, loadPageScan } from './book-files.js';
-import { loadExtras, renderExtrasTab } from './extras.js';
+import { loadExtras } from './extras.js';
 import { forgetTrackPosition, renderFigTab, resetFigureTracking, showPendingFigure, trackFigures } from './figures.js';
 import { renderInfo } from './info.js';
 import { detail, log, mb } from './log.js';
@@ -62,7 +62,7 @@ export async function openBook(id, coverNow) {
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
-  renderMarks(); setMediaSession(); renderFigTab(); renderExtrasTab(); renderSearchTab();
+  renderMarks(); setMediaSession(); renderFigTab(); renderSearchTab();
 
   const mine = cur;
   if (book.hasCover) stored(id, 'cover').then((f) => {

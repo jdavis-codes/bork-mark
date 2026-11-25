@@ -16,12 +16,14 @@ function toNumber(s) {
   return n;
 }
 // The chapter a heading or an audio chapter's name speaks of: "Chapter 5",
-// "Chapter Five", "Chapter IV: …", "5. The Title". Null when it names none.
+// "Chapter Five", "Chapter IV: …", "5. The Title", "II: The Title". Null when it names none.
 export function chapterNumber(s) {
   let m = /\bchapter\s+(\d+|[ivxlc]+|[a-z]+)\b/i.exec(s || '');
   if (m) return toNumber(m[1]);
   m = /^\s*(\d{1,2})\s*[.:)–—-]\s+\S/.exec(s || '');
-  return m ? Number(m[1]) : null;
+  if (m) return Number(m[1]);
+  m = /^\s*([IVXLC]+)\s*[.:)–—-]\s+\S/.exec(s || '');
+  return m ? toNumber(m[1]) : null;
 }
 
 const KINDS = 'figure|fig\\.?|table|chart|map|exhibit|worksheet|box|illustration|plate|diagram|graph|handout|form|appendix';
