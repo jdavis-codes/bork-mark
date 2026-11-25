@@ -4,8 +4,8 @@
 import { flushLog, log } from './log.js';
 import { cur } from './player.js';
 import { save } from './state.js';
-import { $, audio } from './ui/dom.js';
-import { BUILD, CHANNEL, VERSION } from './version.js';
+import { $, audio, el } from './ui/dom.js';
+import { BUILD, CHANNEL, COMMIT, SOURCE, VERSION } from './version.js';
 
 // A home-screen app has no reload button, so Settings provides one. It asks
 // the service worker to look for new files first, then reloads the page.
@@ -23,15 +23,25 @@ async function latestBuild() {
   const res = await fetch('version.json', { cache: 'no-store' });
   return String((await res.json()).build);
 }
+// "Version 0.1.4-dev.8 (development), commit a36ba38, published …", the
+// commit linking to it on GitHub, then whether a newer build is out.
+function showVersionLine(status) {
+  const p = $('appVersion');
+  p.replaceChildren(CHANNEL === 'local' ? 'Local copy' : 'Version ' + VERSION + (CHANNEL === 'dev' ? ' (development)' : ''));
+  if (COMMIT) {
+    const a = el('a', '', COMMIT.slice(0, 7));
+    a.href = SOURCE + '/commit/' + COMMIT; a.target = '_blank'; a.rel = 'noopener';
+    p.append(', commit ', a);
+  }
+  p.append(', published ' + buildDate(BUILD) + '.' + (status ? ' ' + status : ''));
+}
 async function showVersion() {
-  const name = CHANNEL === 'local' ? 'Local copy' : 'Version ' + VERSION + (CHANNEL === 'dev' ? ' (development)' : '');
-  const mine = name + ', published ' + buildDate(BUILD) + '.';
-  $('appVersion').textContent = mine;
+  showVersionLine('');
   try {
     const latest = await latestBuild();
-    $('appVersion').textContent = mine + (latest === BUILD ? ' Up to date.' : ' A newer one (' + buildDate(latest) + ') is available: tap Reload app.');
+    showVersionLine(latest === BUILD ? 'Up to date.' : 'A newer one (' + buildDate(latest) + ') is available: tap Reload app.');
   } catch (e) {
-    $('appVersion').textContent = mine + ' Could not check for a newer one (offline?).';
+    showVersionLine('Could not check for a newer one (offline?).');
   }
 }
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showVersion);
@@ -53,7 +63,7 @@ async function showChannelSwitch() {
   try {
     const res = await fetch(OTHER.dir + 'version.json', { cache: 'no-store' });
     const v = await res.json();
-    $('channelVersion').textContent = 'Version ' + v.version + ', published ' + buildDate(v.build);
+    $('channelVersion').textContent = 'Version ' + v.version + (v.commit ? ' (' + v.commit.slice(0, 7) + ')' : '') + ', published ' + buildDate(v.build);
   } catch (e) {
     $('channelVersion').textContent = '';   // offline: the switch still works if that copy was opened before
   }

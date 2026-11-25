@@ -8,7 +8,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 - The book text model (`js/text/`) doesn't care which file the text came from. File readers live in `js/sources/` and all return the shape described in `js/sources/index.js`. Planned: a PDF as the book text (a new reader there) and text search (on the word index in `js/text/book.js`).
 - When adding a module, add it to the `SHELL` list in `sw.js`, or the app won't open offline.
 - Only the module that owns a variable assigns to it. Others call a small function exported by the owner (for example `endTrim`, `setChapStatus`). eslint's `no-import-assign` enforces this.
-- `stamp.sh` writes the version into `js/version.js` at deploy time. Leave its three `export const` lines as they are.
+- `stamp.sh` writes the version into `js/version.js` at deploy time. Leave its stamped `export const` lines (VERSION, CHANNEL, BUILD, COMMIT) as they are.
 - Rendering: the player redraws on every `timeupdate`. Write to the DOM only when a value changes (`setText`, `setAttr`, `setFill` in `js/ui/dom.js`), and animate with `transform` and `opacity`.
 - Memory: iOS ends the app without warning when it uses too much memory, and the speech model is most of it (about 340 MB at rest, 600–770 MB while loading and transcribing, measured in Chromium). Heavy steps call `crumb(stage)` so the next launch can say what happened and avoid repeating it. Keep heavy steps from overlapping.
 - Logging: `log()` always records, while `detail()` records only in the dev and local copies. Users copy the log from Settings → Diagnostics.
