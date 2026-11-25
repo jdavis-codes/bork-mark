@@ -130,17 +130,19 @@ export async function jumpToFigure(i) {
 }
 
 // ---------- figures tab ----------
+// One tab for the book's own pictures and tables and for the extras PDF
+// (extras.js runs the sheet). It counts the book's figures, or the extras' pages.
 export function renderFigTab() {
-  const n = cur ? cur.meta.figures.length : 0;
-  $('figsBtn').hidden = !n;
-  $('figsLabel').textContent = String(n);
-  $('figsBtn').setAttribute('aria-label', 'Figures, ' + n);
+  const n = cur ? cur.meta.figures.length : 0, pages = cur && cur.book.hasExtras ? cur.book.extrasPages || 0 : 0;
+  $('figsBtn').hidden = !n && !pages;
+  $('figsLabel').textContent = String(n || pages || '');
+  $('figsBtn').setAttribute('aria-label', 'Figures' + (n ? ', ' + n + ' in the book' : '') + (pages ? ', ' + pages + ' pages of extras' : ''));
 }
-$('figsBtn').addEventListener('click', () => {
+// Fills the list of the book's figures; returns the next one coming up, if known.
+export function renderFigList() {
   const ol = $('figList'), figs = cur.meta.figures;
   ol.textContent = '';
   $('figStatus').textContent = '';
-  $('figCount').textContent = '(' + figs.length + ')';
   const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
   let nextOne = null;
   figs.forEach((f, i) => {
@@ -157,11 +159,8 @@ $('figsBtn').addEventListener('click', () => {
     if (est != null && nextOne == null && f.at > est) { nextOne = li; li.classList.add('upnext'); }
     ol.append(li);
   });
-  $('figsDlg').showModal();
-  $('figsDlg').scrollTop = 0;
-  if (nextOne) nextOne.scrollIntoView({ block: 'center' });
-});
-$('figsClose').addEventListener('click', () => closeSheet($('figsDlg')));
+  return nextOne;
+}
 async function probe(t) {
   if (probing || queueBusy || naming || !canWork() || !cur.source || modelState === 'failed' || Date.now() < probeRest) return;
   probing = true;
