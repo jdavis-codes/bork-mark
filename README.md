@@ -86,15 +86,17 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 
 ### Versions and deploying
 
-Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`:
+Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`. Pages must be set to deploy from Actions: Settings, Pages, Source: **GitHub Actions**.
 
 | Branch | Goes to | Also |
 |---|---|---|
 | `main` | https://jdavis-codes.github.io/bork-mark/ | a git tag and a GitHub release |
 | `develop` | https://jdavis-codes.github.io/bork-mark/dev/ | |
 
-The `VERSION` file holds the first two numbers, such as `1.0`. Every merge into `main` gets the next free third number (`v1.0.0`, `v1.0.1`, …) as its tag and release. To start a new series, change `VERSION` to `1.1` or `2.0`. Development builds are named after their commit, such as `1.0-dev.4989d40`. Settings, App shows which version is running.
+Pages serves one site per repository, so every run publishes both copies together: the latest release at the top and the head of `develop` under `dev/`. A push to `develop` republishes the latest release unchanged.
+
+The `VERSION` file holds the first two numbers, such as `1.0`. Every push to `main` gets the next free third number (`v1.0.0`, `v1.0.1`, …) as its tag and release. To start a new series, change `VERSION` to `1.1` or `2.0`. Development builds are named after their commit, such as `1.0-dev.4989d40`. Settings, App shows which version is running.
 
 The development copy keeps its own books and settings, separate from the released app, and installs as "Bork Mark (dev)".
 
-The workflow runs `./stamp.sh`, which writes the version and a build number into `app.js` and `version.json`; an installed copy compares build numbers to notice a newer version. The result is committed to the `gh-pages` branch, which is what GitHub Pages serves. Nothing else should push to that branch.
+The workflow runs `./stamp.sh`, which writes the version and a build number into `app.js` and `version.json`; an installed copy compares build numbers to notice a newer version.

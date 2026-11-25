@@ -1,13 +1,14 @@
 #!/bin/sh
 # Stamps a copy of the app for publishing. Usage: ./stamp.sh [version] [channel]
 #
-# Gives the build a number (the current time) in both app.js and version.json;
-# the app compares the two to notice a newer version. The version and channel
-# (release or dev) are shown in Settings. The deploy workflow runs this; run it
-# yourself only when publishing by hand.
+# Writes the version, the channel (release or dev) and a build number into
+# app.js and version.json. Settings shows the version; the app compares build
+# numbers to notice a newer one. The build number is the time now, or $BUILD
+# when that is set. The deploy workflow runs this; there is no need to run it
+# by hand.
 set -e
 cd "$(dirname "$0")"
-B=$(date +%s)
+B=${BUILD:-$(date +%s)}
 V=${1:-$(tr -d ' \n' < VERSION)}
 C=${2:-release}
 sed -i "s/^const BUILD = '[0-9]*';/const BUILD = '$B';/" app.js
