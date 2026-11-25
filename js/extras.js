@@ -6,7 +6,7 @@ import { clearFigures, renderFigGrid, renderFigList, renderFigTab } from './figu
 import { renderInfo } from './info.js';
 import { crumb, detail, log } from './log.js';
 import { chapterAt, cur } from './player.js';
-import { readExtras, sameChapter } from './sources/extras.js';
+import { outline, readExtras, sameChapter } from './sources/extras.js';
 import { browsePdf } from './sources/pdf.js';
 import { save } from './state.js';
 import { store, stored } from './storage.js';
@@ -89,8 +89,12 @@ function renderContents() {
   const box = $('extrasList'), now = chapterNow(), list = groups(cur.extras.entries);
   box.textContent = '';
   let current = null;
+  const full = (g) => (g.name || '') + (g.head && g.head.title ? ': ' + g.head.title : '');
+  // Chapters inside a part are set in, under the part's name when the extras have no heading for it.
+  const places = outline(list.map(full), cur.meta.toc, true);
   list.forEach((g, k) => {
-    const section = el('section', 'exgroup'), head = el('button', 'exhead');
+    if (places[k].missing) { const part = el('section', 'exgroup partonly'), title = el('div', 'exhead'); title.append(el('span', '', places[k].parent)); part.append(title); box.append(part); }
+    const section = el('section', places[k].depth ? 'exgroup sub' : 'exgroup'), head = el('button', 'exhead');
     const name = g.name || (k === 0 ? 'Before the chapters' : 'After the chapters');
     head.append(el('span', '', name + (g.head && g.head.title ? ' · ' + g.head.title : '')));
     if (!current && g.name && now && sameChapter(now, g.name + (g.head && g.head.title ? ': ' + g.head.title : ''))) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); current = current || section; }

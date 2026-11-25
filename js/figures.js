@@ -8,7 +8,7 @@ import { chapterAt, cur, pause, seek } from './player.js';
 import { queueBusy, runQueue } from './queue.js';
 import { sound } from './sounds.js';
 import { modelState, transcribe, warmModel } from './speech.js';
-import { chapterNumber, sameChapter } from './sources/extras.js';
+import { chapterNumber, outline, sameChapter } from './sources/extras.js';
 import { canWork, save, settings } from './state.js';
 import { stored } from './storage.js';
 import { entryAt, findInBook } from './text/book.js';
@@ -167,11 +167,16 @@ export function renderFigList() {
   $('figStatus').textContent = '';
   const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
   let nextOne = null, listening = null, group = null, name = null;
+  // Chapters inside a part are set in, under the part's name when the part has no figures itself.
+  const used = [...new Set(figs.map((f) => { const sec = chapterOf(f.at, chapters); return sec ? sec.label : null; }).filter(Boolean))];
+  const places = new Map(outline(used, cur.meta.toc, true).map((o, k) => [used[k], o]));
   figs.forEach((f, i) => {
     const sec = chapterOf(f.at, chapters), label = sec ? sec.label : 'Before the contents';
     if (!group || label !== name) {
       name = label;
-      const section = el('section', 'exgroup'), head = el('div', 'exhead');
+      const place = places.get(label) || { depth: 0 };
+      if (place.missing) { const part = el('section', 'exgroup partonly'), title = el('div', 'exhead'); title.append(el('span', '', place.parent)); part.append(title); box.append(part); }
+      const section = el('section', place.depth ? 'exgroup sub' : 'exgroup'), head = el('div', 'exhead');
       head.append(el('span', '', label));
       if (label === now) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); listening = listening || section; }
       group = el('ol');

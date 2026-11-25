@@ -515,6 +515,16 @@
   }
   /* long chapter names wrap onto more lines rather than being cut off */
   .exhead span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  /* chapters inside a part: set in, and lighter than the part */
+  .exgroup.sub { margin-left: 18px; }
+  .exgroup.sub + .exgroup.sub, .exgroup.partonly + .exgroup.sub, .group.sub + .group.sub, .group.partonly + .group.sub { margin-top: 4px; }
+  .exgroup.sub .exhead { font-size: 0.92rem; font-weight: 550; }
+  .group.sub { margin-left: 18px; }
+  .group.sub .grouphead { font-size: 0.92rem; font-weight: 550; }
+  .picklist.nested li:not(.sub) button { font-weight: 650; }
+  .picklist li.sub button { padding-left: 22px; }
+  .chapbox ol.nested li:not(.sub) .editable { font-weight: 650; }
+  .chapbox li.sub { padding-left: 18px; }
   .exgroup.now .exhead span:first-child { color: var(--accent); font-weight: 800; }
   .exgroup.now .exhead { border-bottom-color: var(--accent); }
   .exnow { flex: none; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: var(--tint); border-radius: 999px; padding: 2px 8px; }

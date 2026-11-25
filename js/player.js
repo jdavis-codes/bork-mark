@@ -17,6 +17,7 @@ import { save, settings, state } from './state.js';
 import { stored } from './storage.js';
 import { $, audio, el, fillRange, fmt, setAttr, setText, toast } from './ui/dom.js';
 import { setScroll } from './ui/marquee.js';
+import { outline } from './sources/extras.js';
 import { busyWhile } from './ui/busy.js';
 import { closeSheet } from './ui/sheets.js';
 import { renderSearchTab } from './search.js';
@@ -36,6 +37,15 @@ export let cur = null;   // { book, source, text, audioUrl, coverUrl }
 let scrubbing = false;
 
 const chaptersOf = (b) => (b.chapters && b.chapters.length ? b.chapters : [{ start: 0, title: '' }]);
+// How deep each of the book's audio chapters sits (see outline): chapters inside a part are 1.
+export function chapterDepths(b) {
+  return outline(chaptersOf(b).map((c) => c.title), cur && cur.book === b ? cur.meta.toc : []).map((o) => o.depth);
+}
+// The same for a few of them, by index, for a list that can show a missing part's name first.
+export function chapterOutline(b, indexes) {
+  const ch = chaptersOf(b);
+  return outline(indexes.map((i) => ch[i].title), cur && cur.book === b ? cur.meta.toc : [], true);
+}
 export function chapterAt(b, t) {
   const ch = chaptersOf(b);
   let i = 0;
@@ -274,12 +284,14 @@ $('chapterBtn').addEventListener('click', () => {
   const b = cur.book, now = chapterAt(b, audio.currentTime).i, ol = $('chapList');
   ol.textContent = '';
   let current = null;
+  const depths = chapterDepths(b);
+  ol.classList.toggle('nested', depths.some((d) => d > 0));
   chaptersOf(b).forEach((ch, i) => {
     const btn = el('button');
     btn.append(el('span', '', ch.title), el('span', '', fmt(ch.start)));
     if (i === now) { btn.setAttribute('aria-current', 'true'); current = btn; }
     btn.addEventListener('click', () => { seek(ch.start); closeSheet($('chapDlg')); });
-    const li = el('li'); li.append(btn); ol.append(li);
+    const li = el('li', depths[i] ? 'sub' : ''); li.append(btn); ol.append(li);
   });
   $('chapDlg').showModal();
   if (current) current.scrollIntoView({ block: 'center' });

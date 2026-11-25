@@ -1,6 +1,6 @@
 // Bookmarks: making one, and the Bookmarks sheet with a card for each.
 
-import { chapterAt, cur, play, seek } from './player.js';
+import { chapterAt, chapterOutline, cur, play, seek } from './player.js';
 import { runQueue } from './queue.js';
 import { requote, shareText } from './quotes.js';
 import { sound } from './sounds.js';
@@ -175,11 +175,16 @@ export function renderMarks() {
   } else {
     // In book order, under a heading for each chapter that has bookmarks.
     let group = null, last = null, count = null, inGroup = 0;
+    // Chapters inside a part are set in, under the part's name when the part has no bookmarks itself.
+    const order = [...new Set([...shown].sort((x, y) => x.t - y.t).map((m) => chapterAt(b, m.t).i))];
+    const places = new Map(chapterOutline(b, order).map((o, k) => [order[k], o]));
     for (const m of [...shown].sort((x, y) => x.t - y.t)) {
       const c = chapterAt(b, m.t);
       if (c.i !== last) {
         if (count) count.textContent = String(inGroup);
-        group = el('div', 'group'); last = c.i; inGroup = 0;
+        const place = places.get(c.i) || { depth: 0 };
+        if (place.missing) { const part = el('div', 'group partonly'), name = el('div', 'grouphead'); name.append(el('span', '', place.parent), el('span')); part.append(name); list.append(part); }
+        group = el('div', place.depth ? 'group sub' : 'group'); last = c.i; inGroup = 0;
         const head = el('div', 'grouphead');
         count = el('span');
         head.append(el('span', '', c.count > 1 ? c.title : b.title), count);

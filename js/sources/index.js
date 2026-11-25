@@ -4,7 +4,8 @@
 //
 //   { text,                        the whole book as one string
 //     title, author, publisher, year,  '' when the file doesn't say
-//     toc:   [{ label, at }],      contents entries; `at` is a character position in text
+//     toc:   [{ label, at, depth }],  contents entries; `at` is a character position in text,
+//                                  `depth` how far it is nested (0 at the top; may be missing)
 //     pages: [{ label, at }],      print page numbers, when the file records them
 //     figures: [{ at, kind: 'image' | 'table', cap, img | rows }],   img indexes images
 //     images: [Blob] }

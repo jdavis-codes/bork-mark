@@ -41,6 +41,37 @@ export function sameChapter(a, b) {
   return s === t || s.startsWith(t + ' ') || t.startsWith(s + ' ');
 }
 
+// Where each of a list of chapter names sits in the book: at the top, or
+// inside a part. The book's contents list says, when it records nesting and
+// has an entry of that name. Otherwise chapters that follow a "Part" are taken
+// to be inside it, until the back of the book.
+//
+// For each name: { depth: 0 or 1, parent: the part's name or null, missing:
+// true when that part is not itself in the list just above }. A list that can
+// show the part's name first passes `insert`; in one that can't, a chapter
+// whose part is absent counts as top-level.
+const PART = /^\s*(part|book)\s+(\d+|[ivxlc]+|[a-z]+)\b/i;
+const BACK = /^\s*(conclusion|epilogue|afterword|acknowledge?ments|notes|appendix|appendices|index|bibliography|references|glossary|about the|also by|copyright|credits|closing)\b/i;
+export function outline(names, toc = [], insert = false) {
+  const nested = toc.some((e) => e.depth > 0);
+  let part = null, shown = null;
+  return names.map((name) => {
+    const k = nested ? toc.findIndex((e) => sameChapter(name, e.label)) : -1;
+    let parent = null;
+    if (k >= 0) {
+      const depth = toc[k].depth || 0;
+      for (let n = k - 1; depth > 0 && n >= 0; n--) if ((toc[n].depth || 0) < depth) { parent = toc[n].label; break; }
+      if (!parent) part = PART.test(name) ? name : null;
+    } else if (PART.test(name)) part = name;
+    else if (BACK.test(name)) part = null;
+    else parent = part;
+    let missing = !!parent && !(shown && sameChapter(parent, shown));
+    if (missing && !insert) { parent = null; missing = false; }
+    shown = parent || name;
+    return { depth: parent ? 1 : 0, parent, missing };
+  });
+}
+
 const KINDS = 'figure|fig\\.?|table|chart|map|exhibit|worksheet|box|illustration|plate|diagram|graph|handout|form|appendix';
 const CAPTION = new RegExp('^(' + KINDS + ')\\s+((?:[A-Za-z]\\.?)?\\d+(?:[.–-]\\d+)*[a-z]?|[A-Z])(?!\\w|\\.\\d)\\s*[.:–—-]?\\s*(.*)$', 'i');
 const HEADING = /^chapter\s+(\d+|[ivxlc]+|[a-z]+)(?!\w)\s*[.:–—-]?\s*(.*)$/i;
