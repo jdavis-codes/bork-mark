@@ -37,7 +37,7 @@ async function open({ model = false, touch = true, sw = false } = {}) {
 async function addBook(page, audio, text) {
   await page.goto(BASE);
   if (await page.$eval('#introDlg', (d) => d.open)) { await page.click('#introSkip'); await page.waitForTimeout(300); }
-  await page.click('#addBtn');
+  await page.click((await page.isVisible('#addBig')) ? '#addBig' : '#addBtn');
   await page.setInputFiles('#addAudio', path.join(FIX, audio));
   if (text) await page.setInputFiles('#addText', path.join(FIX, text));
   await page.click('#addGo');

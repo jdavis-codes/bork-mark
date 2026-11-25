@@ -75,6 +75,7 @@ function libRow(b) {
 export async function renderLibrary() {
   const ul = $('books');
   $('emptyLib').hidden = state.books.length > 0;
+  document.body.classList.toggle('no-books', !state.books.length);   // the large plus stands in for the small one
   for (const [id, r] of libRows) {
     if (state.books.some((b) => b.id === id)) continue;
     r.li.remove(); forgetCover(id); libRows.delete(id);
@@ -90,6 +91,13 @@ export async function renderLibrary() {
   });
   if (navigator.storage && navigator.storage.estimate) {
     const { usage, quota } = await navigator.storage.estimate();
-    if (usage != null && quota) $('storage').textContent = 'Using ' + (usage / 1048576).toFixed(0) + ' MB of about ' + (quota / 1073741824).toFixed(1) + ' GB available to this app.';
+    if (usage != null && quota) {
+      // "312 MB / 38 GB", and a pie that always shows at least a sliver once anything is stored.
+      const size = (bytes) => (bytes < 1e9 ? Math.round(bytes / 1048576) + ' MB' : (bytes / 1073741824).toFixed(bytes < 1e10 ? 1 : 0) + ' GB');
+      $('storageText').textContent = size(usage) + ' / ' + size(quota);
+      $('storagePie').style.setProperty('--used', (usage ? Math.max(4, 100 * usage / quota) : 0).toFixed(1) + '%');
+      $('storage').setAttribute('aria-label', size(usage) + ' of ' + size(quota) + ' of storage used');
+      $('storage').hidden = false;
+    }
   }
 }

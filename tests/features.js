@@ -16,7 +16,7 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   for (let i = 0; i < 3; i++) await page.click('#introNext');
   say('intro last button', await page.textContent('#introNext'));
   await page.keyboard.press('Escape'); await page.waitForTimeout(400);
-  if (!(await page.$eval('#addDlg', (d) => d.open))) { await page.click('#addBtn'); await page.waitForTimeout(300); }
+  if (!(await page.$eval('#addDlg', (d) => d.open))) { await page.click((await page.isVisible('#addBig')) ? '#addBig' : '#addBtn'); await page.waitForTimeout(300); }
   await page.setInputFiles('#addAudio', FIX + '/book.m4b'); await page.setInputFiles('#addText', FIX + '/book.epub');
   say('picks', await page.textContent('#addAudioName'), '|', await page.textContent('#addTextName'));
   await page.click('#addGo'); await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(1200);

@@ -93,7 +93,19 @@
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
     padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 10px;
   }
-  #library { padding-top: 70px; }
+  #library { padding-top: 94px; }
+  /* how much of this app's storage is used: a small pie and two numbers, under the title */
+  #storage { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  #storagePie { flex: none; width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(var(--accent) var(--used, 0%), var(--line) 0); }
+  /* no books yet: a large plus in the middle of the empty screen */
+  #emptyLib { min-height: calc(100dvh - 300px); display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; }
+  #emptyLib p { max-width: 30ch; margin: 0; }
+  #addBig {
+    width: 104px; height: 104px; padding: 0; border: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--soft); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); color: var(--accent);
+  }
+  #addBig svg { width: 50px; height: 50px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  body.no-books #addBar { display: none; }
   #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); }
   /* whichever is lowest fills the strip under the home indicator with its own color */
   /* Add a book: a round plus that floats at the bottom right, above the mini player when there is one */
@@ -766,7 +778,10 @@
 <body>
 
 <main id="library">
-  <div class="libhead row spread"><h1 aria-label="Bork Mark">Bork<br>Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
+  <div class="libhead">
+    <div class="row spread"><h1 aria-label="Bork Mark">Bork<br>Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
+    <p id="storage" hidden><span id="storagePie" aria-hidden="true"></span><span id="storageText"></span></p>
+  </div>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
     <div class="row" style="margin-top:8px">
@@ -775,10 +790,12 @@
     </div>
   </div>
   <ul id="books"></ul>
-  <p id="emptyLib" class="muted" hidden>No books yet. Tap + to add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
+  <div id="emptyLib" hidden>
+    <button id="addBig" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <p class="muted">No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
+  </div>
   <p id="modelNote" class="muted" style="margin-top:18px"></p>
   <button id="modelAgain" class="small" hidden>Try again</button>
-  <p id="storage" class="muted" style="margin-top:4px"></p>
 </main>
 
 <main id="player" hidden>
