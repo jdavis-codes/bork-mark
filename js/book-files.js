@@ -15,6 +15,7 @@ import { buildBook, findInBook, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
 import { $, toast } from './ui/dom.js';
 import { detail } from './log.js';
+import { renderSearchTab } from './search.js';
 
 // The book text, plus where its contents entries and print pages fall in it.
 export async function storeText(id, doc) {
@@ -64,7 +65,7 @@ export async function loadBookText(mine) {
     for (const m of book.marks) delete m.figs;   // figure numbers have shifted
     store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
   }
-  renderFigTab();
+  renderFigTab(); renderSearchTab();
   rematch(); runQueue(); renderInfo();
 }
 
@@ -99,6 +100,7 @@ $('textFile').addEventListener('change', async (e) => {
     mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true };
     renderFigTab();
     mine.text = buildBook(doc.text);
+    renderSearchTab();
     metaChanged(); rematch(); runQueue();
     toast('Book text added');
   } catch (err) {

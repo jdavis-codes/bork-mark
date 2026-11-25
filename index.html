@@ -380,6 +380,43 @@
   ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
   @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
 
+  /* search: a rounded field, in the Search sheet and (swapped for the title) in the Bookmarks heading */
+  .searchfield { display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 12px; background: var(--soft); min-width: 0; }
+  .searchfield svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .searchfield input { flex: 1; min-width: 0; border: none; background: none; color: var(--fg); font: inherit; font-size: 16px; padding: 10px 0; outline: none; -webkit-appearance: none; appearance: none; }
+  .searchfield input::-webkit-search-decoration { -webkit-appearance: none; }
+  .searchfield.wide { margin-top: 12px; }
+  #marksSearch, #marksSearchCancel { display: none; }
+  #marksDlg.searching .markshead > h2, #marksDlg.searching #markOrder, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksClose { display: none; }
+  #marksDlg.searching #marksSearch { display: flex; flex: 1; }
+  #marksDlg.searching #marksSearchCancel { display: block; flex: none; }
+  #marks mark, #searchResults b { background: var(--tint); color: inherit; border-radius: 3px; }
+  #searchResults b { font-weight: 700; }
+  #searchStatus { margin-top: 10px; }
+  #searchStatus:empty { display: none; }
+  #searchRecent { margin-top: 18px; }
+  #searchRecent h3 { margin: 0; font-size: 1.05rem; font-family: Georgia, "Iowan Old Style", serif; }
+  #searchHistory, #searchResults { list-style: none; margin: 6px 0 0; padding: 0; }
+  .recent { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 2px; }
+  .recent svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .recent span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* a result: chapter and page over two lines of text, with play and bookmark beside */
+  .hit { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); }
+  .hitmain { flex: 1; min-width: 0; display: grid; gap: 4px; text-align: left; border: none; border-radius: 0; padding: 14px 2px; }
+  .hithead { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; font-weight: 650; }
+  .hithead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hithead .muted { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .hittext { font-family: Georgia, "Iowan Old Style", serif; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .hit.open .hittext { display: block; -webkit-line-clamp: none; }
+  .hit .acts { flex-direction: column; margin-right: -6px; }
+  .hit .acts svg { width: 22px; height: 22px; }
+  .hit .acts button:first-child svg { fill: currentColor; stroke: none; }
+  .hit .acts button { color: var(--accent); }
+  #searchDlg.busy .hit .acts button { opacity: 0.4; pointer-events: none; }
+  #searchMore { display: block; margin: 14px auto 4px; }
+  #searchMore[hidden] { display: none; }
+
   /* figures tab */
   #figsDlg { overflow-y: auto; }
   #figList { list-style: none; margin: 8px 0 0; padding: 0; }
@@ -638,6 +675,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-4-5 4z"/></svg>
         <span id="marksLabel"></span>
       </button>
+      <button id="searchBtn" aria-label="Search the book" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+        <span></span>
+      </button>
       <button id="figsBtn" aria-label="Figures" hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5"/><circle cx="15.5" cy="9.5" r="1.3"/></svg>
         <span id="figsLabel"></span>
@@ -870,7 +911,13 @@
       <button id="orderBook" aria-pressed="true">Book order</button>
       <button id="orderNew" aria-pressed="false">Newest</button>
     </div>
+    <button id="marksSearchBtn" class="iconbtn" aria-label="Search bookmarks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button>
     <button id="marksClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div id="marksSearch" class="searchfield">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <input id="marksSearchInput" type="search" placeholder="Search bookmarks" aria-label="Search bookmarks" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    </div>
+    <button id="marksSearchCancel" class="plain">Cancel</button>
   </div>
   <p id="queueStatus" class="muted"></p>
   <div id="marks"></div>
@@ -902,6 +949,21 @@
   <div id="viewTools" class="row"></div>
   <p id="viewStatus" class="muted"></p>
   <div id="viewBody"></div>
+</dialog>
+
+<dialog id="searchDlg" class="bottom tall">
+  <div class="row spread"><h2 tabindex="-1">Search book</h2><button id="searchClose" class="small">Close</button></div>
+  <div class="searchfield wide">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+    <input id="searchInput" type="search" placeholder="In this book" aria-label="Search the book" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+  </div>
+  <p id="searchStatus" class="muted"></p>
+  <div id="searchRecent" hidden>
+    <div class="row spread"><h3>Recent searches</h3><button id="searchClear" class="plain">Clear</button></div>
+    <ol id="searchHistory"></ol>
+  </div>
+  <ol id="searchResults"></ol>
+  <button id="searchMore" class="small" hidden>Show more</button>
 </dialog>
 
 <dialog id="speedDlg" class="bottom">

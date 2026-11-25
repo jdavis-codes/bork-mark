@@ -44,6 +44,14 @@ const { BASE, OUT, open, addBook, check, done } = require('./lib');
 
   await page.click('#marksBtn'); await page.waitForTimeout(500);
   check('four cards under two chapter headings', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks .grouphead')).length === 2);
+  // the magnifier filters the cards and marks the words
+  await page.click('#marksSearchBtn'); await page.keyboard.type('follows');
+  await page.waitForTimeout(200);
+  check('filter keeps matching cards and marks the word', (await page.$$('#marks .mark')).length === 4 && (await page.$$('#marks mark')).length === 4);
+  await page.fill('#marksSearchInput', 'nothing like this');
+  check('filter with no match says so', /No bookmarks match/.test(await page.textContent('#marks')));
+  await page.click('#marksSearchCancel'); await page.waitForTimeout(200);
+  check('cancel shows every card again', (await page.$$('#marks .mark')).length === 4 && !(await page.$$('#marks mark')).length);
   await page.click('#marks .mark .quote'); await page.waitForTimeout(400);
   await page.click('#marks .mark button[aria-label="Trim quote"]'); await page.waitForTimeout(600);
   const before = await page.textContent('#trimCount');

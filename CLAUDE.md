@@ -5,7 +5,8 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 ## Working on it
 
 - No build step: plain HTML, CSS and ES modules. `app.js` starts the app, and each part lives in a module under `js/` (see the README's table). Each module opens with a line saying what it holds.
-- The book text model (`js/text/`) doesn't care which file the text came from. File readers live in `js/sources/` and all return the shape described in `js/sources/index.js`. Planned: a PDF as the book text (a new reader there) and text search (on the word index in `js/text/book.js`).
+- The book text model (`js/text/`) doesn't care which file the text came from. File readers live in `js/sources/` and all return the shape described in `js/sources/index.js`. Text search is `js/text/search.js` (matching) and `js/search.js` (the sheet). Planned: a PDF as the book text (a new reader there).
+- Search is a way back into the audio, not a reader: a result opens only to its own paragraph. Keep it that way.
 - When adding a module, add it to the `SHELL` list in `sw.js`, or the app won't open offline.
 - Only the module that owns a variable assigns to it. Others call a small function exported by the owner (for example `endTrim`, `setChapStatus`). eslint's `no-import-assign` enforces this.
 - `stamp.sh` writes the version into `js/version.js` at deploy time. Leave its stamped `export const` lines (VERSION, CHANNEL, BUILD, COMMIT) as they are.

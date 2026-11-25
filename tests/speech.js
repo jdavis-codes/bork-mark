@@ -20,6 +20,18 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   let m = (await saved(page)).books[0].marks[0];
   check('quote found for a spoken bookmark', m.status === 'done' && /lemons makes fine punch/.test(m.before + m.after), m.status + ': ' + (m.after || '').slice(0, 40));
   console.log('  info ' + (await logLines(page, /ready in|transcribed/)).map((l) => l.slice(13)).join(' | '));
+  // From a search result: bookmark it, then play from it.
+  await page.click('#playBtn');   // pause
+  await page.click('#searchBtn'); await page.keyboard.type('chopped corn'); await page.waitForTimeout(500);
+  await page.click('#searchResults .hit .acts button[aria-label="Bookmark this"]');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('borkmark.v1')).books[0].marks.length === 2, null, { timeout: 120000 });
+  m = (await saved(page)).books[0].marks[0];
+  check('bookmark from search quotes that text', m.status === 'done' && /chopped corn/.test(m.after), (m.after || '').slice(0, 40));
+  check('…at the time it is read (about 0:22)', m.t > 16 && m.t < 30, m.t.toFixed(1));
+  await page.click('#searchResults .hit .acts button[aria-label="Play from here"]');
+  await page.waitForFunction(() => !document.getElementById('searchDlg').open, null, { timeout: 120000 });
+  const at = await page.$eval('#audio', (a) => ({ t: a.currentTime, paused: a.paused }));
+  check('play from search moves there and plays', !at.paused && at.t > 16 && at.t < 32, at.t.toFixed(1));
   done(page); await browser.close();
 
   // 2. Chapters named by themselves, a bookmark first.

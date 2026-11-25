@@ -6,11 +6,11 @@ const SHELL = [
   'js/audio/listen.js', 'js/book-files.js', 'js/chapter-names.js', 'js/cite.js',
   'js/figures.js', 'js/info.js', 'js/intro.js', 'js/library.js',
   'js/log.js', 'js/marks.js', 'js/player.js', 'js/queue.js',
-  'js/quotes.js', 'js/screens.js', 'js/settings-sheet.js', 'js/sleep.js',
+  'js/quotes.js', 'js/screens.js', 'js/search.js', 'js/settings-sheet.js', 'js/sleep.js',
   'js/sounds.js', 'js/sources/epub.js', 'js/sources/index.js', 'js/sources/pdf.js',
   'js/sources/plain-text.js', 'js/speech-worker.js', 'js/speech.js', 'js/state.js',
   'js/storage.js', 'js/store-worker.js', 'js/text/book.js', 'js/text/cleanup.js',
-  'js/text/quote.js', 'js/theme.js', 'js/trim.js', 'js/ui/dom.js',
+  'js/text/quote.js', 'js/text/search.js', 'js/theme.js', 'js/trim.js', 'js/ui/dom.js',
   'js/ui/marquee.js', 'js/ui/sheets.js', 'js/updates.js', 'js/version.js',
   'js/viewer.js', 'manifest.webmanifest',
 ];
