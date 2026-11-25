@@ -53,6 +53,14 @@ export function chapterAt(b, t) {
   return { i, start: ch[i].start, end: i + 1 < ch.length ? ch[i + 1].start : b.duration, title: ch[i].title, count: ch.length };
 }
 
+// The tab bar's click guard: a greyed-out tab shows its hint and goes no further.
+$('tabbar').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-hint]');
+  if (!btn) return;
+  e.stopImmediatePropagation();
+  toast(btn.dataset.hint);
+}, true);
+
 export async function openBook(id) {
   const book = state.books.find((b) => b.id === id);
   if (!book) return;

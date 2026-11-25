@@ -12,7 +12,7 @@ import { chapterNumber, outline, sameChapter } from './sources/extras.js';
 import { canWork, save, settings } from './state.js';
 import { stored } from './storage.js';
 import { entryAt, findInBook } from './text/book.js';
-import { $, audio, el, fmt, icon, toast } from './ui/dom.js';
+import { $, audio, el, fmt, icon, tabState, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { figureName, openFigure } from './viewer.js';
 
@@ -135,8 +135,16 @@ export async function jumpToFigure(i) {
 // One tab for the book's own pictures and tables and for the extras PDF
 // (extras.js runs the sheet). It counts the book's figures, or the extras' pages.
 export function renderFigTab() {
-  const n = cur ? cur.meta.figures.length : 0, pages = cur && cur.book.hasExtras ? cur.book.extrasPages || 0 : 0;
-  $('figsBtn').hidden = !n && !pages;
+  const b = cur && cur.book, loaded = !!(cur && cur.text);
+  const pages = b && b.hasExtras ? b.extrasPages || 0 : 0;
+  // How many figures the book has is kept with it, so the tab shows the
+  // right number (and state) before the text has loaded.
+  if (loaded && b.figureCount !== cur.meta.figures.length) { b.figureCount = cur.meta.figures.length; save(); }
+  const n = loaded ? cur.meta.figures.length : (b && b.figureCount) || 0;
+  tabState($('figsBtn'), (n && loaded) || pages ? ''
+    : b && b.hasText && !loaded ? 'The book text is still loading.'
+    : b && b.hasText ? 'This book has no pictures or tables in its text.'
+    : 'Add the book text (EPUB) to see its pictures and tables, or a PDF of extras.');
   $('figsLabel').textContent = String(n || pages || '');
   $('figsBtn').setAttribute('aria-label', 'Figures' + (n ? ', ' + n + ' in the book' : '') + (pages ? ', ' + pages + ' pages of extras' : ''));
 }

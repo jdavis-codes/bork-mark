@@ -19,6 +19,15 @@ export const setFill = (node, frac) => {
   const v = 'scaleX(' + Math.max(0, Math.min(1, frac || 0)).toFixed(4) + ')';
   if (node.style.transform !== v) node.style.transform = v;
 };
+// A tab in the player's bar is always there, so the bar never shifts as a
+// book loads. One that can't be used yet (or for this book) is greyed out,
+// and tapping it shows `hint` instead (see the tab bar's click guard in
+// player.js). An empty hint makes it usable.
+export function tabState(btn, hint) {
+  btn.hidden = false;
+  btn.classList.toggle('off', !!hint);
+  if (hint) { btn.dataset.hint = hint; btn.setAttribute('aria-disabled', 'true'); } else { delete btn.dataset.hint; btn.removeAttribute('aria-disabled'); }
+}
 export const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;

@@ -10,7 +10,7 @@ import { cur, play, seek } from './player.js';
 import { save } from './state.js';
 import { entryAt, pageNumber } from './text/book.js';
 import { findMatches, paragraphAround, snippet } from './text/search.js';
-import { $, el, fmt, icon, toast } from './ui/dom.js';
+import { $, el, fmt, icon, tabState, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 
 const SHOWN = 50;        // results drawn at first; "Show more" adds this many again
@@ -19,7 +19,9 @@ let hits = [], shown = 0, timer = null, busy = false, searched = null;   // sear
 
 // The tab button shows once the open book has its text.
 export function renderSearchTab() {
-  $('searchBtn').hidden = !(cur && cur.text);
+  const b = cur && cur.book;
+  tabState($('searchBtn'), !b || !b.hasText ? 'Add the book text (EPUB or TXT) in About this book to search it.'
+    : !cur.text ? 'The book text is still loading.' : '');
 }
 
 const history = () => cur.book.searches || (cur.book.searches = []);

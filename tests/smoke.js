@@ -18,7 +18,12 @@ const { ENGINE, BASE, OUT, open, addBook, check, done } = require('./lib');
     localStorage.setItem('borkmark.v1', JSON.stringify(s));
   });
   await page.goto(BASE); await page.waitForSelector('.book'); await page.click('.book');
-  await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(800);
+  await page.waitForSelector('#player:not([hidden])');
+  // every tab is there from the start, so the bar doesn't shift as the book loads
+  const tabs = () => page.$$eval('#tabbar .tabs button', (l) => l.map((b) => (b.hidden ? '-' : Math.round(b.getBoundingClientRect().left))).join(' '));
+  const tabsAtFirst = await tabs();
+  await page.waitForTimeout(800);
+  check('the tab bar doesn’t shift as the book loads', tabsAtFirst === await tabs(), tabsAtFirst);
 
   // Layout counts come from Chromium's own tools; in WebKit the time just passes.
   const cdp = ENGINE === 'chromium' ? await ctx.newCDPSession(page) : null;
