@@ -173,7 +173,7 @@ export function renderFigList() {
       name = label;
       const section = el('section', 'exgroup'), head = el('div', 'exhead');
       head.append(el('span', '', label));
-      if (label === now) { head.append(el('span', 'exnow', 'Listening')); listening = listening || section; }
+      if (label === now) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); listening = listening || section; }
       group = el('ol');
       section.append(head, group); box.append(section);
     }

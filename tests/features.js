@@ -97,6 +97,8 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#exBook'); await page.waitForTimeout(200); say('book groups', (await page.$$eval('#figList .exhead', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
   await page.click('#exGrid'); await page.waitForSelector('#figGrid .exthumb img'); say('book grid', (await page.$$('#figGrid .excell')).length, 'cells', await page.$$eval('#figGrid .exthumb', (l) => l.map((x) => x.textContent || 'img').join(',')));
   await page.click('#exGrid'); await page.click('#exExtras'); await page.waitForTimeout(200);
+  { const seen = await page.evaluate(() => { const d = document.getElementById('figsDlg'), h = d.querySelector('.markshead').getBoundingClientRect().bottom, n = d.querySelector('#extrasList .exgroup.now .exhead').getBoundingClientRect(); return n.top >= h - 1 && n.bottom <= d.getBoundingClientRect().bottom; });
+    check('the chapter being listened to is in view below the heading', seen); }
   say('extras groups', (await page.$$eval('#extrasList .exhead', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
   say('extras rows', (await page.$$eval('.exrow', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
   await page.click('.exrow'); await page.waitForSelector('#viewBody canvas');
