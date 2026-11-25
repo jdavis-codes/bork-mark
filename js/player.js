@@ -20,6 +20,7 @@ import { setScroll } from './ui/marquee.js';
 import { busyWhile } from './ui/busy.js';
 import { closeSheet } from './ui/sheets.js';
 import { renderSearchTab } from './search.js';
+import { coverUrl } from './library.js';
 
 // ---------- player ----------
 // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
@@ -42,7 +43,7 @@ export function chapterAt(b, t) {
   return { i, start: ch[i].start, end: i + 1 < ch.length ? ch[i + 1].start : b.duration, title: ch[i].title, count: ch.length };
 }
 
-export async function openBook(id, coverNow) {
+export async function openBook(id) {
   const book = state.books.find((b) => b.id === id);
   if (!book) return;
   if (cur && cur.book === book) { showPlayer(); return; }   // already loaded, maybe playing
@@ -57,31 +58,21 @@ export async function openBook(id, coverNow) {
   $('playerError').hidden = true;
   renderInfo();
   renderSpeed();
-  // Show the library's copy of the cover at once; the book's own copy replaces it when loaded.
-  if (coverNow) $('cover').src = coverNow; else $('cover').removeAttribute('src');
+  // The cover, at the same address the library shows it at (see coverUrl), so
+  // it is already drawn and nothing replaces it later.
+  cur.coverUrl = await coverUrl(book);
+  if (cur.coverUrl) $('cover').src = cur.coverUrl; else $('cover').removeAttribute('src');
   cur.audioUrl = URL.createObjectURL(await playable(file));
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
   renderMarks(); setMediaSession(); renderFigTab(); renderSearchTab();
 
-  // The rest is heavy (the text's word index, the audio's index, the full
-  // cover) and can wait until the player has finished sliding in.
+  // The rest is heavy (the text's word index, the audio's index) and can wait
+  // until the player has finished sliding in.
   const mine = cur;
   afterMotion(() => {
     if (cur !== mine) return;
-    if (book.hasCover) stored(id, 'cover').then(async (f) => {
-      if (!f || cur !== mine) return;
-      mine.coverUrl = URL.createObjectURL(f);
-      // Decoded before it replaces the library's copy, so the cover never
-      // shows blank while the new one loads.
-      const img = new Image();
-      img.src = mine.coverUrl;
-      try { await img.decode(); } catch (e) { /* show it anyway */ }
-      if (cur !== mine) return;
-      $('cover').src = mine.coverUrl;
-      setMediaSession(); renderMini();
-    });
     busyWhile('Reading the audio…', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
       .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
     if (book.hasText) busyWhile('Loading the book text…', loadBookText(mine));
@@ -101,7 +92,6 @@ export function closeBook() {
   save(true);
   audio.removeAttribute('src'); audio.load();
   if (cur.audioUrl) URL.revokeObjectURL(cur.audioUrl);
-  if (cur.coverUrl) URL.revokeObjectURL(cur.coverUrl);
   cur = null;
   renderMini();
 }

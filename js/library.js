@@ -9,20 +9,33 @@ import { $, el, fmt, setFill, setText } from './ui/dom.js';
 // Each book's row is built once and then only updated, so its cover is not
 // read and decoded again every time the library shows, which happens at the
 // start of every swipe down from the player.
-const libRows = new Map();   // book id -> { li, img, name, meta, fill, url }
+// One address (object URL) per book's cover, shared by the library, the
+// player and the mini player. An image already on screen is then never loaded
+// again under a new address, which on Safari made the cover blink as a book
+// opened. The library owns them: they are let go when the book is removed.
+const covers = new Map();   // book id -> promise of the address, or of null
+export function coverUrl(b) {
+  if (!b.hasCover) return Promise.resolve(null);
+  if (!covers.has(b.id)) covers.set(b.id, stored(b.id, 'cover').then((f) => (f ? URL.createObjectURL(f) : null)));
+  return covers.get(b.id);
+}
+function forgetCover(id) {
+  const p = covers.get(id);
+  covers.delete(id);
+  if (p) p.then((u) => { if (u) URL.revokeObjectURL(u); });
+}
+
+const libRows = new Map();   // book id -> { li, img, name, meta, fill }
 function libRow(b) {
-  const r = { li: el('li'), img: el('img', 'thumb'), name: el('div', 'name'), meta: el('div', 'muted'), fill: el('div'), url: null };
+  const r = { li: el('li'), img: el('img', 'thumb'), name: el('div', 'name'), meta: el('div', 'muted'), fill: el('div') };
   const btn = el('button', 'book'), info = el('div'), bar = el('div', 'bar');
   r.img.alt = '';
   bar.append(r.fill); info.append(r.name, r.meta, bar);
   btn.append(r.img, info); r.li.append(btn);
   // The tapped cover grows into the player's cover. If this book is the
   // one in the mini player, that cover is the one that grows instead.
-  btn.addEventListener('click', () => morph(() => openBook(b.id, r.img.getAttribute('src')), cur && cur.book === b ? null : r.img));
-  if (b.hasCover) stored(b.id, 'cover').then((f) => {
-    if (!f || libRows.get(b.id) !== r) return;
-    r.url = URL.createObjectURL(f); r.img.src = r.url;
-  });
+  btn.addEventListener('click', () => morph(() => openBook(b.id), cur && cur.book === b ? null : r.img));
+  coverUrl(b).then((u) => { if (u && libRows.get(b.id) === r) r.img.src = u; });
   return r;
 }
 export async function renderLibrary() {
@@ -30,7 +43,7 @@ export async function renderLibrary() {
   $('emptyLib').hidden = state.books.length > 0;
   for (const [id, r] of libRows) {
     if (state.books.some((b) => b.id === id)) continue;
-    r.li.remove(); if (r.url) URL.revokeObjectURL(r.url); libRows.delete(id);
+    r.li.remove(); forgetCover(id); libRows.delete(id);
   }
   state.books.forEach((b, k) => {
     let r = libRows.get(b.id);
