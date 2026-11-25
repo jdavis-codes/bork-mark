@@ -38,7 +38,12 @@ function asrRequest(pcm) {
     asrWorker.postMessage({ id, audio: pcm || null, model: MODEL, device: 'wasm', alt: altRuntime }, pcm ? [pcm.buffer] : []);
   });
 }
-export const transcribe = (pcm) => asrRequest(pcm);
+export async function transcribe(pcm) {
+  const secs = Math.round(pcm.length / 16000);   // read now: sending the audio to the worker empties it here
+  const r = await asrRequest(pcm);
+  log('transcribed ' + secs + ' s of audio in ' + (r.runMs / 1000).toFixed(1) + ' s');
+  return r;
+}
 
 // The model's runtime is a large download from a CDN, and on a phone that
 // sometimes fails part-way. A failed start can't be resumed, so each retry
@@ -55,7 +60,11 @@ async function forgetRuntime() {
 }
 async function loadModel() {
   for (let attempt = 0; ; attempt++) {
-    try { await asrRequest(null); if (attempt) log('speech model loaded on try ' + (attempt + 1) + (altRuntime ? ', from the second host' : '')); return; } catch (err) {
+    try {
+      const r = await asrRequest(null);
+      log('speech model ready in ' + (r.loadMs / 1000).toFixed(1) + ' s' + (attempt ? ', on try ' + (attempt + 1) : '') + (altRuntime ? ', from the second host' : ''));
+      return;
+    } catch (err) {
       log('speech model failed, try ' + (attempt + 1) + ': ' + err.message + ' | online ' + navigator.onLine
         + ' | service worker ' + !!(navigator.serviceWorker && navigator.serviceWorker.controller));
       if (asrWorker) { asrWorker.terminate(); asrWorker = null; }

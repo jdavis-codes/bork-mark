@@ -3,9 +3,12 @@
 
 import { tokenize } from '../text/book.js';
 
-export async function decode(arrayBuffer) {
+// Decodes compressed audio. The browser resamples it to `rate` as it decodes,
+// so asking for 16 kHz (what Whisper wants) never holds the clip at full
+// quality: a minute of stereo is about 8 MB instead of 21.
+export async function decode(arrayBuffer, rate = 44100) {
   const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new Ctx(1, 1, 44100);
+  const ctx = new Ctx(1, 1, rate);
   return await new Promise((res, rej) => {
     const p = ctx.decodeAudioData(arrayBuffer, res, rej);
     if (p && p.catch) p.catch(rej);
@@ -37,7 +40,7 @@ export async function transcribeAround(source, T, before, after, transcribe, onS
   onStage('cutting the audio clip');
   const c = await source.clip(T - before, T + after);
   onStage('decoding the audio clip');
-  const pcm = to16kMono(await decode(c.buffer));
+  const pcm = to16kMono(await decode(c.buffer, 16000));   // already 16 kHz: this only mixes to mono
   onStage('transcribing');
   const out = await transcribe(pcm);
   const words = [], times = [];

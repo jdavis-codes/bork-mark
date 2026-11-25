@@ -39,5 +39,8 @@ export function crumb(stage) {
     if (stage) localStorage.setItem(CRUMB, JSON.stringify({ stage, t: Date.now(), playing: !audio.paused }));
     else localStorage.removeItem(CRUMB);
   } catch (e) {}
+  // Heavy steps are when iOS ends the app, so the log is written out now
+  // rather than in the next batch, which a crash would lose.
+  flushLog();
 }
 crumb(null);
