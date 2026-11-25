@@ -19,7 +19,45 @@ export function closeSheet(d) {
   d.classList.add('closing');
   setTimeout(finish, 200);
 }
+// The on-screen keyboard. iOS doesn't shrink the page for it: it slides the
+// visible part of the page up instead, which leaves a sheet pinned to the
+// bottom of the page hidden behind the keyboard, with its heading pushed up
+// under the status bar. So while the keyboard is up, an open sheet is fitted
+// to the part of the page that can be seen (window.visualViewport): its
+// bottom sits on the keyboard and its top stays clear of the status bar.
+const vv = window.visualViewport;
+let fitted = null;
+function fitSheet() {
+  const d = document.querySelector('dialog[open]:not(.closing)');
+  const page = document.documentElement.clientHeight;             // the whole page's height, keyboard or not
+  const up = !!vv && !!d && page - vv.height > 80;                  // a keyboard, not just a toolbar
+  if (fitted && (fitted !== d || !up)) {
+    for (const p of ['maxHeight', 'height', 'marginBottom', 'marginTop']) fitted.style[p] = '';
+    fitted = null;
+  }
+  if (!up) return;
+  const safeTop = parseFloat(getComputedStyle(document.body).paddingTop) - 14;   // body's padding is 14px + the status bar
+  const room = vv.height - Math.max(safeTop, 0) - 8;
+  const below = Math.max(0, page - (vv.offsetTop + vv.height));     // page hidden under the keyboard
+  d.style.maxHeight = room + 'px';
+  if (d.classList.contains('tall') || d.id === 'settingsDlg') d.style.height = room + 'px';
+  if (d.id === 'settingsDlg') d.style.marginTop = (vv.offsetTop + vv.height - room) + 'px';
+  else d.style.marginBottom = below + 'px';
+  fitted = d;
+  // …and the field being typed in stays in sight inside it.
+  const f = document.activeElement;
+  if (f && d.contains(f) && f.matches('input, textarea')) f.scrollIntoView({ block: 'nearest' });
+}
+if (vv) {
+  let queued = false;
+  const later = () => { if (!queued) { queued = true; requestAnimationFrame(() => { queued = false; fitSheet(); }); } };
+  vv.addEventListener('resize', later);
+  vv.addEventListener('scroll', later);
+  document.addEventListener('focusout', () => setTimeout(later, 50));   // the keyboard going away
+}
+
 for (const d of document.querySelectorAll('dialog')) {
+  d.addEventListener('close', () => { if (fitted === d) fitSheet(); });
   const locked = () => d.classList.contains('busy');   // the add-book sheet while a book is being copied in
   d.addEventListener('cancel', (e) => { e.preventDefault(); if (!locked()) closeSheet(d); });
   d.addEventListener('click', (e) => {

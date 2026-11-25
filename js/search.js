@@ -107,9 +107,9 @@ async function act(h, what) {
   if (busy || !cur) return;
   remember($('searchInput').value);
   const mine = cur, say = (msg) => { $('searchStatus').textContent = msg; };
-  busy = true; $('searchDlg').classList.add('busy');
+  busy = true; $('searchDlg').classList.add('finding');
   let t;
-  try { t = await placeInAudio(h.at, say); } finally { busy = false; $('searchDlg').classList.remove('busy'); }
+  try { t = await placeInAudio(h.at, say); } finally { busy = false; $('searchDlg').classList.remove('finding'); }
   if (cur !== mine) return;
   if (what === 'play') {
     if (t == null) return;

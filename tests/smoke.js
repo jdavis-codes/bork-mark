@@ -2,7 +2,7 @@
 // player, the bookmarks list (open, trim by dragging, save, delete), and every
 // sheet. Also prints layout counts during playback, to compare after
 // rendering changes. Screenshots go to tests/out/.
-const { BASE, OUT, open, addBook, check, done } = require('./lib');
+const { ENGINE, BASE, OUT, open, addBook, check, done } = require('./lib');
 
 (async () => {
   require('fs').mkdirSync(OUT, { recursive: true });
@@ -20,10 +20,12 @@ const { BASE, OUT, open, addBook, check, done } = require('./lib');
   await page.goto(BASE); await page.waitForSelector('.book'); await page.click('.book');
   await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(800);
 
-  const cdp = await ctx.newCDPSession(page);
-  await cdp.send('Performance.enable');
+  // Layout counts come from Chromium's own tools; in WebKit the time just passes.
+  const cdp = ENGINE === 'chromium' ? await ctx.newCDPSession(page) : null;
+  if (cdp) await cdp.send('Performance.enable');
   const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
   const measure = async (label, ms) => {
+    if (!cdp) { await page.waitForTimeout(ms); return; }
     const a = await metrics(); await page.waitForTimeout(ms); const z = await metrics();
     console.log('  info ' + label + ': ' + (z.LayoutCount - a.LayoutCount) + ' layouts, ' + (z.RecalcStyleCount - a.RecalcStyleCount) + ' style recalcs, '
       + Math.round((z.LayoutDuration - a.LayoutDuration) * 1000) + ' ms layout');

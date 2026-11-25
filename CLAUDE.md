@@ -10,6 +10,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 - When adding a module, add it to the `SHELL` list in `sw.js`, or the app won't open offline.
 - Only the module that owns a variable assigns to it. Others call a small function exported by the owner (for example `endTrim`, `setChapStatus`). eslint's `no-import-assign` enforces this.
 - `stamp.sh` writes the version into `js/version.js` at deploy time. Leave its stamped `export const` lines (VERSION, CHANNEL, BUILD, COMMIT) as they are.
+- The on-screen keyboard: `fitSheet` in `js/ui/sheets.js` fits an open sheet to the visible area while the keyboard is up. Sheets with text fields rely on it.
 - Rendering: the player redraws on every `timeupdate`. Write to the DOM only when a value changes (`setText`, `setAttr`, `setFill` in `js/ui/dom.js`), and animate with `transform` and `opacity`.
 - Memory: iOS ends the app without warning when it uses too much memory, and the speech model is most of it (about 340 MB at rest, 600–770 MB while loading and transcribing, measured in Chromium). Heavy steps call `crumb(stage)` so the next launch can say what happened and avoid repeating it. Keep heavy steps from overlapping.
 - Logging: `log()` always records, while `detail()` records only in the dev and local copies. Users copy the log from Settings → Diagnostics.
@@ -27,13 +28,18 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 | Level | What | Time |
 |---|---|---|
 | `lint` | eslint over `app.js` and `js/`: undefined names, writes to imports, unused code | ~5 s |
-| `quick` | lint + `smoke` (add a book, play, library, bookmarks, trim, every sheet) + `gestures` (swipes) | ~1 min |
-| `full` | quick + `features` (EPUB, figures, info sheet, settings, citations, reopening, removing) + `crash` (crash guard) | ~1 min |
-| `speech` | the real speech model: quote found, chapters named by themselves, resuming. Needs the network | ~2 min |
+| `quick` | lint + `smoke` (add a book, play, library, bookmarks and their search, trim, every sheet) and `gestures` (swipes) in Chromium, then `smoke` and `keyboard` in WebKit | ~1.5 min |
+| `full` | quick + `features` (EPUB, search, figures, info sheet, settings, citations, reopening, removing) in both browsers + `crash` (crash guard) | ~2 min |
+| `webkit` | only the WebKit suites | ~1.5 min |
+| `speech` | the real speech model: quote found, bookmark and play from search, chapters named by themselves, resuming. Needs the network | ~2.5 min |
 | `compare <ref>` | `features` on another version and on this one, and the differences | ~1 min |
+
+WebKit (Safari's engine) runs as an iPhone. `run.sh` downloads it into `tests/.browsers` the first time, along with the system libraries it needs (apt, as root), which takes a minute or two. Its tests use a real profile folder, because WebKit has no on-device file storage in a throwaway one. No test browser shows an iPhone keyboard, so `keyboard.js` simulates the way iOS reports one (a shorter visible area, scrolled down).
 
 When to run what:
 - Always: `lint`. It's fast and catches most mistakes after moving code.
+- Any change to the interface: test it in WebKit too, not only Chromium (`quick` does both). iOS Safari is where the app is used, and the two differ.
+- A new sheet or text field: add it to `keyboard.js`. On iOS the keyboard covers the bottom of the page and slides it up, rather than shrinking it.
 - Small, local changes (copy, styles, one function): `lint`, plus `quick` if the change touches something on screen.
 - Big changes only (moving or splitting modules, the player, sheets, gestures, storage, launch): `full`, and `compare <last commit>` for refactors that should change no behaviour.
 - `speech` only when touching transcription, matching, quotes, chapter naming, the speech worker or the queue.
