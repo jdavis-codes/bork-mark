@@ -14,21 +14,47 @@ import { swipeDown } from './ui/sheets.js';
 // cover, the bottom bar) glide from their old place and size to the new one.
 // `fromCover` is a library thumbnail to treat as the cover for this change.
 // Heavy work started by a change of screen (opening a book: reading its
-// text, its audio's index, its cover) waits until the animation has finished,
-// so it doesn't make it stutter. afterMotion(fn) runs fn then, or straight
-// away when nothing is animating.
+// text, its audio's index) waits until the animation has finished, so it
+// doesn't make it stutter. afterMotion(fn) runs fn then, or straight away when
+// nothing is animating.
 let motion = Promise.resolve();
 export const afterMotion = (fn) => motion.then(() => setTimeout(fn, 0));
-export function morph(update, fromCover) {
-  if (!document.startViewTransition || calm.matches) return update();
-  const mini = $('miniCover');
-  if (fromCover) { fromCover.style.viewTransitionName = 'cover'; mini.style.viewTransitionName = 'none'; }
-  const reset = () => { if (fromCover) fromCover.style.viewTransitionName = ''; mini.style.viewTransitionName = ''; };
-  let t;
-  try { t = document.startViewTransition(async () => { await update(); reset(); }); } catch (e) { reset(); return update(); }
-  t.ready.catch((e) => log('screen animation skipped: ' + ((e && e.message) || e)));
-  motion = t.finished.catch(() => {});
-  motion.then(reset);
+
+// Opening the player: show() puts it up (see prepareBook), and it rises into
+// place, from the bottom of the screen or, from the mini player, from there.
+// `from` is the picture tapped (a library cover or the mini player's): the
+// player's own cover starts exactly over it and flies into place, so it is the
+// one image, already drawn, all the way. Only transforms move.
+const RISE = 380, RISE_CURVE = 'cubic-bezier(0.2, 0.85, 0.25, 1)';
+export function openPlayer(show, from) {
+  if (calm.matches) { show(); return; }
+  const player = $('player'), cover = $('cover'), under = [$('library'), $('libFoot')];
+  const fromMini = from === $('miniCover');
+  const start = fromMini ? $('mini').getBoundingClientRect().top : window.innerHeight;
+  const a = from && !from.hidden ? from.getBoundingClientRect() : null;
+  show();
+  for (const n of under) n.hidden = false;   // the library stays in view behind the rising sheet
+  const b = cover.getBoundingClientRect();     // where the cover ends up
+  player.classList.add('rising');
+  player.style.transition = 'none'; player.style.transform = 'translateY(' + start + 'px)';
+  const flies = !!(a && a.width && b.width && cover.getAttribute('src'));
+  if (flies) {
+    cover.style.transition = 'none';
+    cover.style.transform = 'translate(' + ((a.left + a.width / 2) - (b.left + b.width / 2)) + 'px, '
+      + ((a.top + a.height / 2) - (b.top + b.height / 2) - start) + 'px) scale(' + (a.width / b.width) + ')';
+    from.style.visibility = 'hidden';          // the player's cover is the one on its way
+  }
+  player.getBoundingClientRect();              // the start is in place before the transitions are set
+  const t = 'transform ' + RISE + 'ms ' + RISE_CURVE;
+  player.style.transition = t; player.style.transform = '';
+  if (flies) { cover.style.transition = t; cover.style.transform = ''; }
+  motion = new Promise((done) => setTimeout(() => {
+    player.classList.remove('rising');
+    player.style.transition = ''; cover.style.transition = ''; cover.style.transform = '';
+    if (from) from.style.visibility = '';
+    if (!player.hidden) for (const n of under) n.hidden = true;
+    done();
+  }, RISE + 30));
 }
 
 // The two screens. Going to the library leaves the book loaded and playing,
@@ -49,7 +75,6 @@ export function showLibrary() {
   window.scrollTo(0, 0);
   refitScrolls();
 }
-$('backBtn').addEventListener('click', () => morph(showLibrary));
 
 // Swipe down on the player to return to the library: the big player turns
 // into the mini player. All the motion is in the stylesheet (see "pulling the
@@ -130,10 +155,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     set(to);
     setTimeout(() => done(to === 1), GLIDE_MS + 30);
   }
-  swipeDown(player, {
-    slop: 10,
-    canStart: (e) => state === 'idle' && window.scrollY <= 0 && !e.target.closest('input, select, textarea'),
-    start() {
+  function begin() {
       for (const n of under) n.hidden = false;   // the library, behind the player, to fade in
       renderLibrary(); renderMini();
       for (const n of [$('title'), $('miniTitle')]) n.classList.add('still');   // long titles hold still to be measured
@@ -141,7 +163,17 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       set(0);
       root.classList.add('pulling');
       state = 'pulling';
-    },
+  }
+  // The back button: the same change as pulling all the way down.
+  $('backBtn').addEventListener('click', () => {
+    if (state !== 'idle') return;
+    begin();
+    if (calm.matches) done(true); else glide(1);
+  });
+  swipeDown(player, {
+    slop: 10,
+    canStart: (e) => state === 'idle' && window.scrollY <= 0 && !e.target.closest('input, select, textarea'),
+    start: begin,
     move(dy) {
       if (state !== 'pulling') return;
       set(dy / end);
@@ -169,7 +201,7 @@ export function renderMini() {
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
   setFill($('miniFill'), t / (b.duration || 1));
 }
-$('miniOpen').addEventListener('click', () => morph(showPlayer));
+$('miniOpen').addEventListener('click', () => openPlayer(showPlayer, $('miniCover')));
 $('miniMark').addEventListener('click', () => addMark());
 $('miniPlay').addEventListener('click', () => {
   log('screen: ' + (audio.paused ? 'play' : 'pause') + ' (mini player)');

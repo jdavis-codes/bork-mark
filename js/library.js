@@ -1,10 +1,11 @@
 // The library screen: one row per book.
 
-import { cur, openBook } from './player.js';
-import { morph } from './screens.js';
+import { cur, prepareBook } from './player.js';
 import { state } from './state.js';
-import { stored } from './storage.js';
+import { store, stored } from './storage.js';
 import { $, el, fmt, setFill, setText } from './ui/dom.js';
+import { detail } from './log.js';
+import { openPlayer } from './screens.js';
 
 // Each book's row is built once and then only updated, so its cover is not
 // read and decoded again every time the library shows, which happens at the
@@ -13,11 +14,41 @@ import { $, el, fmt, setFill, setText } from './ui/dom.js';
 // player and the mini player. An image already on screen is then never loaded
 // again under a new address, which on Safari made the cover blink as a book
 // opened. The library owns them: they are let go when the book is removed.
+//
+// The address is of a display-size copy (COVER_MAX across, made once and kept
+// with the book). Covers in audiobook files run to 3000 px, and Safari, which
+// decodes a big image the first time it is drawn at a size, showed the player's
+// cover blank for a moment after the screen slid in while it did.
+const COVER_MAX = 1024;
 const covers = new Map();   // book id -> promise of the address, or of null
 export function coverUrl(b) {
   if (!b.hasCover) return Promise.resolve(null);
-  if (!covers.has(b.id)) covers.set(b.id, stored(b.id, 'cover').then((f) => (f ? URL.createObjectURL(f) : null)));
+  if (!covers.has(b.id)) covers.set(b.id, displayCover(b).then((f) => (f ? URL.createObjectURL(f) : null)));
   return covers.get(b.id);
+}
+async function displayCover(b) {
+  const kept = await stored(b.id, 'cover-display');
+  if (kept) return kept;
+  const f = await stored(b.id, 'cover');
+  if (!f) return null;
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.min(1, COVER_MAX / Math.max(bmp.width, bmp.height));
+    if (k === 1) { bmp.close(); return f; }   // small enough already
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const g = c.getContext('2d');
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    const small = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
+    if (!small) return f;
+    store('write', b.id, 'cover-display', small).catch(() => {});
+    detail('cover made display size: ' + Math.round(f.size / 1024) + ' KB → ' + Math.round(small.size / 1024) + ' KB, ' + c.width + '×' + c.height);
+    return small;
+  } catch (e) {
+    return f;   // can't be read as an image here: show it as it is
+  }
 }
 function forgetCover(id) {
   const p = covers.get(id);
@@ -34,7 +65,10 @@ function libRow(b) {
   btn.append(r.img, info); r.li.append(btn);
   // The tapped cover grows into the player's cover. If this book is the
   // one in the mini player, that cover is the one that grows instead.
-  btn.addEventListener('click', () => morph(() => openBook(b.id), cur && cur.book === b ? null : r.img));
+  btn.addEventListener('click', async () => {
+    const show = await prepareBook(b.id);   // ready first, then the screen changes at once
+    if (show) openPlayer(show, cur && cur.book === b && !$('mini').hidden ? $('miniCover') : r.img);
+  });
   coverUrl(b).then((u) => { if (u && libRows.get(b.id) === r) r.img.src = u; });
   return r;
 }

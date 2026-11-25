@@ -61,26 +61,39 @@ $('tabbar').addEventListener('click', (e) => {
   toast(btn.dataset.hint);
 }, true);
 
+// Opening a book is in two parts. prepareBook does the slow steps (finding
+// the audio file, the cover, decoding it) and resolves to show(), which swaps
+// the screen to the player at once, so the opening animation (openPlayer)
+// starts with everything ready.
 export async function openBook(id) {
+  const show = await prepareBook(id);
+  if (show) show();
+}
+export async function prepareBook(id) {
   const book = state.books.find((b) => b.id === id);
-  if (!book) return;
-  if (cur && cur.book === book) { showPlayer(); return; }   // already loaded, maybe playing
+  if (!book) return null;
+  if (cur && cur.book === book) return showPlayer;   // already loaded, maybe playing
   const file = await stored(id, 'audio');
-  if (!file) { toast('The audio for this book is missing from this device'); return; }
+  if (!file) { toast('The audio for this book is missing from this device'); return null; }
+  const blob = await playable(file);
+  // The cover, at the same address the library shows it at (see coverUrl),
+  // decoded now so the player has it drawn from its first frame.
+  const coverAt = await coverUrl(book);
+  if (coverAt) { const img = new Image(); img.src = coverAt; try { await img.decode(); } catch (e) { /* show what there is */ } }
+  return () => showBook(book, file, blob, coverAt);
+}
+function showBook(book, file, blob, coverAt) {
   closeBook();
-  cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: null, openedAt: Date.now() };
+  cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: coverAt, openedAt: Date.now() };
   detail('opening ' + book.title + ': audio ' + mb(file.size));
+  if (coverAt) $('cover').src = coverAt; else $('cover').removeAttribute('src');
   showPlayer();
   setScroll($('title'), book.title);
   $('author').textContent = book.author;
   $('playerError').hidden = true;
   renderInfo();
   renderSpeed();
-  // The cover, at the same address the library shows it at (see coverUrl), so
-  // it is already drawn and nothing replaces it later.
-  cur.coverUrl = await coverUrl(book);
-  if (cur.coverUrl) $('cover').src = cur.coverUrl; else $('cover').removeAttribute('src');
-  cur.audioUrl = URL.createObjectURL(await playable(file));
+  cur.audioUrl = URL.createObjectURL(blob);
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);

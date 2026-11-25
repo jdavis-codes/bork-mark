@@ -434,21 +434,11 @@
     html.has-bar, body.has-bar { overflow: hidden; overscroll-behavior: none; }
   }
 
-  /* moving between library and player: the cover and the bottom bar glide
-     between their two positions while the rest cross-fades */
-  #cover, #miniCover { view-transition-name: cover; }
-  /* The mini player and the player are one surface: opening a book, the mini
-     player's box grows to fill the screen; going back, the player shrinks into
-     it. Their contents keep their own size and cross-fade, pinned to the top
-     of the moving box, so nothing is stretched. */
-  #mini, #player { view-transition-name: playerbox; }
-  ::view-transition-old(playerbox), ::view-transition-new(playerbox) { width: 100%; height: 100%; object-fit: none; object-position: top center; }
-  /* with no mini player to grow from, the player rises from the bottom edge */
-  ::view-transition-new(playerbox):only-child { animation: 0.36s cubic-bezier(0.2, 0.85, 0.25, 1) both sheet-up; }
-  ::view-transition-old(playerbox):only-child { animation: 0.26s ease-in both sheet-down; }
-  ::view-transition-group(*) { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.2, 0.85, 0.25, 1); }
-  ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
-  @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+  /* Opening the player (openPlayer in screens.js): it rises from the bottom, or from the mini player,
+     with the real cover flying from the picture that was tapped. Plain transitions on transform: no
+     view transition, whose pictures of the screen WebKit drew with the cover missing. */
+  #player.rising { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); will-change: transform; }
+  #player.rising #cover { will-change: transform; }
 
   /* search: a rounded field, in the Search sheet and (swapped for the title) in the Bookmarks heading */
   .searchfield { display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 12px; background: var(--soft); min-width: 0; }
@@ -778,7 +768,7 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg>
     </button>
   </div>
-  <div class="coverwrap"><img id="cover" alt=""></div>
+  <div class="coverwrap"><img id="cover" alt="" decoding="sync"></div>
   <h1 id="title" class="scroller"></h1>
   <p id="author" class="muted"></p>
 
@@ -1158,7 +1148,7 @@
   <div class="bar"><div id="miniFill"></div></div>
   <div class="minirow">
     <button id="miniOpen" aria-label="Open player">
-      <img id="miniCover" alt="">
+      <img id="miniCover" alt="" decoding="sync">
       <span class="minitext"><span id="miniTitle" class="scroller"></span><span id="miniSub" class="muted"><span id="miniTime"></span><span id="miniChap" class="scroller"></span></span></span>
     </button>
     <button id="miniMark" class="round" aria-label="Bookmark">
