@@ -1,7 +1,7 @@
 // The About this book sheet: editable details, the chapter list, file links, removing the book.
 
 import { chaptersChanged, keepAudioChapters, nameChapters, namingChapters } from './chapter-names.js';
-import { chapterDepths, closeBook, cur, setMediaSession } from './player.js';
+import { chapterOutline, closeBook, cur, setMediaSession } from './player.js';
 import { findPages } from './quotes.js';
 import { showLibrary } from './screens.js';
 import { META, resolveMeta, save, state } from './state.js';
@@ -71,10 +71,11 @@ export function renderInfo() {
     toggle.addEventListener('click', () => { chaptersOpen = !chaptersOpen; renderInfo(); });
     row('Chapters', toggle);
     if (chaptersOpen) {
-      const box = el('div', 'chapbox'), ol = el('ol'), depths = chapterDepths(b);
-      ol.classList.toggle('nested', depths.some((d) => d > 0));
+      const box = el('div', 'chapbox'), ol = el('ol'), places = chapterOutline(b);
+      ol.classList.toggle('nested', places.some((o) => o.depth > 0));
       ch.forEach((c, k) => {
-        const li = el('li', depths[k] ? 'sub' : '');
+        if (places[k].missing) ol.append(el('li', 'parthead', places[k].parent));
+        const li = el('li', places[k].depth ? 'sub' : '');
         li.append(el('span', 'muted', fmt(c.start)), editable(c.title, 'name of chapter ' + (k + 1), (typed) => {
           if (typed && typed !== c.title) { keepAudioChapters(b); c.title = typed; c.src = 'you'; }
           chaptersChanged();

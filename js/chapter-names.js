@@ -31,6 +31,8 @@ let pass = null;             // the whole run through the chapters, while it las
 export const namingChapters = () => !!pass;
 const LISTEN = 25;        // seconds heard at the start of each chapter
 const NEAR_START = 1500;  // characters: how close to a contents entry counts as its beginning
+const CREDITS = [0, 35, 80];   // seconds further into the first chapter to try, past any opening credits
+const PACE = 20;          // characters read aloud per second, at the most
 const rest = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function nameChapters() { return startPass(false); }
@@ -78,18 +80,28 @@ async function namingPass(auto) {
       const ch = b.chapters[i];
       if (ch.src !== 'you') {
         say((auto ? 'Naming chapters from the book’s contents: ' : 'Listening to the start of chapter ') + (i + 1) + ' of ' + b.chapters.length + '…');
-        let r;
-        naming = true;
-        try {
-          r = await transcribeAround(mine.source, ch.start + LISTEN, LISTEN, 0, transcribe, (stage) => crumb(stage && 'naming chapters: ' + stage));
-        } finally { naming = false; crumb(null); }
-        const loc = findInBook(mine.text, r.words, 0);
-        const at = loc && mine.text.starts.length ? mine.text.starts[Math.min(loc.start, mine.text.starts.length - 1)] : null;
-        const entry = at == null ? null : entryAt(mine.meta.toc, at + 200);
-        if (entry && at - entry.at <= NEAR_START && entry.label !== ch.title) {
-          keepAudioChapters(b);
-          ch.title = entry.label; ch.src = 'text'; named++;
-          if (cur === mine) chaptersChanged();   // shows the new name straight away
+        // The first chapter usually opens with the title and credits, which are
+        // not in the book's text: listen further in before giving up on it.
+        for (const later of i === 0 ? CREDITS : [0]) {
+          if (later && ch.start + LISTEN + later + LISTEN > (b.chapters[i + 1] ? b.chapters[i + 1].start : b.duration)) break;   // no further than the chapter runs
+          let r;
+          naming = true;
+          try {
+            r = await transcribeAround(mine.source, ch.start + LISTEN + later, LISTEN, 0, transcribe, (stage) => crumb(stage && 'naming chapters: ' + stage));
+          } finally { naming = false; crumb(null); }
+          if (cur !== mine) break;
+          const loc = findInBook(mine.text, r.words, 0);
+          const at = loc && mine.text.starts.length ? mine.text.starts[Math.min(loc.start, mine.text.starts.length - 1)] : null;
+          const entry = at == null ? null : entryAt(mine.meta.toc, at + 200);
+          // Heard later, the place found is further into the section by about that much reading.
+          if (entry && at - entry.at <= NEAR_START + later * PACE) {
+            if (entry.label !== ch.title) {
+              keepAudioChapters(b);
+              ch.title = entry.label; ch.src = 'text'; named++;
+              if (cur === mine) chaptersChanged();   // shows the new name straight away
+            }
+            break;
+          }
         }
       }
       if (auto) { b.autoNaming = i + 1; save(true); }

@@ -52,8 +52,19 @@ export function sameChapter(a, b) {
 // whose part is absent counts as top-level.
 const PART = /^\s*(part|book)\s+(\d+|[ivxlc]+|[a-z]+)\b/i;
 const BACK = /^\s*(conclusion|epilogue|afterword|acknowledge?ments|notes|appendix|appendices|index|bibliography|references|glossary|about the|also by|copyright|credits|closing)\b/i;
-export function outline(names, toc = [], insert = false) {
-  const nested = toc.some((e) => e.depth > 0);
+// A contents list kept from before nesting was recorded is flat. If it names
+// parts, the entries after each one are inside it, until the back of the book.
+function withNesting(toc) {
+  if (toc.some((e) => e.depth > 0) || !toc.some((e) => PART.test(e.label))) return toc;
+  let inPart = false;
+  return toc.map((e) => {
+    if (PART.test(e.label)) { inPart = true; return { ...e, depth: 0 }; }
+    if (BACK.test(e.label)) inPart = false;
+    return { ...e, depth: inPart ? 1 : 0 };
+  });
+}
+export function outline(names, list = [], insert = false) {
+  const toc = withNesting(list), nested = toc.some((e) => e.depth > 0);
   let part = null, shown = null;
   return names.map((name) => {
     const k = nested ? toc.findIndex((e) => sameChapter(name, e.label)) : -1;
