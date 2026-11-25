@@ -6,9 +6,9 @@
 # Pages serves one site per repository, so every run publishes both copies:
 # the latest release at the top and the head of develop under dev/.
 #
-# The version number starts from the VERSION file (for example 1.0). Each
-# push to main gets the next free last number: v1.0.0, v1.0.1, … To start a
-# new series, change VERSION to 1.1 or 2.0.
+# The version number starts from the VERSION file (for example 0.1). Each
+# push to main gets the next free last number: v0.1.0, v0.1.1, … To start a
+# new series, change VERSION to 0.2 or 1.0.
 name: Deploy
 
 on:
