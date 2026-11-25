@@ -23,6 +23,17 @@ const { open, addBook, check, done } = require('./lib');
   await swipe(195, 300, 700); await page.waitForTimeout(600);
   check('long swipe: library with mini player', !(await page.$eval('#library', (n) => n.hidden)) && (await page.$eval('#player', (n) => n.hidden)) && !(await page.$eval('#mini', (n) => n.hidden)));
   check('library styles cleaned up after the drag', (await page.$eval('#library', (n) => n.style.cssText)) === '');
+  check('nothing left half way through the pull', await page.evaluate(() => !document.documentElement.classList.contains('pulling')
+    && !document.documentElement.classList.contains('gliding') && !document.documentElement.style.getPropertyValue('--p')));
+  // pulled most of the way and cancelled, then a short pull let go: back on the player each time, cleared
+  await page.tap('#miniOpen'); await page.waitForTimeout(600);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 195, y: 200 }] });
+  for (let i = 1; i <= 8; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 195, y: 200 + i * 40 }] }); await page.waitForTimeout(16); }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] }); await page.waitForTimeout(400);
+  await swipe(195, 300, 360, 6); await page.waitForTimeout(400);
+  check('a cancelled pull and a short one leave the player as it was', !(await page.$eval('#player', (n) => n.hidden))
+    && await page.evaluate(() => !document.documentElement.classList.contains('pulling') && getComputedStyle(document.getElementById('cover')).transform === 'none'));
+  await swipe(195, 300, 800); await page.waitForTimeout(600);
   await page.tap('#miniMark'); await page.waitForTimeout(300);
   await page.tap('#miniOpen'); await page.waitForTimeout(600);
   check('player screen locks page scrolling', await page.$eval('html', (n) => n.classList.contains('has-bar')));
