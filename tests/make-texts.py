@@ -38,8 +38,9 @@ rng = random.Random(4)
 epub('chapters.epub', 'Speech Book', 'A', [('Opening Remarks', ps(6)), ('The Harvard Sentences', '<p>%s</p><p>%s</p>' % (' '.join(HARVARD[:5]), ' '.join(HARVARD[5:])) + ps(4))])
 
 
-# A three-page PDF of extras: a chapter heading and a figure, a letter-spaced
-# caption and a table whose title is on the next line, and an appendix.
+# A four-page PDF of extras: a chapter heading and a figure, a letter-spaced
+# caption and a table whose title is on the next line, a division that is not a
+# chapter, and an appendix.
 def pdf(name, pages):
     objs = [b'<< /Type /Catalog /Pages 2 0 R >>', None, b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
     kids = []
@@ -61,5 +62,6 @@ def pdf(name, pages):
 pdf('extras.pdf', [
     ['Chapter One', 'Figure 1.1. Sales by region. Darker bars are later years.', 'Table 1.1 shows the same numbers.'],
     ['CHAPTER 2', 'F I G U R E 2 . 1 . A map of the valley', 'TABLE 2.1', 'MONTHLY RAINFALL'],
+    ['Rule #3', 'Figure 9. A flow chart'],
     ['Appendix A', 'Notes on the sources'],
 ])

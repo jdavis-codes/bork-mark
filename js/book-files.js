@@ -7,12 +7,14 @@ import { renderMarks } from './marks.js';
 import { cur } from './player.js';
 import { runQueue } from './queue.js';
 import { findPages, rematch, requote } from './quotes.js';
+import { isOrnament } from './sources/epub.js';
 import { readBook } from './sources/index.js';
 import { buildPageIndex, guessFirstNumbered, readPdfPages } from './sources/pdf.js';
 import { fromDoc, resolveMeta, save } from './state.js';
 import { store, stored } from './storage.js';
 import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
+import { busy } from './ui/busy.js';
 import { $, toast } from './ui/dom.js';
 import { detail } from './log.js';
 import { renderSearchTab } from './search.js';
@@ -20,7 +22,7 @@ import { renderSearchTab } from './search.js';
 // The book text, plus where its contents entries and print pages fall in it.
 export async function storeText(id, doc) {
   await store('write', id, 'text', new Blob([doc.text], { type: 'text/plain' }));
-  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true })], { type: 'application/json' }));
+  await store('write', id, 'meta', new Blob([JSON.stringify({ toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true, sized: true })], { type: 'application/json' }));
   for (let i = 0; i < doc.images.length; i++) await store('write', id, 'img-' + i, doc.images[i]);
 }
 
@@ -65,6 +67,23 @@ export async function loadBookText(mine) {
     for (const m of book.marks) delete m.figs;   // figure numbers have shifted
     store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
   }
+  if (!mine.meta.sized) {
+    // Books added before rules, ornaments and cover thumbnails were recognised: drop those now.
+    const keep = [];
+    for (const fig of mine.meta.figures) {
+      const pic = fig.kind === 'image' ? await stored(id, 'img-' + fig.img) : null;
+      if (pic && (/^cover ?(image|art)?$/i.test(fig.cap || '') || isOrnament(new Uint8Array(await pic.slice(0, 1 << 20).arrayBuffer())))) continue;
+      keep.push(fig);
+    }
+    if (cur !== mine) return;
+    if (keep.length !== mine.meta.figures.length) {
+      detail('dropped ' + (mine.meta.figures.length - keep.length) + ' ornaments from the figures');
+      mine.meta.figures = keep;
+      for (const m of book.marks) delete m.figs;   // figure numbers have shifted
+    }
+    mine.meta.sized = true;
+    store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
+  }
   // Bookmarks made before page labels were cleaned up kept "page 62." as their page.
   for (const m of book.marks) if (m.page && m.page !== pageNumber(m.page)) m.page = pageNumber(m.page);
   renderFigTab(); renderSearchTab();
@@ -87,7 +106,7 @@ $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, b = mine.book;
+  const mine = cur, b = mine.book, done = busy('Adding the book text…');
   try {
     toast('Reading ' + f.name + '…');
     const doc = await readBook(f);
@@ -99,7 +118,7 @@ $('textFile').addEventListener('change', async (e) => {
     delete b.anchors; delete b.autoNaming;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
-    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true };
+    mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true, sized: true };
     renderFigTab();
     mine.text = buildBook(doc.text);
     renderSearchTab();
@@ -107,13 +126,13 @@ $('textFile').addEventListener('change', async (e) => {
     toast('Book text added');
   } catch (err) {
     if (cur === mine) { renderInfo(); toast('Could not read that file'); }
-  }
+  } finally { done(); }
 });
 $('pageFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; };
+  const mine = cur, b = mine.book, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding the page scan…');
   try {
     say('Reading ' + f.name + '…');
     const pdf = await readPdfPages(f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));
@@ -130,5 +149,5 @@ $('pageFile').addEventListener('change', async (e) => {
     toast(quotes ? 'Pages found for ' + found + ' of ' + quotes + (quotes === 1 ? ' quote' : ' quotes') : 'Page PDF added');
   } catch (err) {
     if (cur === mine) { renderInfo(); toast('Could not use that PDF: ' + ((err && err.message) || err)); }
-  }
+  } finally { done(); }
 });

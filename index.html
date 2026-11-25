@@ -716,6 +716,18 @@
   .channelswitch .muted:empty { display: none; }
   /* Notifications drop in at the top, under the status bar, where they don't
      cover the controls. */
+  /* background work: a small notice with a spinner, top right in the library and top centre over the player */
+  #busy {
+    position: fixed; z-index: 6; top: calc(env(safe-area-inset-top) + 14px); right: 60px; max-width: calc(100% - 190px);
+    display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 9px; border-radius: 999px;
+    background: var(--soft); border: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; pointer-events: none;
+  }
+  #busy[hidden] { display: none; }
+  html.has-bar #busy { right: auto; left: 50%; transform: translateX(-50%); max-width: calc(100% - 130px); }
+  #busyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spin { flex: none; width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
@@ -943,6 +955,24 @@
         <label class="switchrow" for="sounds"><span>Sounds</span><input id="sounds" type="checkbox" class="switch"></label>
         <p class="muted">A short tone when you bookmark, skip from your headphones or watch, or reach a picture.</p>
       </div>
+      <div id="soundOptions" class="stack">
+        <div class="field">
+          <div class="fieldhead"><label for="soundStyle">Sound</label></div>
+          <div class="select"><select id="soundStyle"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option></select></div>
+        </div>
+        <div class="field">
+          <div class="fieldhead"><label for="soundVolume">Loudness</label><output id="soundVolumeOut" for="soundVolume"></output></div>
+          <input id="soundVolume" type="range" min="10" max="100" step="5">
+          <p class="muted">Compared with the book. Changing either plays the bookmark sound.</p>
+        </div>
+        <div class="field">
+          <label class="switchrow" for="soundMark"><span>When you bookmark</span><input id="soundMark" type="checkbox" class="switch"></label>
+        </div>
+        <div class="field">
+          <label class="switchrow" for="soundSkip"><span>When you skip</span><input id="soundSkip" type="checkbox" class="switch"></label>
+          <p class="muted">From your headphones, watch or the lock screen.</p>
+        </div>
+      </div>
       <div class="field">
         <label class="switchrow" for="figAlert"><span>Notice pictures and tables</span><input id="figAlert" type="checkbox" class="switch"></label>
         <p class="muted">When the reading reaches one in the book text, the app chimes and shows it. To keep track of the place, it listens to a few seconds of the book every few minutes. Locked, that needs “Find quotes while locked”.</p>
@@ -1131,6 +1161,7 @@
 </div>
 
 <audio id="audio" preload="metadata"></audio>
+<div id="busy" role="status" hidden><span class="spin" aria-hidden="true"></span><span id="busyText"></span></div>
 <div id="toast" role="status" popover="manual"></div>
 
 <script type="module" src="app.js"></script>

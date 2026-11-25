@@ -1,6 +1,7 @@
 // Speech to text: the Whisper worker, loading its model (with retries), and the status line
 // that reports on it.
 
+import { busyWhile } from './ui/busy.js';
 import { crumb, detail, log } from './log.js';
 import { runQueue } from './queue.js';
 import { state } from './state.js';
@@ -110,7 +111,7 @@ export function warmModel() {
   modelState = 'loading';
   crumb('loading the speech model');
   setQueueStatus('Getting the speech model ready…');
-  warming = loadModel().then(() => {
+  warming = busyWhile('Loading the speech model…', loadModel()).then(() => {
     modelState = 'ready';
   }, (err) => {
     modelState = 'failed';

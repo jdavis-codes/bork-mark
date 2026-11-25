@@ -59,19 +59,28 @@ const SOUNDS = {
   back: [[1050, 45], [700, 55]],
   figure: [[660, 90], [880, 90], [1100, 150]],
 };
+// How the notes are voiced. Each style may change the pitch and length of a
+// note and shapes its wave and its fade: `wave(x)` takes the position in the
+// cycle (0 to 1) and `fade(k, len)` the sample's place in the note.
+const sine = (x) => Math.sin(2 * Math.PI * x);
+const VOICES = {
+  chime: { pitch: 1, stretch: 1, wave: sine, fade: (k, len) => Math.min(1, k / 200, (len - k) / 400) },
+  soft: { pitch: 0.5, stretch: 1.5, wave: sine, fade: (k, len) => Math.min(1, k / 700, (len - k) / 1100) },
+  bell: { pitch: 1, stretch: 2.2, wave: (x) => (sine(x) + 0.5 * sine(2 * x) + 0.25 * sine(3 * x)) / 1.75, fade: (k, len) => Math.min(1, k / 60) * Math.exp(-4 * k / len) },
+  click: { pitch: 1.6, stretch: 0.28, wave: (x) => (sine(x) > 0 ? 0.6 : -0.6), fade: (k, len) => Math.min(1, k / 20, (len - k) / 60) },
+};
 function toneWav(notes) {
-  const rate = 22050, gap = 0.03;
-  const total = notes.reduce((sum, [, ms]) => sum + ms / 1000 + gap, 0);
-  const { buf, v } = wav(rate, Math.ceil(rate * total), 16);
+  const rate = 22050, gap = 0.03, voice = VOICES[settings.soundStyle] || VOICES.chime;
+  // Loudness 50 is the level the tones always had.
+  const level = 0.6 * Math.max(10, Math.min(100, settings.soundVolume || 50)) / 100;
+  const lengths = notes.map(([, ms]) => Math.max(1, Math.floor(rate * ms * voice.stretch / 1000)));
+  const { buf, v } = wav(rate, lengths.reduce((sum, len) => sum + len + Math.floor(rate * gap), 0), 16);
   let at = 0;
-  for (const [freq, ms] of notes) {
-    const len = Math.floor(rate * ms / 1000);
-    for (let k = 0; k < len; k++) {
-      const env = Math.min(1, k / 200, (len - k) / 400);   // soft start and end, so no clicks
-      v.setInt16(44 + (at + k) * 2, Math.round(Math.sin(2 * Math.PI * freq * k / rate) * env * 0.3 * 32767), true);
-    }
+  notes.forEach(([freq], n) => {
+    const len = lengths[n], f = freq * voice.pitch;
+    for (let k = 0; k < len; k++) v.setInt16(44 + (at + k) * 2, Math.round(voice.wave((f * k / rate) % 1) * voice.fade(k, len) * level * 32767), true);
     at += len + Math.floor(rate * gap);
-  }
+  });
   return new Blob([buf], { type: 'audio/wav' });
 }
 const fx = {};
@@ -87,9 +96,23 @@ export function primeSounds() {
     a.play().then(() => { a.pause(); a.currentTime = 0; a.muted = false; }, () => { a.muted = false; fxReady = false; });
   }
 }
+// The style or loudness changed: make the tones again, and play one to hear it.
+// Called from a tap in Settings, which is also what lets iOS play them later.
+export function retuneSounds(preview) {
+  for (const key of Object.keys(SOUNDS)) {
+    const a = fx[key] || (fx[key] = new Audio());
+    if (a.src) URL.revokeObjectURL(a.src);
+    a.src = URL.createObjectURL(toneWav(SOUNDS[key]));
+    a.preload = 'auto'; a.muted = false;
+  }
+  fxReady = false;   // the silent first play happens again at the next press of play
+  if (preview && fx[preview]) fx[preview].play().catch(() => {});
+}
+// Which setting switches each sound on; a picture's chime follows "Notice pictures and tables".
+const WHEN = { mark: 'soundMark', fwd: 'soundSkip', back: 'soundSkip' };
 export function sound(key) {
   const a = fx[key];
-  if (!settings.sounds || !a) return;
+  if (!settings.sounds || !a || (WHEN[key] && settings[WHEN[key]] === false)) return;
   try { a.currentTime = 0; } catch (e) {}
   const p = a.play();
   if (p) p.catch((e) => log('sound "' + key + '" did not play: ' + e.name));

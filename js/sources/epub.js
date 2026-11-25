@@ -154,8 +154,8 @@ export async function readEpub(file) {
     // Keep real pictures: skip ornaments and rules (tiny files), anything huge,
     // and stop once the book's pictures pass 60 MB in all.
     const bytes = zip[fig.src], type = TYPES[(fig.src.split('.').pop() || '').toLowerCase()];
-    if (!bytes || !type || bytes.length < 4096 || bytes.length > 6 << 20) continue;
-    if (/(^|[\/_-])(cover|logo|titlepage)[^\/]*$/i.test(fig.src)) continue;   // not part of the text
+    if (!bytes || !type || bytes.length < 4096 || bytes.length > 6 << 20 || isOrnament(bytes)) continue;
+    if (/(^|[\/_-])(cover|logo|titlepage|tit(le)?(?![a-z]))[^\/]*$/i.test(fig.src)) continue;   // not part of the text
     if (!imageAt.has(fig.src)) {
       if (imageBytes + bytes.length > 60 << 20) continue;
       imageBytes += bytes.length;
@@ -172,7 +172,7 @@ export async function readEpub(file) {
   // Drop pictures that are publisher furniture rather than part of the book:
   // anything on the cover, title, copyright or sign-up pages, and logos.
   const FURNITURE = /^(cover|title ?page|half ?title|copyright|imprint|colophon|contents|about( the)? (author|publisher)|also by|newsletter|sign ?up)/i;
-  const BADGE = /logo|sign ?up|newsletter|instagram|facebook|twitter|pinterest/i;
+  const BADGE = /logo|sign ?up|newsletter|instagram|facebook|twitter|pinterest|^cover ?(image|art)?$/i;
   const sorted = dedupe(toc);
   const kept = figures.filter((f) => {
     if (f.kind !== 'image') return true;
@@ -190,4 +190,28 @@ export async function readEpub(file) {
     // The date an EPUB records is usually that edition's, not the first printing's.
     year: (clean((byTag(meta, 'date')[0] || {}).textContent).match(/\b\d{4}\b/) || [''])[0],
   };
+}
+
+// Width and height of a PNG, GIF or JPEG, read from its first bytes. Null for
+// anything else, or when the bytes given stop before the size is reached.
+export function imageSize(b) {
+  const u16 = (o) => (b[o] << 8) | b[o + 1];
+  if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return { w: (u16(16) << 16) | u16(18), h: (u16(20) << 16) | u16(22) };
+  if (b.length > 10 && b[0] === 0x47 && b[1] === 0x49) return { w: b[6] | (b[7] << 8), h: b[8] | (b[9] << 8) };
+  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return null;
+  // A JPEG is a run of segments; the size is in the first "start of frame".
+  for (let o = 2; o + 9 < b.length;) {
+    if (b[o] !== 0xff) return null;
+    const marker = b[o + 1];
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { w: u16(o + 7), h: u16(o + 5) };
+    o += 2 + u16(o + 2);
+  }
+  return null;
+}
+// A rule between sections, a tick mark, a flourish: very small, or long and
+// thin. Some are padded with enough hidden data to pass for a picture by file size.
+export function isOrnament(bytes) {
+  const size = imageSize(bytes);
+  if (!size || !size.w || !size.h) return false;
+  return Math.min(size.w, size.h) < 48 || Math.max(size.w, size.h) / Math.min(size.w, size.h) > 8;
 }

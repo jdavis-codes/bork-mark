@@ -42,7 +42,7 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Search** | Search the book's text: each result shows its chapter and two lines, opens to its paragraph, and can play from there or become a bookmark. Recent searches are kept per book. The bookmarks list can be searched too, and also shows bookmarks related by meaning: “boat” finds a quote about a canoe. |
 | **Figures** | Pictures and tables in the book text, listed by chapter or as a grid, and the app can chime when the reading reaches one. |
 | **Extras** | The PDF of figures, tables or notes that comes with many audiobooks sits under the same Figures button: by chapter, starting at the one you are listening to, or every page as a grid. |
-| **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |
+| **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, your choice of accent colour, and confirmation sounds in four styles with their own loudness. |
 
 ### Citations
 
