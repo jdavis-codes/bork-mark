@@ -748,6 +748,8 @@
   /* A setting chosen from a short list: its name and note on the left, the list beside them, no wider than it needs. */
   .field.beside { grid-template-columns: minmax(0, 1fr) fit-content(54%); column-gap: 14px; row-gap: 0; align-items: center; }
   .field.beside > .fieldhead { grid-column: 1; }
+  /* with no note under it, the name is centred on the list */
+  .field.beside > .fieldhead:nth-last-child(2) { grid-row: 1 / span 2; align-self: center; }
   .field.beside > .select { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-width: 0; }
   .field.beside > .muted { grid-column: 1; margin-top: 3px; }
   .field.beside select { width: 100%; padding: 9px 34px 9px 12px; font-size: 0.95rem; }
@@ -929,7 +931,7 @@
       <div class="field beside">
         <div class="fieldhead"><label for="nextAction">Next track</label></div>
         <div class="select"><select id="nextAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
-        <p class="muted">Usually a double-press on headphones.</p>
+        <p class="muted">Often a double-press</p>
       </div>
       <div class="field" id="nextSecsField">
         <div class="fieldhead"><label for="nextSecs">Skip by</label><output id="nextSecsOut" for="nextSecs"></output></div>
@@ -938,7 +940,7 @@
       <div class="field beside">
         <div class="fieldhead"><label for="prevAction">Previous track</label></div>
         <div class="select"><select id="prevAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
-        <p class="muted">Usually a triple-press on headphones.</p>
+        <p class="muted">Often a triple-press</p>
       </div>
       <div class="field" id="prevSecsField">
         <div class="fieldhead"><label for="prevSecs">Skip by</label><output id="prevSecsOut" for="prevSecs"></output></div>
@@ -1036,7 +1038,7 @@
         <div class="field beside">
           <div class="fieldhead"><label for="soundSkip">A skip</label></div>
           <div class="select"><select id="soundSkip"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
-          <p class="muted">From your headphones, watch or the lock screen.</p>
+          <p class="muted">Headphones / lock screen</p>
         </div>
         <div class="field beside">
           <div class="fieldhead"><label for="soundFigure">A picture or table</label></div>
