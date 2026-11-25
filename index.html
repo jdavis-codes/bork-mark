@@ -319,20 +319,25 @@
      0 (the player) to 1 (the mini player), which screens.js sets as the finger moves and lets go of to
      0 or 1 (animated by the transition on .gliding). --end is how far down the mini player's top is.
      The cover and title ride down with the sheet; in the sheet they only shrink (the cover about its
-     own middle) and slide left, mostly early on (--e), and each stops when it reaches its place in the
-     mini player (--*-stick below where it started), the sheet carrying on underneath. The play button
+     own middle) and slide left. That change (--e, p to the fourth power) barely starts until the end
+     of the pull, then comes quickly. Each stops when it reaches the mini player's line, the sheet
+     carrying on underneath: the title when its middle gets there (--title-stick), the cover when its
+     bottom edge reaches the mini cover's (--cover-floor), then it shrinks down onto its place. The play button
      does the same, sliding right, while its circle fades away and its icon turns from light-on-dark to
      the mini player's dark; the mini player's bookmark button then pops out from behind it (.pop). */
   @property --p { syntax: '<number>'; inherits: true; initial-value: 0; }
   html.gliding { transition: --p 0.26s cubic-bezier(0.3, 0.6, 0.35, 1); }
-  html.pulling { --e: calc(var(--p) * (2 - var(--p))); }
+  html.pulling { --e: calc(var(--p) * var(--p) * var(--p) * var(--p)); }
   html.pulling #player {
     transform: translateY(calc(var(--p) * var(--end))); will-change: transform;
     border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
   }
   html.pulling #cover {
-    transform: translate(calc(var(--e) * var(--cover-x, 0px)), min(0px, calc(var(--cover-stick, 9999px) - var(--p) * var(--end))))
-      scale(calc(1 + var(--e) * (var(--cover-s, 1) - 1)));
+    --sc: calc(1 + var(--e) * (var(--cover-s, 1) - 1));
+    transform: translate(calc(var(--e) * var(--cover-x, 0px)),
+        max(calc(var(--cover-hh, 0px) * var(--sc) + var(--cover-top, -9999px)),   /* top edge stays on the sheet */
+          min(0px, calc(var(--cover-floor, 9999px) - var(--p) * var(--end) - var(--cover-hh, 0px) * var(--sc)))))
+      scale(var(--sc));
     will-change: transform;
   }
   html.pulling #title {

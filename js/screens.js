@@ -68,7 +68,9 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     const a = cover.getBoundingClientRect(), b = miniCover.getBoundingClientRect();
     if (!miniCover.hidden && a.width && b.width) {
       v['--cover-x'] = (b.left + b.width / 2) - (a.left + a.width / 2) + 'px';
-      v['--cover-stick'] = (b.top + b.height / 2) - (a.top + a.height / 2) + 'px';   // how far down until it reaches its place
+      v['--cover-floor'] = b.bottom - (a.top + a.height / 2) + 'px';   // from its middle down to where its bottom edge stops
+      v['--cover-hh'] = a.height / 2 + 'px';
+      v['--cover-top'] = (b.top - end) - (a.top + a.height / 2) + 'px';   // its top edge never above where it sits in the mini player
       v['--cover-s'] = String(b.width / a.width);
     }
     // The title's text, centred or not, travels to the mini title's text.
@@ -95,7 +97,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
   function done(toLibrary) {
     root.classList.remove('pulling', 'gliding');
     root.style.removeProperty('--p');
-    for (const k of ['--end', '--cover-x', '--cover-stick', '--cover-s', '--title-x', '--title-in', '--title-stick', '--title-s', '--play-x', '--play-stick', '--play-s']) player.style.removeProperty(k);
+    for (const k of ['--end', '--cover-x', '--cover-floor', '--cover-hh', '--cover-top', '--cover-s', '--title-x', '--title-in', '--title-stick', '--title-s', '--play-x', '--play-stick', '--play-s']) player.style.removeProperty(k);
     for (const n of [$('title'), $('miniTitle')]) n.classList.remove('still');
     state = 'idle';
     if (toLibrary) {
