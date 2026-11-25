@@ -13,6 +13,12 @@ import { swipeDown } from './ui/sheets.js';
 // `update` and blends them; elements that share a name in both pictures (the
 // cover, the bottom bar) glide from their old place and size to the new one.
 // `fromCover` is a library thumbnail to treat as the cover for this change.
+// Heavy work started by a change of screen (opening a book: reading its
+// text, its audio's index, its cover) waits until the animation has finished,
+// so it doesn't make it stutter. afterMotion(fn) runs fn then, or straight
+// away when nothing is animating.
+let motion = Promise.resolve();
+export const afterMotion = (fn) => motion.then(() => setTimeout(fn, 0));
 export function morph(update, fromCover) {
   if (!document.startViewTransition || calm.matches) return update();
   const mini = $('miniCover');
@@ -21,7 +27,8 @@ export function morph(update, fromCover) {
   let t;
   try { t = document.startViewTransition(async () => { await update(); reset(); }); } catch (e) { reset(); return update(); }
   t.ready.catch((e) => log('screen animation skipped: ' + ((e && e.message) || e)));
-  t.finished.catch(() => {}).then(reset);
+  motion = t.finished.catch(() => {});
+  motion.then(reset);
 }
 
 // The two screens. Going to the library leaves the book loaded and playing,

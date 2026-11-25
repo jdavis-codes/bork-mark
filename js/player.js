@@ -9,7 +9,7 @@ import { renderInfo } from './info.js';
 import { detail, log, mb } from './log.js';
 import { addMark, renderMarks } from './marks.js';
 import { runQueue } from './queue.js';
-import { renderMini, showPlayer } from './screens.js';
+import { afterMotion, renderMini, showPlayer } from './screens.js';
 import { checkSleep, setSleep, sleep } from './sleep.js';
 import { keepAlive, keepAliveLater, keepOn, primeSounds, sound } from './sounds.js';
 import { setQueueStatus } from './speech.js';
@@ -64,18 +64,23 @@ export async function openBook(id, coverNow) {
   renderTime(book.position || 0);
   renderMarks(); setMediaSession(); renderFigTab(); renderSearchTab();
 
+  // The rest is heavy (the text's word index, the audio's index, the full
+  // cover) and can wait until the player has finished sliding in.
   const mine = cur;
-  if (book.hasCover) stored(id, 'cover').then((f) => {
-    if (!f || cur !== mine) return;
-    mine.coverUrl = URL.createObjectURL(f);
-    $('cover').src = mine.coverUrl;
-    setMediaSession(); renderMini();
+  afterMotion(() => {
+    if (cur !== mine) return;
+    if (book.hasCover) stored(id, 'cover').then((f) => {
+      if (!f || cur !== mine) return;
+      mine.coverUrl = URL.createObjectURL(f);
+      $('cover').src = mine.coverUrl;
+      setMediaSession(); renderMini();
+    });
+    openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
+      .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
+    if (book.hasText) loadBookText(mine);
+    if (book.pageSrcName) loadPageScan(mine);
+    if (book.hasExtras) loadExtras(mine);
   });
-  openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
-    .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
-  if (book.hasText) loadBookText(mine);
-  if (book.pageSrcName) loadPageScan(mine);
-  if (book.hasExtras) loadExtras(mine);
 }
 
 export function closeBook() {
