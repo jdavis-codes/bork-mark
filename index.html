@@ -83,8 +83,8 @@
   #library .iconbtn { margin-right: -6px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
   #modelNote:empty { display: none; }
-  /* the two main buttons, Add a book and Bookmark, are the same size */
-  #addBtn, #markBtn { width: 100%; height: 58px; padding: 0 16px; font-size: 1.1rem; }
+  /* the Bookmark button */
+  #markBtn { width: 100%; height: 58px; padding: 0 16px; font-size: 1.1rem; }
   /* library: the title bar stays at the top, Add a book and the mini player at the bottom */
   /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
      down past its top, and the page is told not to bounce at all. */
@@ -96,8 +96,14 @@
   #library { padding-top: 70px; }
   #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); }
   /* whichever is lowest fills the strip under the home indicator with its own color */
-  body:not(.has-mini) #addBar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-  #addBar { max-width: 592px; margin: 0 auto; padding: 10px 16px; }
+  /* Add a book: a round plus that floats at the bottom right, above the mini player when there is one */
+  #addBar { position: absolute; right: max(16px, calc((100vw - 560px) / 2)); bottom: calc(100% + 14px); }
+  body:not(.has-mini) #addBar { bottom: calc(100% + 16px + env(safe-area-inset-bottom)); }
+  #addBtn {
+    width: 58px; height: 58px; padding: 0; border: none; border-radius: 50%; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 16%, var(--bg)); color: var(--accent); box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+  }
+  #addBtn svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
   #libFoot::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
   body:not(.has-bar) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
@@ -769,7 +775,7 @@
     </div>
   </div>
   <ul id="books"></ul>
-  <p id="emptyLib" class="muted" hidden>No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
+  <p id="emptyLib" class="muted" hidden>No books yet. Tap + to add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
   <p id="modelNote" class="muted" style="margin-top:18px"></p>
   <button id="modelAgain" class="small" hidden>Try again</button>
   <p id="storage" class="muted" style="margin-top:4px"></p>
@@ -1157,7 +1163,7 @@
 </dialog>
 
 <div id="libFoot">
-  <div id="addBar"><button id="addBtn" class="primary">Add a book</button></div>
+  <div id="addBar"><button id="addBtn" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
 <div id="mini" hidden>
   <div class="bar"><div id="miniFill"></div></div>
   <div class="minirow">
