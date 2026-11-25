@@ -107,6 +107,9 @@
     mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
   }
   .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; will-change: transform; }
+  /* held still, at the place the slide starts from (while the player is pulled down) */
+  .scroller.still .mq { animation: none; }
+  .scroller.still.scrolls .mq { transform: translateX(var(--pad)); }
   @keyframes marquee {
     0%, 16% { transform: translateX(var(--pad)); }
     50%, 66% { transform: translateX(calc(var(--shift, 0px) - var(--pad))); }
