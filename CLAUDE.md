@@ -23,6 +23,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 - `develop` publishes to `/bork-mark/dev/` and `main` to the released site. Both are published by `.github/workflows/deploy.yml`.
 - The dev copy keeps its own books and settings (names prefixed `dev.`), so books added in one copy don't appear in the other.
 - Push to `develop` when asked to deploy for testing. Changes reach `main` through a pull request.
+- Several people push to `develop` at once. Before starting work, pull it in (`git fetch origin develop && git merge origin/develop`), and again just before pushing. No need to re-run the tests after merging.
 
 ## Tests
 

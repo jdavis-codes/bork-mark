@@ -26,6 +26,10 @@ import './js/theme.js';
 import './js/trim.js';
 import './js/viewer.js';
 
+// No pinch zoom: the app is laid out for the screen, like a native one. iOS
+// ignores user-scalable=no in the viewport tag, so its pinch gesture is stopped here.
+for (const type of ['gesturestart', 'gesturechange']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+
 autoUpdate();
 renderSettings();
 

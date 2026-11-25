@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Bork Mark</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -88,7 +88,7 @@
   /* library: the title bar stays at the top, Add a book and the mini player at the bottom */
   /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
      down past its top, and the page is told not to bounce at all. */
-  html { overscroll-behavior-y: none; }
+  html { overscroll-behavior-y: none; touch-action: manipulation; }   /* no double-tap zoom (pinch: see app.js) */
   .libhead {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
     padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 6px;
