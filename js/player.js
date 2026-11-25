@@ -70,9 +70,15 @@ export async function openBook(id, coverNow) {
   const mine = cur;
   afterMotion(() => {
     if (cur !== mine) return;
-    if (book.hasCover) stored(id, 'cover').then((f) => {
+    if (book.hasCover) stored(id, 'cover').then(async (f) => {
       if (!f || cur !== mine) return;
       mine.coverUrl = URL.createObjectURL(f);
+      // Decoded before it replaces the library's copy, so the cover never
+      // shows blank while the new one loads.
+      const img = new Image();
+      img.src = mine.coverUrl;
+      try { await img.decode(); } catch (e) { /* show it anyway */ }
+      if (cur !== mine) return;
       $('cover').src = mine.coverUrl;
       setMediaSession(); renderMini();
     });
