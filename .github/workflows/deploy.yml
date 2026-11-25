@@ -1,0 +1,111 @@
+# Publishes the app to GitHub Pages (Settings > Pages > Source: GitHub Actions).
+#
+#   main     -> https://<owner>.github.io/<repo>/       plus a git tag and a release
+#   develop  -> https://<owner>.github.io/<repo>/dev/
+#
+# Pages serves one site per repository, so every run publishes both copies:
+# the latest release at the top and the head of develop under dev/.
+#
+# The version number starts from the VERSION file (for example 0.1). Each
+# push to main gets the next free last number: v0.1.0, v0.1.1, … To start a
+# new series, change VERSION to 0.2 or 1.0.
+name: Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write    # tags and releases
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Choose what to publish
+        id: pick
+        run: |
+          releasing=no
+          latest=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -n 1)
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" = main ]; then
+            # A new release: the next free number after VERSION.
+            base=$(tr -d ' \n' < VERSION)
+            last=-1
+            for t in $(git tag -l "v$base.*"); do
+              n=${t#"v$base."}
+              case "$n" in ''|*[!0-9]*) continue ;; esac
+              if [ "$n" -gt "$last" ]; then last=$n; fi
+            done
+            releasing=yes
+            release_ref=$GITHUB_SHA
+            release_version=$base.$((last + 1))
+          elif [ -n "$latest" ]; then
+            # Not a release: publish the latest one again, unchanged.
+            release_ref=$latest
+            release_version=${latest#v}
+          else
+            # Nothing released yet: show this commit at the top as well.
+            release_ref=$GITHUB_SHA
+            release_version=$(tr -d ' \n' < VERSION)-pre
+          fi
+          dev_ref=
+          if git rev-parse -q --verify origin/develop > /dev/null; then dev_ref=origin/develop; fi
+          {
+            echo "releasing=$releasing"
+            echo "release_ref=$release_ref"
+            echo "release_version=$release_version"
+            echo "dev_ref=$dev_ref"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build the site
+        env:
+          RELEASE_REF: ${{ steps.pick.outputs.release_ref }}
+          RELEASE_VERSION: ${{ steps.pick.outputs.release_version }}
+          DEV_REF: ${{ steps.pick.outputs.dev_ref }}
+        run: |
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site"
+          # build <commit> <version> <channel> <folder>
+          build() {
+            src="$RUNNER_TEMP/src-$3"
+            git worktree add --detach "$src" "$1"
+            # The build number is the commit's time, so publishing the same
+            # commit again does not look like a new version to installed copies.
+            ( cd "$src" && BUILD=$(git log -1 --format=%ct) ./stamp.sh "$2" "$3" )
+            mkdir -p "$4"
+            cp "$src"/*.html "$src"/*.js "$src"/*.json "$src"/manifest.webmanifest "$4/"
+          }
+          build "$RELEASE_REF" "$RELEASE_VERSION" release "$site"
+          if [ -n "$DEV_REF" ]; then
+            dev_version=$(git show "$DEV_REF:VERSION" | tr -d ' \n')-dev.$(git rev-parse --short "$DEV_REF")
+            build "$DEV_REF" "$dev_version" dev "$site/dev"
+          fi
+          touch "$site/.nojekyll"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+      - id: pages
+        uses: actions/deploy-pages@v4
+
+      - name: Tag and publish the release
+        if: steps.pick.outputs.releasing == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pick.outputs.release_version }}
+        run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes

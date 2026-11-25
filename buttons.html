@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bork Mark – media button test</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bork Mark">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#14532d">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f5f1; --fg: #1c1b19; --muted: #6b6860; --card: #ffffff;
+    --line: #dddad2; --accent: #14532d; --accent-fg: #ffffff; --warn: #9a3412;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151614; --fg: #ecebe6; --muted: #9c998f; --card: #1f201d;
+      --line: #34352f; --accent: #4ade80; --accent-fg: #0b2212; --warn: #fdba74;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    padding: calc(16px + env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); font-size: 0.875rem; }
+  section {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; margin-top: 14px;
+  }
+  audio { width: 100%; margin-top: 10px; }
+  button, .filebtn {
+    font: inherit; border-radius: 10px; border: 1px solid var(--line);
+    background: transparent; color: var(--fg); padding: 10px 14px; cursor: pointer;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #mark {
+    width: 100%; margin-top: 12px; padding: 22px; font-size: 1.25rem; font-weight: 600;
+    background: var(--accent); color: var(--accent-fg); border: none;
+  }
+  #mark.flash { opacity: 0.55; }
+  input[type=file] { display: none; }
+  label.check { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  ol, ul { margin: 0; padding: 0; list-style: none; }
+  li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.9rem; }
+  li:first-child { border-top: none; }
+  .pos { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 8px; }
+  .tag {
+    font-size: 0.75rem; border: 1px solid var(--line); border-radius: 6px;
+    padding: 1px 6px; margin-left: 6px; color: var(--muted);
+  }
+  #log li { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; padding: 4px 0; overflow-wrap: anywhere; }
+  #log { max-height: 260px; overflow-y: auto; }
+  .warn { color: var(--warn); }
+  .empty { color: var(--muted); font-size: 0.875rem; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.85rem; }
+  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bork Mark</h1>
+  <p class="muted">Test page: can a headphone or watch button drop a bookmark while the phone is locked? <a href="./" style="color:var(--accent)">App</a> · <a href="align.html" style="color:var(--accent)">Alignment test</a></p>
+
+  <section>
+    <h2>1. Load audio and press play</h2>
+    <div class="row">
+      <label class="filebtn">Choose audio file<input id="file" type="file"></label>
+      <button id="tone">Use 5-minute test tone</button>
+    </div>
+    <p id="source" class="muted" style="margin-top:10px">Nothing loaded yet.</p>
+    <audio id="audio" controls preload="auto"></audio>
+    <button id="mark">Bookmark</button>
+  </section>
+
+  <section>
+    <h2>2. Lock the phone, then press your buttons</h2>
+    <p class="muted">Try a double-press and triple-press on the headphones, and next / previous on the watch. Everything received is logged below.</p>
+    <label class="check"><input type="checkbox" id="optNext" checked> “Next track” drops a bookmark</label>
+    <label class="check"><input type="checkbox" id="optPrev" checked> “Previous track” drops a bookmark</label>
+    <label class="check"><input type="checkbox" id="optSeek"> Also register seek buttons (changes lock-screen controls)</label>
+  </section>
+
+  <section>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Bookmarks <span id="count" class="muted"></span></h2>
+      <div class="row">
+        <button id="copy">Copy</button>
+        <button id="clear">Clear</button>
+      </div>
+    </div>
+    <ol id="marks" style="margin-top:10px"></ol>
+  </section>
+
+  <section>
+    <h2>Event log</h2>
+    <ul id="log"></ul>
+  </section>
+
+  <section>
+    <h2>Device</h2>
+    <dl id="info"></dl>
+  </section>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const audio = $('audio');
+  const KEY = 'borkmark.test.v1';
+  const MAX_LOG = 200;
+
+  let state = { marks: [], log: [], opts: { next: true, prev: true, seek: false } };
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    if (saved) state = Object.assign(state, saved);
+  } catch (e) { /* storage unavailable: run without persistence */ }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+  let sourceName = '';
+
+  const fmtPos = (s) => {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+  };
+  const fmtClock = (t) => new Date(t).toLocaleTimeString([], { hour12: false });
+
+  function log(msg) {
+    state.log.unshift({ t: Date.now(), msg, hidden: document.visibilityState === 'hidden' });
+    if (state.log.length > MAX_LOG) state.log.length = MAX_LOG;
+    save(); renderLog();
+  }
+
+  function addMark(trigger) {
+    if (!audio.src) { log('bookmark ignored (' + trigger + '): no audio loaded'); return; }
+    state.marks.unshift({
+      pos: audio.currentTime, t: Date.now(), trigger,
+      source: sourceName, hidden: document.visibilityState === 'hidden',
+    });
+    save(); renderMarks();
+    log('BOOKMARK at ' + fmtPos(audio.currentTime) + ' via ' + trigger);
+    $('mark').classList.add('flash');
+    setTimeout(() => $('mark').classList.remove('flash'), 180);
+  }
+
+  function renderMarks() {
+    const ol = $('marks');
+    ol.textContent = '';
+    $('count').textContent = state.marks.length ? '(' + state.marks.length + ')' : '';
+    if (!state.marks.length) {
+      const li = document.createElement('li');
+      li.className = 'empty'; li.textContent = 'No bookmarks yet.';
+      ol.append(li); return;
+    }
+    for (const m of state.marks) {
+      const li = document.createElement('li');
+      const pos = document.createElement('span');
+      pos.className = 'pos'; pos.textContent = fmtPos(m.pos);
+      li.append(pos, document.createTextNode(fmtClock(m.t)));
+      for (const label of [m.trigger, m.hidden ? 'screen off / background' : 'foreground']) {
+        const tag = document.createElement('span');
+        tag.className = 'tag'; tag.textContent = label; li.append(tag);
+      }
+      if (m.source) {
+        const src = document.createElement('div');
+        src.className = 'muted'; src.textContent = m.source; li.append(src);
+      }
+      ol.append(li);
+    }
+  }
+
+  function renderLog() {
+    const ul = $('log');
+    ul.textContent = '';
+    if (!state.log.length) {
+      const li = document.createElement('li');
+      li.className = 'empty'; li.textContent = 'Nothing received yet.';
+      ul.append(li); return;
+    }
+    for (const e of state.log) {
+      const li = document.createElement('li');
+      li.textContent = fmtClock(e.t) + (e.hidden ? ' [bg] ' : '      ') + e.msg;
+      ul.append(li);
+    }
+  }
+
+  // ---- Media Session: the part under test ----
+  const hasMS = 'mediaSession' in navigator;
+
+  function setHandler(action, fn) {
+    try { navigator.mediaSession.setActionHandler(action, fn); return true; }
+    catch (e) { log('cannot register "' + action + '": ' + e.message); return false; }
+  }
+
+  function registerHandlers() {
+    if (!hasMS) return;
+    setHandler('play', () => { log('action: play'); audio.play().catch((e) => log('play() failed: ' + e.message)); });
+    setHandler('pause', () => { log('action: pause'); audio.pause(); });
+    setHandler('nexttrack', () => {
+      log('action: nexttrack');
+      if (state.opts.next) addMark('next track');
+    });
+    setHandler('previoustrack', () => {
+      log('action: previoustrack');
+      if (state.opts.prev) addMark('previous track');
+    });
+    const seek = (delta, name) => (d) => {
+      log('action: ' + name);
+      const step = (d && d.seekOffset) || 15;
+      audio.currentTime = Math.min(Math.max(0, audio.currentTime + delta * step), audio.duration || 1e9);
+    };
+    setHandler('seekbackward', state.opts.seek ? seek(-1, 'seekbackward') : null);
+    setHandler('seekforward', state.opts.seek ? seek(1, 'seekforward') : null);
+  }
+
+  function setMetadata() {
+    if (!hasMS || !window.MediaMetadata) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: sourceName || 'Test audio', artist: 'Bork Mark', album: 'Media button test',
+    });
+  }
+
+  function updatePosition() {
+    if (!hasMS || !navigator.mediaSession.setPositionState) return;
+    if (!isFinite(audio.duration) || !audio.duration) return;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: audio.duration, playbackRate: audio.playbackRate,
+        position: Math.min(audio.currentTime, audio.duration),
+      });
+    } catch (e) {}
+  }
+
+  // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
+  // without one, so label the blob from its first bytes.
+  async function playable(f) {
+    const h = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+    const tag = String.fromCharCode(...h.subarray(4, 8));
+    if (tag === 'ftyp') return f.slice(0, f.size, 'audio/mp4');
+    if ((h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0)) return f.slice(0, f.size, 'audio/mpeg');
+    return f;
+  }
+
+  // ---- Audio sources ----
+  let currentUrl = null;
+  function load(url, name) {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = url; sourceName = name;
+    audio.src = url; audio.load();
+    $('source').textContent = 'Loaded: ' + name;
+    setMetadata(); registerHandlers();
+    log('loaded "' + name + '"');
+  }
+
+  // A quiet tick every second and a higher pip every 10 seconds, so position is audible.
+  function makeTone(seconds) {
+    const rate = 8000, n = rate * seconds;
+    const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+    v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    str(36, 'data'); v.setUint32(40, n, true);
+    const out = new Uint8Array(buf, 44);
+    for (let i = 0; i < n; i++) {
+      const sec = Math.floor(i / rate), t = (i % rate) / rate;
+      const pip = sec % 10 === 0;
+      const len = pip ? 0.25 : 0.06, freq = pip ? 880 : 440;
+      let s = 0.02 * Math.sin(2 * Math.PI * 110 * i / rate); // faint hum keeps the session alive
+      if (t < len) s += 0.5 * Math.sin(2 * Math.PI * freq * t) * (1 - t / len);
+      out[i] = 128 + Math.round(s * 110);
+    }
+    return new Blob([buf], { type: 'audio/wav' });
+  }
+
+  $('file').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (f) load(URL.createObjectURL(await playable(f)), f.name);
+  });
+  $('tone').addEventListener('click', () => {
+    load(URL.createObjectURL(makeTone(300)), '5-minute test tone');
+    audio.play().catch(() => {});
+  });
+
+  // ---- Wiring ----
+  $('mark').addEventListener('click', () => addMark('on-screen button'));
+  $('clear').addEventListener('click', () => {
+    if (!confirm('Clear all bookmarks and the event log?')) return;
+    state.marks = []; state.log = []; save(); renderMarks(); renderLog();
+  });
+  $('copy').addEventListener('click', async () => {
+    const text = JSON.stringify({ marks: state.marks, log: state.log, ua: navigator.userAgent }, null, 2);
+    try { await navigator.clipboard.writeText(text); $('copy').textContent = 'Copied'; }
+    catch (e) { $('copy').textContent = 'Copy failed'; }
+    setTimeout(() => { $('copy').textContent = 'Copy'; }, 1500);
+  });
+
+  const opts = { optNext: 'next', optPrev: 'prev', optSeek: 'seek' };
+  for (const [id, key] of Object.entries(opts)) {
+    $(id).checked = !!state.opts[key];
+    $(id).addEventListener('change', (e) => {
+      state.opts[key] = e.target.checked; save(); registerHandlers();
+    });
+  }
+
+  for (const ev of ['play', 'pause', 'ended', 'stalled', 'error']) {
+    audio.addEventListener(ev, () => {
+      log('audio: ' + ev + ' at ' + fmtPos(audio.currentTime));
+      if (hasMS) navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+    });
+  }
+  audio.addEventListener('loadedmetadata', updatePosition);
+  audio.addEventListener('ratechange', updatePosition);
+  audio.addEventListener('seeked', updatePosition);
+  document.addEventListener('visibilitychange', () => log('page ' + document.visibilityState));
+
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const info = {
+    'Media Session': hasMS ? 'supported' : 'NOT supported – buttons cannot be captured',
+    'Installed to home screen': standalone ? 'yes' : 'no (Share → Add to Home Screen)',
+    'Browser': navigator.userAgent,
+  };
+  for (const [k, val] of Object.entries(info)) {
+    const dt = document.createElement('dt'), dd = document.createElement('dd');
+    dt.textContent = k; dd.textContent = val;
+    if (k === 'Media Session' && !hasMS) dd.className = 'warn';
+    $('info').append(dt, dd);
+  }
+
+  registerHandlers();
+  renderMarks(); renderLog();
+})();
+</script>
+</body>
+</html>
