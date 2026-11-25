@@ -55,7 +55,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
 {
   const root = document.documentElement, player = $('player'), under = [$('library'), $('libFoot')];
   const ARRIVE = 0.4, GLIDE_MS = 260;
-  let end = 0, state = 'idle';   // idle | pulling | gliding
+  let end = 0, state = 'idle', popFrom = 0;   // state: idle | pulling | gliding
   const set = (p) => root.style.setProperty('--p', String(Math.max(0, Math.min(1, p))));
 
     // Where the cover and title go: how far each slides across, how much it
@@ -81,15 +81,34 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       v['--title-stick'] = (tb.top + tb.height / 2) - (ta.top + ta.height / 2) + 'px';
       v['--title-s'] = String(s);
     }
+    // The play button: its icon travels to the mini player's play button.
+    const pa = $('playBtn').querySelector('svg').getBoundingClientRect(), pb = $('miniPlay').querySelector('svg').getBoundingClientRect();
+    if (pa.width && pb.width) {
+      v['--play-x'] = (pb.left + pb.width / 2) - (pa.left + pa.width / 2) + 'px';
+      v['--play-stick'] = (pb.top + pb.height / 2) - (pa.top + pa.height / 2) + 'px';
+      v['--play-s'] = String(pb.width / pa.width);
+    }
+    // The bookmark button pops out from behind it once the change is made.
+    popFrom = $('miniPlay').getBoundingClientRect().left - $('miniMark').getBoundingClientRect().left;
     for (const [k, x] of Object.entries(v)) player.style.setProperty(k, x);
   }
   function done(toLibrary) {
     root.classList.remove('pulling', 'gliding');
     root.style.removeProperty('--p');
-    for (const k of ['--end', '--cover-x', '--cover-stick', '--cover-s', '--title-x', '--title-in', '--title-stick', '--title-s']) player.style.removeProperty(k);
+    for (const k of ['--end', '--cover-x', '--cover-stick', '--cover-s', '--title-x', '--title-in', '--title-stick', '--title-s', '--play-x', '--play-stick', '--play-s']) player.style.removeProperty(k);
     for (const n of [$('title'), $('miniTitle')]) n.classList.remove('still');
     state = 'idle';
-    if (toLibrary) { showLibrary(); return; }
+    if (toLibrary) {
+      showLibrary();
+      if (!calm.matches && popFrom) {
+        const mark = $('miniMark');
+        mark.style.setProperty('--pop-x', popFrom + 'px');
+        mark.classList.remove('pop'); void mark.offsetWidth;   // restart, if it's still popping from last time
+        mark.classList.add('pop');
+        mark.addEventListener('animationend', () => mark.classList.remove('pop'), { once: true });
+      }
+      return;
+    }
     for (const n of under) n.hidden = true;   // still on the player: the library goes back out of sight
     renderMini();
   }
