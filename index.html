@@ -45,7 +45,7 @@
   h1 { font-size: 1.5rem; margin: 0; text-wrap: balance; }
   /* the name sits on two lines, leaving the middle of the top row for notices */
   .libhead h1 { line-height: 1.02; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
-  /* Borky, the app's icon, as tall as the two lines of the name */
+  /* Borky, the app's icon, after the name and as tall as its two lines, looking back at it */
   .borky { flex: none; height: 2.9rem; width: auto; aspect-ratio: 69 / 62; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: square; }
   h2 { font-size: 1rem; margin: 0; }
   p { margin: 0; }
@@ -818,7 +818,7 @@
 
 <main id="library">
   <div class="libhead">
-    <div class="row spread"><h1 aria-label="Bork Mark"><svg class="borky" viewBox="-2 -1 69 62" aria-hidden="true"><path d="M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5"/><path d="M1 22 L12.5 16.5 L18 18.5 H38.5"/><path d="M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5"/><path d="M48.5 42 V59 L53.5 54.5 L58.5 59 V42"/></svg><span>Bork<br>Mark</span></h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
+    <div class="row spread"><h1 aria-label="Bork Mark"><span>Bork<br>Mark</span><svg class="borky" viewBox="-2 -1 69 62" aria-hidden="true"><path d="M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5"/><path d="M1 22 L12.5 16.5 L18 18.5 H38.5"/><path d="M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5"/><path d="M48.5 42 V59 L53.5 54.5 L58.5 59 V42"/></svg></h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
     <p id="storage" hidden><span id="storagePie" aria-hidden="true"></span><span id="storageText"></span></p>
     <div id="modelFail" hidden><span id="modelNote"></span><button id="modelAgain">Try again</button></div>
   </div>
