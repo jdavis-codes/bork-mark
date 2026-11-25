@@ -65,7 +65,9 @@
   .book .thumb { width: 64px; }
   .book .name { font-weight: 600; overflow-wrap: anywhere; }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
-  .bar > div { height: 100%; background: var(--accent); }
+  /* Fills are full width and scaled from the left (set from script), so moving
+     one is a compositor-only change instead of a relayout. */
+  .bar > div { height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); }
   #emptyLib { margin-top: 24px; }
   #library .iconbtn { margin-right: -8px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
@@ -98,7 +100,7 @@
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
     mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
   }
-  .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; }
+  .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; will-change: transform; }
   @keyframes marquee {
     0%, 16% { transform: translateX(var(--pad)); }
     50%, 66% { transform: translateX(calc(var(--shift, 0px) - var(--pad))); }
@@ -111,6 +113,7 @@
   #player {
     position: fixed; inset: 0; z-index: 5; background: var(--bg);   /* above the library's fixed bars */
     display: flex; flex-direction: column;
+    contain: layout size style;   /* the clock ticking inside never re-lays-out the page behind */
     padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) calc(4px + env(safe-area-inset-bottom));
   }
   .coverwrap {
@@ -122,9 +125,8 @@
   .iconbtn { border: none; padding: 8px; line-height: 0; border-radius: 50%; color: var(--muted); }
   .iconbtn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
   #title, #author { text-align: center; }
-  #author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #author { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 1.3em; }
   #title { font-size: 1.2rem; }
-  #author { min-height: 1.3em; }
   #chapterBtn {
     display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 14px;
     border: none; background: var(--soft); font-weight: 600;
@@ -233,10 +235,15 @@
   button.chip { cursor: pointer; }
   @media (prefers-reduced-motion: reduce) { .playpill, .chip, .acts button, .seg button, .presets button, .trimmer .more { transition: none; } }
   .skeleton { display: grid; gap: 7px; }
-  .skeleton i { height: 0.8em; border-radius: 4px; background: linear-gradient(90deg, var(--soft), var(--line), var(--soft)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+  .skeleton i { position: relative; overflow: hidden; height: 0.8em; border-radius: 4px; background: var(--soft); }
+  /* the shine slides across (transform only), rather than repainting a moving gradient every frame */
+  .skeleton i::after {
+    content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--line), transparent);
+    transform: translateX(-100%); animation: shimmer 1.4s linear infinite; will-change: transform;
+  }
   .skeleton i:nth-child(2) { width: 92%; } .skeleton i:nth-child(3) { width: 64%; }
-  @keyframes shimmer { to { background-position: -200% 0; } }
-  @media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }
+  @keyframes shimmer { to { transform: translateX(100%); } }
+  @media (prefers-reduced-motion: reduce) { .skeleton i::after { animation: none; display: none; } }
 
   /* trimming a quote, inside its card */
   .trimmer { display: grid; gap: 10px; }
@@ -244,8 +251,7 @@
   .presets button { padding: 7px 12px; border-radius: 999px; font-size: 0.85rem; }
   .presets button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); font-weight: 600; }
   /* a plain "+" above and below the text brings in more of the book */
-  .trimmer .more { justify-self: center; padding: 6px; margin: -4px 0; border: none; border-radius: 50%; line-height: 0; color: var(--muted); }
-  .trimmer .more { margin-top: -2px; }
+  .trimmer .more { justify-self: center; padding: 6px; margin: -2px 0 -4px; border: none; border-radius: 50%; line-height: 0; color: var(--muted); }
   .passage p:last-of-type { margin-bottom: 0; }
   .passage + .more { margin-top: -6px; }   /* tuned so each + has the same clear space (14px) on both sides */
   .trimmer .more svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
@@ -257,13 +263,15 @@
   .sent.anchor { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
   .passage .pin { opacity: 1; }
   /* drag handles: a bar at each edge of the quote with a knob, on a touch target wider than it looks */
-  .handle { position: absolute; width: 36px; margin-left: -18px; touch-action: none; cursor: grab; z-index: 1; }
+  /* placed with transform (set from script), so following a finger never re-lays-out the text */
+  .handle { position: absolute; left: 0; top: 0; width: 36px; margin-left: -18px; touch-action: none; cursor: grab; z-index: 1; }
   .handle::before { content: ""; position: absolute; left: 17px; top: -2px; bottom: -2px; width: 2px; background: var(--accent); border-radius: 1px; }
   .handle::after { content: ""; position: absolute; left: 11px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
   .handle.start::after { top: -14px; }
   .handle.end::after { bottom: -14px; }
+  .handle::after { transition: transform 0.12s; }
   .handle.dragging::after { transform: scale(1.3); }
-  .passage.settling .handle { transition: left 0.18s, top 0.18s; }   /* glide to the sentence boundary on release */
+  .passage.settling .handle { transition: transform 0.18s; }   /* glide to the sentence boundary on release */
   /* Cancel and Save float over the text as their own rounded bar, clear of the sheet's bottom edge */
   .trimbar {
     position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -274,7 +282,6 @@
   .trimbar button:not(.primary) { background: var(--card); }
   .count { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   .trimbar .row { flex-wrap: nowrap; flex: none; }   /* Cancel and Save stay side by side */
-  .section { margin-top: 26px; }
 
   dialog {
     border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--fg);
@@ -288,11 +295,11 @@
   }
   .picklist button[aria-current=true] { color: var(--accent); font-weight: 600; }
   .picklist span + span { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .picked { overflow-wrap: anywhere; margin: 8px 0 18px; }
   h2[tabindex] { outline: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* bottom bar in the player: speed, sleep, settings within thumb reach */
-  #player.lifted { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); }   /* while being dragged down */
+  #player.lifted { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); will-change: transform; }   /* while being dragged down */
+  dialog.dragging { will-change: transform; }
   #tabbar { margin-top: 6px; }   /* no bar behind them: the buttons sit directly on the player */
   .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: var(--bar); max-width: 560px; margin: 0 auto; }
   /* Icon only, with its number (count, speed, time left) sitting above it.
@@ -354,7 +361,7 @@
   /* The player is a fixed screen, so the page behind it must not scroll or
      bounce. Skipped on very short screens, where it may not all fit. */
   @media (min-height: 480px) {
-    html:has(body.has-bar), body.has-bar { overflow: hidden; overscroll-behavior: none; }
+    html.has-bar, body.has-bar { overflow: hidden; overscroll-behavior: none; }
   }
 
   /* moving between library and player: the cover and the bottom bar glide
@@ -397,8 +404,6 @@
   .figtable { border-collapse: collapse; font-size: 0.85rem; }
   .figtable th, .figtable td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
   .figtable th { background: var(--soft); }
-  .figlist li { grid-template-columns: 4.2em minmax(0, 1fr); }
-  .figlist .linkbtn { text-align: left; overflow-wrap: anywhere; }
 
   /* sheet motion */
   @keyframes sheet-up { from { transform: translateY(100%); } }
@@ -456,7 +461,6 @@
   @keyframes intro-in { from { opacity: 0; transform: translateX(14px); } }
   @media (prefers-reduced-motion: reduce) { #introStep { animation: none; } }
   .citepreview { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--soft); border-radius: 0 10px 10px 0; overflow-wrap: anywhere; }
-  .linkbtn { border: none; padding: 0; color: var(--accent); font-size: inherit; }
   /* inline editing: no box, a pencil beside the value */
   .editable { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
   .editable > span { min-width: 0; overflow-wrap: anywhere; }
@@ -564,6 +568,8 @@
   .fieldhead output { color: var(--muted); font-variant-numeric: tabular-nums; }
   .switchrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .sheet section > button { justify-self: start; }
+  .channelswitch { display: grid; justify-items: start; gap: 2px; text-align: left; justify-self: start; }
+  .channelswitch .muted:empty { display: none; }
   /* Notifications drop in at the top, under the status bar, where they don't
      cover the controls. */
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
@@ -825,6 +831,10 @@
       <h3>App</h3>
       <p id="appVersion" class="muted">Checking for the latest version…</p>
       <div class="row"><button id="appReload">Reload app</button><button id="introShow">Show the intro guide</button></div>
+      <div id="channelRow" class="field" hidden>
+        <button id="channelSwitch" class="channelswitch"><span id="channelName"></span><span id="channelVersion" class="muted"></span></button>
+        <p id="channelNote" class="muted"></p>
+      </div>
       <p class="muted">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
     </section>
   </div>

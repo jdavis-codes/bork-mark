@@ -326,19 +326,19 @@ export async function decode(arrayBuffer) {
 }
 
 // Mix to mono and average down to 16 kHz, which is what Whisper expects.
+// One pass per channel straight into the output, with no full-length mono
+// copy: this runs on the main thread while the book plays, so it is kept lean.
 export function to16kMono(ab) {
   const n = ab.length, ch = ab.numberOfChannels, ratio = ab.sampleRate / 16000;
-  const mono = new Float32Array(n);
+  const out = new Float32Array(Math.floor(n / ratio));
   for (let c = 0; c < ch; c++) {
     const d = ab.getChannelData(c);
-    for (let i = 0; i < n; i++) mono[i] += d[i] / ch;
-  }
-  const out = new Float32Array(Math.floor(n / ratio));
-  for (let i = 0; i < out.length; i++) {
-    const s = Math.floor(i * ratio), e = Math.max(s + 1, Math.min(n, Math.floor((i + 1) * ratio)));
-    let sum = 0;
-    for (let k = s; k < e; k++) sum += mono[k];
-    out[i] = sum / (e - s);
+    for (let i = 0; i < out.length; i++) {
+      const s = Math.floor(i * ratio), e = Math.max(s + 1, Math.min(n, Math.floor((i + 1) * ratio)));
+      let sum = 0;
+      for (let k = s; k < e; k++) sum += d[k];
+      out[i] += sum / ((e - s) * ch);
+    }
   }
   return out;
 }

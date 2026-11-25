@@ -86,13 +86,22 @@ function save(now) {
 const LOGKEY = 'borkmark.' + NS + 'log';
 let logLines = [];
 try { logLines = JSON.parse(localStorage.getItem(LOGKEY)) || []; } catch (e) {}
+// Written to storage in batches: a burst of player events costs one write.
+// Flushed straight away when the page is hidden, which is when iOS may end it.
+let logTimer = null;
+function flushLog() {
+  clearTimeout(logTimer); logTimer = null;
+  try { localStorage.setItem(LOGKEY, JSON.stringify(logLines)); } catch (e) {}
+}
 function log(msg) {
   const d = new Date();
   const stamp = d.toLocaleTimeString([], { hour12: false }) + '.' + String(d.getMilliseconds()).padStart(3, '0');
   logLines.push(stamp + (document.visibilityState === 'hidden' ? ' [bg] ' : ' ') + msg);
   if (logLines.length > 300) logLines = logLines.slice(-300);
-  try { localStorage.setItem(LOGKEY, JSON.stringify(logLines)); } catch (e) {}
+  if (document.visibilityState === 'hidden') flushLog();
+  else if (!logTimer) logTimer = setTimeout(flushLog, 1000);
 }
+window.addEventListener('pagehide', flushLog);
 log('--- app opened' + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) ? ' (home screen)' : ' (browser)'));
 
 // ---------- crash breadcrumbs ----------
@@ -119,6 +128,15 @@ const fmt = (s) => {
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
 };
+// Writes that skip the DOM when nothing changed. The player redraws on every
+// timeupdate; untouched text and attributes cost no style or layout work.
+const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+const setAttr = (node, name, value) => { if (node.getAttribute(name) !== value) node.setAttribute(name, value); };
+// Progress fills are scaled, not resized: see .bar > div in the stylesheet.
+const setFill = (node, frac) => {
+  const v = 'scaleX(' + Math.max(0, Math.min(1, frac || 0)).toFixed(4) + ')';
+  if (node.style.transform !== v) node.style.transform = v;
+};
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -136,7 +154,7 @@ document.addEventListener('keydown', () => { byTouch = false; }, true);
 function closeSheet(d) {
   if (!d.open || d.classList.contains('closing') || (d.id === 'addDlg' && adding)) return;
   const finish = () => {
-    d.classList.remove('closing'); d.close();
+    d.classList.remove('closing', 'dragging'); d.close();
     d.style.transform = ''; d.style.transition = '';
     if (byTouch && document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   };
@@ -154,48 +172,64 @@ for (const d of document.querySelectorAll('dialog')) {
   });
 }
 
+// A downward swipe on `target`, shared by the sheets and the player. Once the
+// finger has moved `slop` pixels, mostly downward, the gesture is ours: start()
+// runs, then move(dy) for each movement, then end(dy, speed, ended) on release,
+// where speed is in pixels per millisecond and `ended` is false for a cancel.
+// Upward or sideways movement is left to the page (scrolling, sliders).
+function swipeDown(target, { slop, canStart, start, move, end }) {
+  let g = null;
+  target.addEventListener('touchstart', (e) => {
+    g = null;
+    if (e.touches.length !== 1 || !canStart(e)) return;
+    g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };
+  }, { passive: true });
+  target.addEventListener('touchmove', (e) => {
+    if (!g) return;
+    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
+    if (!g.dragging) {
+      if (Math.abs(dx) < slop && Math.abs(dy) < slop) return;            // not moved enough to tell
+      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }   // upward or sideways: not ours
+      g.dragging = true;
+      start();
+    }
+    if (e.cancelable) e.preventDefault();
+    g.dy = Math.max(0, dy);
+    move(g.dy);
+  }, { passive: false });
+  const release = (e) => {
+    const was = g;
+    g = null;
+    if (was && was.dragging) end(was.dy, was.dy / Math.max(1, e.timeStamp - was.at), e.type === 'touchend');
+  };
+  target.addEventListener('touchend', release);
+  target.addEventListener('touchcancel', release);
+}
+
 // Swipe down to close a sheet. The sheet follows the finger; letting go past
 // a third of the way, or with a quick flick, closes it, otherwise it springs
 // back. A swipe starts from the sheet's header at any time, or from anywhere
 // in the sheet once its content is scrolled to the top, so it never fights
 // with scrolling a long list. Sliders and text fields are left alone.
 for (const d of document.querySelectorAll('dialog.bottom, #settingsDlg')) {
-  let g = null;
-  d.addEventListener('touchstart', (e) => {
-    g = null;
-    if (e.touches.length !== 1 || d.classList.contains('closing')) return;
-    if (e.target.closest('input, select, textarea, .handle')) return;
-    const header = d.firstElementChild;
-    const inHeader = (header && header.contains(e.target)) || e.touches[0].clientY - d.getBoundingClientRect().top < 48;
-    if (!inHeader && d.scrollTop > 0) return;
-    g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };
-  }, { passive: true });
-  d.addEventListener('touchmove', (e) => {
-    if (!g) return;
-    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
-    if (!g.dragging) {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;                  // not moved enough to tell
-      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }   // upward or sideways: not ours
-      g.dragging = true;
-      d.style.transition = 'none';
-    }
-    if (e.cancelable) e.preventDefault();
-    g.dy = Math.max(0, dy);
-    d.style.transform = 'translateY(' + g.dy + 'px)';
-  }, { passive: false });
-  const release = (e) => {
-    const was = g;
-    g = null;
-    if (!was || !was.dragging) return;
-    const speed = was.dy / Math.max(1, e.timeStamp - was.at);             // pixels per millisecond
-    const far = was.dy > Math.min(140, d.offsetHeight / 3);
-    if (e.type === 'touchend' && (far || (speed > 0.5 && was.dy > 30))) { closeSheet(d); return; }
-    d.style.transition = 'transform 0.2s';
-    d.style.transform = '';
-    setTimeout(() => { d.style.transition = ''; }, 220);
-  };
-  d.addEventListener('touchend', release);
-  d.addEventListener('touchcancel', release);
+  swipeDown(d, {
+    slop: 8,
+    canStart(e) {
+      if (d.classList.contains('closing') || e.target.closest('input, select, textarea, .handle')) return false;
+      const header = d.firstElementChild;
+      const inHeader = (header && header.contains(e.target)) || e.touches[0].clientY - d.getBoundingClientRect().top < 48;
+      return inHeader || d.scrollTop <= 0;
+    },
+    start() { d.style.transition = 'none'; d.classList.add('dragging'); },
+    move(dy) { d.style.transform = 'translateY(' + dy + 'px)'; },
+    end(dy, speed, ended) {
+      const far = dy > Math.min(140, d.offsetHeight / 3);
+      if (ended && (far || (speed > 0.5 && dy > 30))) { closeSheet(d); return; }
+      d.style.transition = 'transform 0.2s';
+      d.style.transform = '';
+      setTimeout(() => { d.style.transition = ''; d.classList.remove('dragging'); }, 220);
+    },
+  });
 }
 
 // Text that is too long for its line slides back and forth so it can be
@@ -206,24 +240,34 @@ function setScroll(node, text) {
   let inner = node.firstElementChild;
   if (!inner || !inner.classList.contains('mq')) { inner = el('span', 'mq'); node.replaceChildren(inner); }
   inner.textContent = text;
-  fitScroll(node);
+  fitScrolls([node]);
 }
-function fitScroll(node) {
-  const inner = node.firstElementChild;
-  if (!inner || !node.clientWidth) return;     // not on screen yet; refitted when it is
-  node.classList.remove('scrolls');
-  const over = inner.scrollWidth - node.clientWidth;
-  if (over <= 6 || calm.matches) return;
-  inner.style.setProperty('--shift', -over + 'px');
-  inner.style.setProperty('--dur', Math.max(7, 5 + over / 16) + 's');   // about 30 pixels a second, with pauses
-  node.classList.add('scrolls');
+// How far each line's text overflows is read for all of them first, then the
+// slides are set, so the browser lays the page out once rather than per line.
+// The measurement is the same whether or not the line is already sliding, so a
+// line whose overflow hasn't changed keeps its animation running smoothly.
+function fitScrolls(nodes) {
+  const over = nodes.map((node) => {
+    const inner = node.firstElementChild;
+    return inner && node.clientWidth ? inner.scrollWidth - node.clientWidth : null;   // null: not on screen; refitted when it is
+  });
+  nodes.forEach((node, k) => {
+    if (over[k] == null) return;
+    const inner = node.firstElementChild, on = over[k] > 6 && !calm.matches;
+    if (on) {
+      const shift = -over[k] + 'px', dur = Math.max(7, 5 + over[k] / 16) + 's';   // about 30 pixels a second, with pauses
+      if (inner.style.getPropertyValue('--shift') !== shift) inner.style.setProperty('--shift', shift);
+      if (inner.style.getPropertyValue('--dur') !== dur) inner.style.setProperty('--dur', dur);
+    }
+    if (node.classList.contains('scrolls') !== on) node.classList.toggle('scrolls', on);
+  });
 }
-const refitScrolls = () => document.querySelectorAll('.scroller').forEach(fitScroll);
+const refitScrolls = () => fitScrolls(Array.from(document.querySelectorAll('.scroller')));
 window.addEventListener('resize', refitScrolls);
 // Re-measure whenever a line's own width changes (a cover appearing beside it,
 // a screen sliding in), so the slide distance is never based on a stale width.
 if (window.ResizeObserver) {
-  const watcher = new ResizeObserver((entries) => entries.forEach((e) => fitScroll(e.target)));
+  const watcher = new ResizeObserver((entries) => fitScrolls(entries.map((e) => e.target)));
   document.querySelectorAll('.scroller').forEach((n) => watcher.observe(n));
 }
 
@@ -288,33 +332,41 @@ async function storeText(id, doc) {
 }
 
 // ---------- library ----------
-const thumbUrls = [];
+// Each book's row is built once and then only updated, so its cover is not
+// read and decoded again every time the library shows, which happens at the
+// start of every swipe down from the player.
+const libRows = new Map();   // book id -> { li, img, name, meta, fill, url }
+function libRow(b) {
+  const r = { li: el('li'), img: el('img', 'thumb'), name: el('div', 'name'), meta: el('div', 'muted'), fill: el('div'), url: null };
+  const btn = el('button', 'book'), info = el('div'), bar = el('div', 'bar');
+  r.img.alt = '';
+  bar.append(r.fill); info.append(r.name, r.meta, bar);
+  btn.append(r.img, info); r.li.append(btn);
+  // The tapped cover grows into the player's cover. If this book is the
+  // one in the mini player, that cover is the one that grows instead.
+  btn.addEventListener('click', () => morph(() => openBook(b.id, r.img.getAttribute('src')), cur && cur.book === b ? null : r.img));
+  if (b.hasCover) stored(b.id, 'cover').then((f) => {
+    if (!f || libRows.get(b.id) !== r) return;
+    r.url = URL.createObjectURL(f); r.img.src = r.url;
+  });
+  return r;
+}
 async function renderLibrary() {
-  thumbUrls.splice(0).forEach((u) => URL.revokeObjectURL(u));
   const ul = $('books');
-  ul.textContent = '';
   $('emptyLib').hidden = state.books.length > 0;
-  for (const b of state.books) {
-    const btn = el('button', 'book');
-    const img = el('img', 'thumb');
-    img.alt = '';
-    const info = el('div');
-    info.append(el('div', 'name', b.title));
-    const n = b.marks.length;
-    info.append(el('div', 'muted', [b.author, fmt(b.duration), n ? n + (n === 1 ? ' bookmark' : ' bookmarks') : ''].filter(Boolean).join(' · ')));
-    const bar = el('div', 'bar'), fill = el('div');
-    fill.style.width = Math.round(100 * (b.position || 0) / (b.duration || 1)) + '%';
-    bar.append(fill); info.append(bar);
-    btn.append(img, info);
-    // The tapped cover grows into the player's cover. If this book is the
-    // one in the mini player, that cover is the one that grows instead.
-    btn.addEventListener('click', () => morph(() => openBook(b.id, img.getAttribute('src')), cur && cur.book === b ? null : img));
-    const li = el('li'); li.append(btn); ul.append(li);
-    if (b.hasCover) stored(b.id, 'cover').then((f) => {
-      if (!f) return;
-      const u = URL.createObjectURL(f); thumbUrls.push(u); img.src = u;
-    });
+  for (const [id, r] of libRows) {
+    if (state.books.some((b) => b.id === id)) continue;
+    r.li.remove(); if (r.url) URL.revokeObjectURL(r.url); libRows.delete(id);
   }
+  state.books.forEach((b, k) => {
+    let r = libRows.get(b.id);
+    if (!r) libRows.set(b.id, (r = libRow(b)));
+    const n = b.marks.length;
+    setText(r.name, b.title);
+    setText(r.meta, [b.author, fmt(b.duration), n ? n + (n === 1 ? ' bookmark' : ' bookmarks') : ''].filter(Boolean).join(' · '));
+    setFill(r.fill, (b.position || 0) / (b.duration || 1));
+    if (ul.children[k] !== r.li) ul.insertBefore(r.li, ul.children[k] || null);
+  });
   if (navigator.storage && navigator.storage.estimate) {
     const { usage, quota } = await navigator.storage.estimate();
     if (usage != null && quota) $('storage').textContent = 'Using ' + (usage / 1048576).toFixed(0) + ' MB of about ' + (quota / 1073741824).toFixed(1) + ' GB available to this app.';
@@ -337,7 +389,7 @@ function renderPick({ key, hint }) {
 function addSay(msg, frac) {
   $('addStatus').textContent = msg; $('addStatus').className = 'muted';
   $('addProgress').style.visibility = frac == null ? 'hidden' : 'visible';   // keeps its space, so the sheet doesn't jump
-  if (frac != null) $('addFill').style.width = Math.round(frac * 100) + '%';
+  if (frac != null) setFill($('addFill'), frac);
 }
 function addBusy(on) {
   adding = on;
@@ -432,7 +484,7 @@ async function openBook(id, coverNow) {
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
-  renderMarks(); renderTextStatus(); setMediaSession(); renderFigTab();
+  renderMarks(); setMediaSession(); renderFigTab();
 
   const mine = cur;
   if (book.hasCover) stored(id, 'cover').then((f) => {
@@ -512,14 +564,16 @@ function morph(update, fromCover) {
 // with a mini player along the bottom.
 function showPlayer() {
   $('library').hidden = true; $('player').hidden = false;
-  $('tabbar').hidden = false; $('libFoot').hidden = true; document.body.classList.add('has-bar');
+  $('tabbar').hidden = false; $('libFoot').hidden = true;
+  document.body.classList.add('has-bar'); document.documentElement.classList.add('has-bar');
   renderMini();
   window.scrollTo(0, 0);
   refitScrolls();
 }
 function showLibrary() {
   $('player').hidden = true; $('library').hidden = false;
-  $('tabbar').hidden = true; $('libFoot').hidden = false; document.body.classList.remove('has-bar');
+  $('tabbar').hidden = true; $('libFoot').hidden = false;
+  document.body.classList.remove('has-bar'); document.documentElement.classList.remove('has-bar');
   renderLibrary(); renderMini();
   window.scrollTo(0, 0);
   refitScrolls();
@@ -548,10 +602,10 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
 // back; otherwise it settles. The scrubber and other sliders are left alone.
 {
   const player = $('player'), under = [$('library'), $('libFoot')];
-  let g = null;
   // Put the library behind the player (or take it away again) for the drag.
+  // While uncovered it fades with the drag, on its own compositor layer.
   const uncover = (on) => {
-    for (const n of under) { n.hidden = !on; n.style.opacity = on ? '0' : ''; }
+    for (const n of under) { n.hidden = !on; n.style.opacity = on ? '0' : ''; n.style.willChange = on ? 'opacity' : ''; }
     if (on) renderLibrary();
     renderMini();
   };
@@ -566,47 +620,32 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       if (!player.hidden) uncover(false);     // still on the player: hide the library again
     }, 240);
   };
-  player.addEventListener('touchstart', (e) => {
-    g = null;
-    if (e.touches.length !== 1 || window.scrollY > 0 || e.target.closest('input, select, textarea')) return;
-    g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };
-  }, { passive: true });
-  player.addEventListener('touchmove', (e) => {
-    if (!g) return;
-    const dx = e.touches[0].clientX - g.x, dy = e.touches[0].clientY - g.y;
-    if (!g.dragging) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      if (dy <= 0 || Math.abs(dx) > Math.abs(dy)) { g = null; return; }
-      g.dragging = true;
-      player.style.transition = 'none';
-      player.classList.add('lifted');
-      uncover(true);
-    }
-    if (e.cancelable) e.preventDefault();
-    g.dy = Math.max(0, dy);
-    player.style.transform = 'translateY(' + g.dy + 'px)';
-    const shown = String(Math.min(1, g.dy / (window.innerHeight * 0.45)));
-    for (const n of under) n.style.opacity = shown;
-  }, { passive: false });
-  const release = (e) => {
-    const was = g;
-    g = null;
-    if (!was || !was.dragging) return;
-    const speed = was.dy / Math.max(1, e.timeStamp - was.at);
-    if (e.type === 'touchend' && (was.dy > window.innerHeight / 3 || (speed > 0.5 && was.dy > 40))) {
+  swipeDown(player, {
+    slop: 10,
+    canStart: (e) => window.scrollY <= 0 && !e.target.closest('input, select, textarea'),
+    start() { player.style.transition = 'none'; player.classList.add('lifted'); uncover(true); },
+    move(dy) {
+      player.style.transform = 'translateY(' + dy + 'px)';
+      const shown = String(Math.min(1, dy / (window.innerHeight * 0.45)));
+      for (const n of under) n.style.opacity = shown;
+    },
+    end(dy, speed, ended) {
+      if (!(ended && (dy > window.innerHeight / 3 || (speed > 0.5 && dy > 40)))) { settle(); return; }
       // From where it was let go, the player carries on gliding down and
       // fades away, while the library finishes fading in.
-      const finish = () => { clear(); player.style.opacity = ''; for (const n of under) { n.style.transition = ''; n.style.opacity = ''; } showLibrary(); };
+      const finish = () => {
+        clear(); player.style.opacity = '';
+        for (const n of under) { n.style.transition = ''; n.style.opacity = ''; n.style.willChange = ''; }
+        showLibrary();
+      };
       if (calm.matches) { finish(); return; }
       player.style.transition = 'transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1), opacity 0.3s ease-in';
-      player.style.transform = 'translateY(' + Math.max(was.dy + 160, window.innerHeight * 0.75) + 'px)';
+      player.style.transform = 'translateY(' + Math.max(dy + 160, window.innerHeight * 0.75) + 'px)';
       player.style.opacity = '0';
       for (const n of under) { n.style.transition = 'opacity 0.25s'; n.style.opacity = '1'; }
       setTimeout(finish, 310);
-    } else settle();
-  };
-  player.addEventListener('touchend', release);
-  player.addEventListener('touchcancel', release);
+    },
+  });
 }
 
 // ---------- mini player (library screen) ----------
@@ -617,11 +656,11 @@ function renderMini() {
   if (!show) return;
   const b = cur.book, t = audio.currentTime || b.position || 0, c = chapterAt(b, t);
   setScroll($('miniTitle'), b.title);
-  $('miniTime').textContent = fmt(t) + (c.count > 1 ? ' · ' : '');
+  setText($('miniTime'), fmt(t) + (c.count > 1 ? ' · ' : ''));
   setScroll($('miniChap'), c.count > 1 ? c.title : '');
-  $('miniCover').hidden = !cur.coverUrl;
+  if ($('miniCover').hidden !== !cur.coverUrl) $('miniCover').hidden = !cur.coverUrl;
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
-  $('miniFill').style.width = (100 * t / (b.duration || 1)) + '%';
+  setFill($('miniFill'), t / (b.duration || 1));
 }
 $('miniOpen').addEventListener('click', () => morph(showPlayer));
 $('miniMark').addEventListener('click', () => addMark());
@@ -731,20 +770,22 @@ function renderOverall(t) {
   const left = Math.max(0, b.duration - t) / (b.speed || 1);
   const mins = Math.round(left / 60), h = Math.floor(mins / 60), m = mins % 60;   // whole minutes first, so 59.6 min is 1h 0m, not 0h 60m
   const leftText = left < 30 ? 'finished' : (h ? h + 'h ' : '') + (mins ? m + 'm' : '<1m') + ' left';
-  $('pie').style.setProperty('--p', (frac * 100).toFixed(1));
-  $('overallText').textContent = Math.floor(frac * 100) + '% · ' + leftText;
-  $('overall').setAttribute('aria-label', Math.floor(frac * 100) + ' percent of the book, ' + leftText);
+  const pie = $('pie'), p = (frac * 100).toFixed(1);
+  if (pie.style.getPropertyValue('--p') !== p) pie.style.setProperty('--p', p);
+  setText($('overallText'), Math.floor(frac * 100) + '% · ' + leftText);
+  setAttr($('overall'), 'aria-label', Math.floor(frac * 100) + ' percent of the book, ' + leftText);
 }
 
 function renderTime(t) {
   const b = cur.book, c = chapterAt(b, t);
   const label = c.count > 1 ? c.title : 'Whole book';
   setScroll($('chapterText'), label);
-  $('chapterBtn').disabled = c.count <= 1;
-  const s = $('scrub');
-  s.min = Math.floor(c.start); s.max = Math.max(Math.floor(c.start) + 1, Math.ceil(c.end)); s.value = t; fillRange(s);
-  $('elapsed').textContent = fmt(t - c.start);
-  $('remaining').textContent = '−' + fmt(c.end - t);
+  if ($('chapterBtn').disabled !== (c.count <= 1)) $('chapterBtn').disabled = c.count <= 1;
+  // The slider moves in whole seconds, so it is only touched when that changes.
+  const s = $('scrub'), min = String(Math.floor(c.start)), max = String(Math.max(Math.floor(c.start) + 1, Math.ceil(c.end)));
+  if (s.min !== min || s.max !== max || s.value !== String(Math.round(t))) { s.min = min; s.max = max; s.value = t; fillRange(s); }
+  setText($('elapsed'), fmt(t - c.start));
+  setText($('remaining'), '−' + fmt(c.end - t));
   renderOverall(t);
 }
 function seek(t) {
@@ -757,8 +798,8 @@ function seek(t) {
 $('scrub').addEventListener('input', () => {
   scrubbing = true;
   const t = Number($('scrub').value), c = chapterAt(cur.book, audio.currentTime);
-  $('elapsed').textContent = fmt(t - c.start);
-  $('remaining').textContent = '−' + fmt(c.end - t);
+  setText($('elapsed'), fmt(t - c.start));
+  setText($('remaining'), '−' + fmt(c.end - t));
   renderOverall(t);
 });
 $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('scrub').value)); });
@@ -771,14 +812,20 @@ $('scrub').addEventListener('change', () => { scrubbing = false; seek(Number($('
 const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const KEEP_ALIVE_MS = 15 * 60 * 1000;
 let keep = null, keepTimer = null, keepOn = false;
-function silentWav(seconds) {
-  const rate = 8000, n = rate * seconds, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+// A mono PCM WAV file of n samples, 8 or 16 bits. Returns the buffer and a
+// view on it; the samples start at byte 44.
+function wav(rate, n, bits) {
+  const bytes = bits / 8, buf = new ArrayBuffer(44 + n * bytes), v = new DataView(buf);
   const str = (o, t) => { for (let k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); };
-  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt ');
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * bytes, true); str(8, 'WAVEfmt ');
   v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
-  str(36, 'data'); v.setUint32(40, n, true);
-  new Uint8Array(buf, 44).fill(128);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * bytes, true); v.setUint16(32, bytes, true); v.setUint16(34, bits, true);
+  str(36, 'data'); v.setUint32(40, n * bytes, true);
+  return { buf, v };
+}
+function silentWav(seconds) {
+  const rate = 8000, { buf } = wav(rate, rate * seconds, 8);
+  new Uint8Array(buf, 44).fill(128);   // 8-bit silence is the midpoint
   return new Blob([buf], { type: 'audio/wav' });
 }
 function keepAlive(on) {
@@ -810,12 +857,7 @@ const SOUNDS = {
 function toneWav(notes) {
   const rate = 22050, gap = 0.03;
   const total = notes.reduce((sum, [, ms]) => sum + ms / 1000 + gap, 0);
-  const n = Math.ceil(rate * total), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
-  const str = (o, t) => { for (let k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); };
-  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVEfmt ');
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-  str(36, 'data'); v.setUint32(40, n * 2, true);
+  const { buf, v } = wav(rate, Math.ceil(rate * total), 16);
   let at = 0;
   for (const [freq, ms] of notes) {
     const len = Math.floor(rate * ms / 1000);
@@ -1046,14 +1088,17 @@ function leadIn(text) {
 function renderMarks() {
   if (!cur) return;
   const b = cur.book, list = $('marks');
-  list.textContent = '';
   const n = b.marks.length, waiting = b.marks.filter((m) => m.status === 'pending' || m.status === 'working').length;
+  list.textContent = '';
   $('markCount').textContent = n ? '(' + n + ')' : '';
   $('marksLabel').textContent = n ? String(n) : '';
   $('marksBtn').setAttribute('aria-label', 'Bookmarks' + (n ? ', ' + n : '') + (waiting ? ', ' + waiting + ' still being processed' : ''));
   $('marksBtn').classList.toggle('on', waiting > 0);
   const newest = settings.markOrder === 'new';
   $('orderBook').setAttribute('aria-pressed', String(!newest)); $('orderNew').setAttribute('aria-pressed', String(newest));
+  // The cards are only built while the sheet is open (opening it renders them),
+  // so quotes arriving during playback just update the counts.
+  if (!$('marksDlg').open) { list.textContent = ''; return; }
   if (!n) {
     list.append(el('p', 'muted', 'None yet. Press Bookmark, or next / previous track on your headphones or watch.'));
     return;
@@ -1316,14 +1361,18 @@ function trimEditor() {
   // Every word is its own piece, so the highlight and the handles can follow a finger word by word.
   const passage = el('div', 'passage');
   let p = null, lastPara = -1, pinned = false;
+  // The words and their character ranges are kept as numbers too, so redrawing
+  // during a drag doesn't re-read hundreds of data attributes.
+  const words = passage.words = [];
   S.forEach((x, i) => {
     if (x.p !== lastPara) { p = el('p'); passage.append(p); lastPara = x.p; }
     const sent = el('span', 'sent' + (i === trim.anchor ? ' anchor' : ''));
     sent.dataset.i = i;
     const body = text.slice(x.a, x.b), word = /\S+\s*/g;
     for (let m; (m = word.exec(body));) {
-      const a = x.a + m.index, w = el('span', 'w', m[0]);
-      w.dataset.a = a; w.dataset.b = a + m[0].trimEnd().length;
+      const a = x.a + m.index, b = a + m[0].trimEnd().length, w = el('span', 'w', m[0]);
+      w.dataset.a = a; w.dataset.b = b;
+      words.push({ node: w, a, b });
       if (!pinned && a >= trim.point) { sent.append(pinIcon()); pinned = true; }
       sent.append(w);
     }
@@ -1368,8 +1417,7 @@ function snapEdge(edge) {
   if (edge === 'start') setTrim(nearest(sentenceStops('start'), trim.a), trim.b); else setTrim(trim.a, nearest(sentenceStops('end'), trim.b));
 }
 function stepEdge(edge, step, passage) {
-  const stops = settings.trimSnap ? sentenceStops(edge)
-    : Array.from(passage.querySelectorAll('.w'), (w) => Number(edge === 'start' ? w.dataset.a : w.dataset.b));
+  const stops = settings.trimSnap ? sentenceStops(edge) : passage.words.map((w) => (edge === 'start' ? w.a : w.b));
   const at = stops.indexOf(nearest(stops, edge === 'start' ? trim.a : trim.b));
   const next = stops[Math.max(0, Math.min(stops.length - 1, at + step))];
   if (edge === 'start') setTrim(next, trim.b); else setTrim(trim.a, next);
@@ -1395,16 +1443,19 @@ function paintTrim() {
   const passage = document.querySelector('.trimmer .passage');
   if (!trim || !passage) return;
   let first = null, last = null, words = 0;
-  for (const w of passage.querySelectorAll('.w')) {
-    const on = Number(w.dataset.a) >= trim.a && Number(w.dataset.b) <= trim.b;
-    w.classList.toggle('in', on);
+  for (const w of passage.words) {
+    const on = w.a >= trim.a && w.b <= trim.b;
+    if (w.node.classList.contains('in') !== on) w.node.classList.toggle('in', on);
     if (on) { words++; first = first || w; last = w; }
   }
   if (first) {
     // measured on the letters alone, so the end handle sits right after the last one
-    const box = passage.getBoundingClientRect(), letters = (w) => { const r = document.createRange(), t = w.firstChild; r.setStart(t, 0); r.setEnd(t, Number(w.dataset.b) - Number(w.dataset.a)); return r.getClientRects(); };
+    const box = passage.getBoundingClientRect(), letters = (w) => { const r = document.createRange(), t = w.node.firstChild; r.setStart(t, 0); r.setEnd(t, w.b - w.a); return r.getClientRects(); };
     const head = letters(first)[0], tails = letters(last), tail = tails[tails.length - 1];
-    const place = (h, x, rect) => { h.style.left = (x - box.left) + 'px'; h.style.top = (rect.top - box.top) + 'px'; h.style.height = rect.height + 'px'; };
+    const place = (h, x, rect) => {
+      h.style.transform = 'translate(' + (x - box.left) + 'px, ' + (rect.top - box.top) + 'px)';
+      if (h.style.height !== rect.height + 'px') h.style.height = rect.height + 'px';
+    };
     if (head && tail) { place(passage.querySelector('.handle.start'), head.left, head); place(passage.querySelector('.handle.end'), tail.right, tail); }
   }
   const n = trim.sents.filter((x) => x.b > trim.a && x.a < trim.b).length;
@@ -1419,9 +1470,12 @@ window.addEventListener('resize', () => { if (trim) paintTrim(); });
 // holding anywhere in the text. The edge follows the word under the finger;
 // held near the top or bottom of the sheet the list keeps scrolling; on
 // letting go the edge settles on a sentence boundary (if snapping is on).
+// Finger movements are only noted as they arrive; the work happens once per
+// frame, however often the screen reports touches (120 Hz screens send twice
+// as many as there are frames to draw at 60).
 function beginDrag(edge, passage, x, y, offsetY) {
   const sheet = $('marksDlg');
-  let at = { x, y };
+  let at = { x, y }, moved = false, raf = 0, prev = 0;
   const follow = () => {
     const w = document.elementsFromPoint(at.x, at.y + offsetY).find((n) => n.classList && n.classList.contains('w') && passage.contains(n));
     if (!w) return;
@@ -1431,17 +1485,23 @@ function beginDrag(edge, passage, x, y, offsetY) {
     else setTrim(a, pastMiddle ? Number(w.dataset.b) : Number(w.dataset.a) - 1);
     if (trim.a !== a || trim.b !== b) paintTrim();
   };
-  const creep = setInterval(() => {
-    const frame = sheet.getBoundingClientRect();
-    const step = at.y < frame.top + 90 ? -10 : at.y > frame.bottom - 110 ? 10 : 0;
-    if (step) { sheet.scrollTop += step; follow(); }
-  }, 16);
+  const tick = (now) => {
+    // Near the top or bottom of the sheet, the list creeps along (about 600 px a second).
+    const frame = sheet.getBoundingClientRect(), dt = prev ? Math.min(50, now - prev) : 16;
+    prev = now;
+    const dir = at.y < frame.top + 90 ? -1 : at.y > frame.bottom - 110 ? 1 : 0;
+    if (dir) { sheet.scrollTop += dir * 0.6 * dt; moved = true; }
+    if (moved) { moved = false; follow(); }
+    raf = requestAnimationFrame(tick);
+  };
   passage.querySelector('.handle.' + edge).classList.add('dragging');
   follow();
+  raf = requestAnimationFrame(tick);
   return {
-    move(nx, ny) { at = { x: nx, y: ny }; follow(); },
+    move(nx, ny) { at = { x: nx, y: ny }; moved = true; },
     end() {
-      clearInterval(creep);
+      cancelAnimationFrame(raf);
+      if (moved) follow();
       const handle = passage.querySelector('.handle.' + edge);
       if (handle) handle.classList.remove('dragging');
       if (settings.trimSnap && trim) { passage.classList.add('settling'); snapEdge(edge); paintTrim(); setTimeout(() => passage.classList.remove('settling'), 220); }
@@ -1619,15 +1679,12 @@ function requote(m, text) {
     const q = quoteAt(text, { start: m.loc[0], split: m.loc[1], end: m.loc[2] }, settings.capture);
     m.before = q.before; m.after = q.after;
   }
-  // Where in the book this is, for citing: its contents entry and print page.
   if (cur && cur.text === text && text.starts.length) {
-    const at = text.starts[Math.min(m.loc[1], text.starts.length - 1)];
-    const section = entryAt(cur.meta.toc, at), page = entryAt(cur.meta.pages, at);
+    // Where in the book this is, for citing: its contents entry and print page.
+    const section = entryAt(cur.meta.toc, point), page = entryAt(cur.meta.pages, point);
     m.section = section ? section.label : ''; m.page = page ? page.label : '';
-  }
-  if (cur && cur.text === text && text.starts.length) {   // pictures and tables that fall inside the quote
-    const at = text.starts[Math.min(m.loc[1], text.starts.length - 1)];
-    const from = at - m.before.length - 40, to = at + m.after.length + 40;
+    // Pictures and tables that fall inside the quote.
+    const from = point - m.before.length - 40, to = point + m.after.length + 40;
     m.figs = cur.meta.figures.map((f, i) => (f.at >= from && f.at <= to ? i : -1)).filter((i) => i >= 0).slice(0, 6);
   }
   if (cur && cur.pageSrc) {   // a scanned edition, when added, decides the page
@@ -1985,7 +2042,7 @@ function showPendingFigure() {
 }
 
 // ---------- sheets: bookmarks and book info ----------
-$('marksBtn').addEventListener('click', () => { renderMarks(); $('marksDlg').showModal(); $('marksDlg').scrollTop = 0; });
+$('marksBtn').addEventListener('click', () => { $('marksDlg').showModal(); renderMarks(); $('marksDlg').scrollTop = 0; });
 $('marksClose').addEventListener('click', () => closeSheet($('marksDlg')));
 const PENCIL = 'M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4';
 function icon(d, cls) {
@@ -2180,7 +2237,6 @@ async function nameChapters() {
 }
 
 // ---------- book text and removal ----------
-const renderTextStatus = renderInfo;
 $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
@@ -2200,10 +2256,10 @@ $('textFile').addEventListener('change', async (e) => {
     mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true };
     renderFigTab();
     mine.text = buildBook(doc.text);
-    metaChanged(); renderTextStatus(); rematch(); runQueue();
+    metaChanged(); rematch(); runQueue();
     toast('Book text added');
   } catch (err) {
-    if (cur === mine) { renderTextStatus(); toast('Could not read that file'); }
+    if (cur === mine) { renderInfo(); toast('Could not read that file'); }
   }
 });
 $('pageFile').addEventListener('change', async (e) => {
@@ -2289,7 +2345,8 @@ applyAccent();
 // The filled part of every slider follows its value.
 function fillRange(input) {
   const min = Number(input.min), max = Number(input.max);
-  input.style.setProperty('--f', max > min ? (Number(input.value) - min) / (max - min) : 0);
+  const f = String(max > min ? +((Number(input.value) - min) / (max - min)).toFixed(4) : 0);
+  if (input.style.getPropertyValue('--f') !== f) input.style.setProperty('--f', f);
 }
 document.addEventListener('input', (e) => { if (e.target.type === 'range') fillRange(e.target); });
 
@@ -2400,6 +2457,35 @@ async function showVersion() {
   }
 }
 for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showVersion);
+
+// The released copy and the development copy are published side by side, the
+// development one in dev/ inside the released site. Settings offers a switch
+// to the other, showing the version that is published there now. They keep
+// separate books, bookmarks and settings (see NS), so nothing carries across.
+const OTHER = CHANNEL === 'release' ? { dir: 'dev/', name: 'development',
+  note: 'Try new features before they are released. It keeps its own books, bookmarks and settings, so books added here are not there.' }
+  : CHANNEL === 'dev' ? { dir: '../', name: 'released',
+    note: 'The released version has its own books, bookmarks and settings, separate from these.' }
+  : null;   // a local copy has no other version beside it
+async function showChannelSwitch() {
+  if (!OTHER) return;
+  $('channelRow').hidden = false;
+  $('channelName').textContent = 'Switch to the ' + OTHER.name + ' version';
+  $('channelNote').textContent = OTHER.note;
+  try {
+    const res = await fetch(OTHER.dir + 'version.json', { cache: 'no-store' });
+    const v = await res.json();
+    $('channelVersion').textContent = 'Version ' + v.version + ', published ' + buildDate(v.build);
+  } catch (e) {
+    $('channelVersion').textContent = '';   // offline: the switch still works if that copy was opened before
+  }
+}
+for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click', showChannelSwitch);
+$('channelSwitch').addEventListener('click', () => {
+  if (cur) { cur.book.position = audio.currentTime || cur.book.position; save(true); }
+  flushLog();
+  location.href = OTHER.dir;
+});
 // On launch and whenever the app comes back to the screen: if a newer build
 // is published and nothing is playing or open, switch to it straight away.
 // Remembering the build it reloaded for stops this from looping.
