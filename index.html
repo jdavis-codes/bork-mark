@@ -54,7 +54,10 @@
   button:disabled { opacity: 0.45; cursor: default; }
   button.primary { background: var(--accent); color: var(--accent-fg); border: none; font-weight: 600; }
   button.plain { border: none; padding: 8px 4px; color: var(--accent); }
-  #backBtn { margin-left: -8px; }
+  /* the top row's icons are as tall as the notices that sit between them */
+  #backBtn, #infoBtn, #settingsBtn { padding: 6px; }
+  #backBtn svg, #infoBtn svg, #settingsBtn svg { width: 30px; height: 30px; }
+  #backBtn { margin-left: -6px; }
   #backBtn svg { stroke-width: 2.2; stroke-linejoin: round; }
   button.small { padding: 6px 10px; font-size: 0.85rem; }
   input[type=file] { display: none; }
@@ -77,7 +80,7 @@
      one is a compositor-only change instead of a relayout. */
   .bar > div { height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); }
   #emptyLib { margin-top: 24px; }
-  #library .iconbtn { margin-right: -8px; }
+  #library .iconbtn { margin-right: -6px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
   #modelNote:empty { display: none; }
   /* the two main buttons, Add a book and Bookmark, are the same size */
@@ -726,7 +729,7 @@
   /* Notices and notifications line up with the middle of the icons in the top row: the settings
      icon in the library, the back and info buttons over the player. */
   html { --notice-top: calc(18px + env(safe-area-inset-top)); }
-  html.has-bar { --notice-top: calc(13.5px + env(safe-area-inset-top)); }
+  html.has-bar { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
   #busy {
     position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(-50%);
     max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
@@ -758,7 +761,6 @@
 
 <main id="library">
   <div class="libhead row spread"><h1 aria-label="Bork Mark">Bork<br>Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
-  <p class="muted">Bookmark audiobooks from your headphones or watch.</p>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
     <div class="row" style="margin-top:8px">
