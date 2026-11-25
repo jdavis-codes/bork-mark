@@ -3,7 +3,7 @@
 
 import { showIntro } from './js/intro.js';
 import { renderLibrary } from './js/library.js';
-import { lastCrash } from './js/log.js';
+import { detail, lastCrash, mb } from './js/log.js';
 import { renderSettings } from './js/settings-sheet.js';
 import { retryModel, warmModel } from './js/speech.js';
 import { save, state } from './js/state.js';
@@ -56,4 +56,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 renderLibrary();
+if (navigator.storage && navigator.storage.estimate) {
+  navigator.storage.estimate().then(({ usage, quota }) => detail('launch: ' + state.books.length + ' books, storage ' + mb(usage || 0) + ' of ' + mb(quota || 0)
+    + ', ' + (navigator.hardwareConcurrency || '?') + ' cores, screen ' + screen.width + '×' + screen.height + ' @' + devicePixelRatio)).catch(() => {});
+}
 if (!state.books.length && !state.introSeen && !lastCrash) showIntro();

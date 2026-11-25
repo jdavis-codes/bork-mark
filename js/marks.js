@@ -9,6 +9,7 @@ import { endTrim, paintTrim, pinIcon, startTrim, trim, trimEditor } from './trim
 import { $, audio, calm, el, fmt, icon, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { openFigure, showPdfPage } from './viewer.js';
+import { log } from './log.js';
 
 const MERGE_WINDOW = 3000;                 // repeated presses within this many ms count once
 
@@ -21,6 +22,7 @@ export function addMark() {
   lastMarkAt = now;
   const t = audio.currentTime || cur.book.position || 0;
   cur.book.marks.unshift({ id: crypto.randomUUID(), t, created: now, status: 'pending' });
+  log('bookmark at ' + fmt(t));
   sound('mark');
   save(true);
   renderMarks();

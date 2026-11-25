@@ -14,6 +14,7 @@ import { store, stored } from './storage.js';
 import { buildBook, findInBook, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
 import { $, toast } from './ui/dom.js';
+import { detail } from './log.js';
 
 // The book text, plus where its contents entries and print pages fall in it.
 export async function storeText(id, doc) {
@@ -41,7 +42,9 @@ export async function loadBookText(mine) {
     }
     store('write', id, 'meta', new Blob([JSON.stringify(mine.meta)], { type: 'application/json' })).catch(() => {});
   }
+  const t0 = performance.now();
   mine.text = buildBook(bookText);
+  detail('book text ready: ' + mine.text.words.length + ' words, ' + mine.text.grams.size + ' three-word keys, ' + Math.round(performance.now() - t0) + ' ms');
   if (mine.rewrap) {
     // Quotes saved from the old text carry its line breaks: cut them again from the joined text.
     for (const m of book.marks) {

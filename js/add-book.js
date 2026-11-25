@@ -5,11 +5,11 @@ import { storeText } from './book-files.js';
 import { openBook } from './player.js';
 import { readBook } from './sources/index.js';
 import { guessFirstNumbered, readPdfPages } from './sources/pdf.js';
-import { warmModel } from './speech.js';
 import { fromDoc, resolveMeta, save, state } from './state.js';
 import { store } from './storage.js';
-import { $, setFill, toast } from './ui/dom.js';
+import { $, fmt, setFill, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
+import { detail, log, mb } from './log.js';
 
 // The three files a book can have. Only the audio is required.
 const PICKS = [
@@ -47,14 +47,23 @@ $('addGo').addEventListener('click', async () => {
   addBusy(true);
   const id = crypto.randomUUID();
   try {
+    let t0 = performance.now();
+    const took = () => { const ms = Math.round(performance.now() - t0); t0 = performance.now(); return ms + ' ms'; };
+    log('adding a book: ' + af.name + ' (' + mb(af.size) + ')' + (tf ? ' + ' + tf.name + ' (' + mb(tf.size) + ')' : '') + (pf ? ' + ' + pf.name + ' (' + mb(pf.size) + ')' : ''));
     addSay('Reading the audiobook…', 0);
     const src = await openAudio(af, (p) => addSay('Reading the audiobook…', p * 0.1));
+    detail('audio read: ' + src.kind + ', ' + fmt(src.duration) + ', ' + src.chapters.length + ' chapters, cover ' + (src.tags.cover ? mb(src.tags.cover.size) : 'none') + ', ' + took());
     let doc = null;
-    if (tf) { addSay('Reading the book text…', 0.1); doc = await readBook(tf); }
+    if (tf) {
+      addSay('Reading the book text…', 0.1); doc = await readBook(tf);
+      detail('text read: ' + doc.text.length + ' characters, ' + doc.toc.length + ' contents entries, ' + doc.pages.length + ' pages, '
+        + doc.figures.length + ' figures, ' + doc.images.length + ' pictures (' + mb(doc.images.reduce((n, x) => n + x.size, 0)) + '), ' + took());
+    }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     await store('write', id, 'audio', af, (p) => addSay('Copying the audiobook… ' + Math.round(p * 100) + '%', 0.15 + p * 0.7));
     if (src.tags.cover) await store('write', id, 'cover', src.tags.cover);
-    if (doc) await storeText(id, doc);
+    detail('audio copied: ' + took());
+    if (doc) { await storeText(id, doc); detail('text stored: ' + took()); }
     // A page scan that can't be used shouldn't stop the book being added.
     let pdf = null, pdfProblem = '';
     if (pf) {
@@ -62,6 +71,7 @@ $('addGo').addEventListener('click', async () => {
         pdf = await readPdfPages(pf, (p) => addSay('Reading the page scan… ' + Math.round(p * 100) + '%', 0.85 + p * 0.15));
         await store('write', id, 'pagesrc', new Blob([JSON.stringify(pdf)], { type: 'application/json' }));
         await store('write', id, 'pagepdf', pf);
+        detail('page scan read: ' + pdf.pages.length + ' pages, ' + took());
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
     const book = {
@@ -77,10 +87,12 @@ $('addGo').addEventListener('click', async () => {
     save(true);
     addBusy(false);
     closeSheet($('addDlg'));
+    // The speech model is not loaded here: it loads once the book's text is
+    // ready and something needs it, so the two heavy steps don't overlap.
     await openBook(id);
     if (pdfProblem) toast('Book added, but not the page scan: ' + pdfProblem);
-    warmModel().catch(() => {});
   } catch (err) {
+    log('adding failed: ' + ((err && err.message) || err));
     await store('remove', id).catch(() => {});
     addBusy(false);
     addSay('Could not add this book: ' + ((err && err.message) || err));

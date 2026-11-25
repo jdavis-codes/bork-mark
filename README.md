@@ -88,6 +88,10 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `sw.js` | Service worker, so the app opens without signal. Its list of app files needs updating when a module is added |
 | `buttons.html`, `align.html` | Test pages for media buttons and for alignment |
 
+### Tests
+
+`tests/run.sh quick` checks the everyday paths in headless Chromium in about a minute; `tests/run.sh` with `lint`, `full`, `speech` or `compare <git ref>` runs less or more. CLAUDE.md says which to run when. The test media is built into `tests/fixtures/` on the first run (needs ffmpeg and python3).
+
 ### Versions and deploying
 
 Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`. Pages must be set to deploy from Actions: Settings, Pages, Source: **GitHub Actions**.

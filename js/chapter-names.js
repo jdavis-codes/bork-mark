@@ -45,10 +45,16 @@ function startPass(auto) {
 // b.autoNaming is the next chapter to listen to, or 'done'. Progress is kept
 // after each chapter, so a run cut short (the app closed, or put away) picks
 // up where it stopped. Called whenever the bookmark queue finishes.
+// It also waits until the book has been open a little while (SETTLE), so it
+// doesn't start while opening or adding the book still has work in hand.
+const SETTLE = 15000;
+let settleTimer = null;
 export function autoNameChapters() {
   if (pass || !cur || !cur.text || !cur.source || !canWork() || modelState === 'failed' || lastCrash) return;
   const b = cur.book;
   if (b.autoNaming === 'done' || (b.chapters || []).length < 2 || !cur.meta.toc.length) return;
+  const wait = cur.openedAt + SETTLE - Date.now();
+  if (wait > 0) { clearTimeout(settleTimer); settleTimer = setTimeout(autoNameChapters, wait); return; }
   startPass(true);
 }
 

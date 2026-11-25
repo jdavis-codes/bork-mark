@@ -1,6 +1,7 @@
 // Diagnostics: a rolling log of button presses and player events, and crash breadcrumbs.
 
 import { NS } from './state.js';
+import { CHANNEL } from './version.js';
 import { audio } from './ui/dom.js';
 
 // A short rolling record of button presses and player events, kept on the
@@ -24,6 +25,10 @@ export function log(msg) {
   else if (!logTimer) logTimer = setTimeout(flushLog, 1000);
 }
 window.addEventListener('pagehide', flushLog);
+// Extra detail (sizes, timings, steps) for working out problems. Only the
+// development and local copies record it, so the released log stays short.
+export const detail = CHANNEL === 'release' ? () => {} : (msg) => log('· ' + msg);
+export const mb = (bytes) => (bytes / 1048576).toFixed(1) + ' MB';
 log('--- app opened' + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) ? ' (home screen)' : ' (browser)'));
 
 // ---------- crash breadcrumbs ----------

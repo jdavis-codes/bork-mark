@@ -32,6 +32,8 @@ async function ensure(model, device, alt) {
     progress_callback: (p) => {
       if (p.status === 'progress') {
         self.postMessage({ type: 'progress', file: p.file, loaded: p.loaded, total: p.total });
+      } else if (p.file && (p.status === 'download' || p.status === 'done')) {
+        self.postMessage({ type: 'file', file: p.file, status: p.status });   // 'download' only when not already saved
       }
     },
   });

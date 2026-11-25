@@ -3,7 +3,7 @@
 import { transcribeAround } from './audio/listen.js';
 import { autoNameChapters, naming } from './chapter-names.js';
 import { probing } from './figures.js';
-import { crumb } from './log.js';
+import { crumb, detail, log } from './log.js';
 import { renderMarks } from './marks.js';
 import { cur } from './player.js';
 import { applyQuote } from './quotes.js';
@@ -33,8 +33,10 @@ export async function runQueue() {
           settings.capture.mode === 'time' ? settings.capture.after : LOCATE_AFTER, transcribe, crumb);
         m.words = r.words; m.split = r.split; m.transcript = r.transcript;
         if (mine.text) applyQuote(m, mine.text); else m.status = 'transcribed';
+        detail('quote: ' + m.status + (m.confidence != null ? ', confidence ' + m.confidence.toFixed(2) : '') + ', ' + r.words.length + ' words heard');
       } catch (err) {
         m.status = 'error'; m.error = String((err && err.message) || err);
+        log('quote failed: ' + m.error);
       }
       crumb(null);
       save(true);

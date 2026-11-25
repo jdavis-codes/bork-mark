@@ -1,7 +1,7 @@
 // Speech to text: the Whisper worker, loading its model (with retries), and the status line
 // that reports on it.
 
-import { crumb, log } from './log.js';
+import { crumb, detail, log } from './log.js';
 import { runQueue } from './queue.js';
 import { state } from './state.js';
 import { $ } from './ui/dom.js';
@@ -21,6 +21,7 @@ function asrRequest(pcm) {
         setQueueStatus('Downloading the speech model (one time): ' + Math.round(100 * m.loaded / m.total) + '%');
         return;
       }
+      if (m.type === 'file') { detail('model file ' + m.status + ': ' + m.file); return; }
       const job = asrJobs.get(m.id);
       if (!job) return;
       asrJobs.delete(m.id);

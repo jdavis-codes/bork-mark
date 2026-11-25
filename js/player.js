@@ -5,7 +5,7 @@ import { openAudio } from './audio/container.js';
 import { loadBookText, loadPageScan } from './book-files.js';
 import { forgetTrackPosition, renderFigTab, resetFigureTracking, showPendingFigure, trackFigures } from './figures.js';
 import { renderInfo } from './info.js';
-import { log } from './log.js';
+import { detail, log, mb } from './log.js';
 import { addMark, renderMarks } from './marks.js';
 import { runQueue } from './queue.js';
 import { renderMini, showPlayer } from './screens.js';
@@ -46,7 +46,8 @@ export async function openBook(id, coverNow) {
   const file = await stored(id, 'audio');
   if (!file) { toast('The audio for this book is missing from this device'); return; }
   closeBook();
-  cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: null };
+  cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: null, openedAt: Date.now() };
+  detail('opening ' + book.title + ': audio ' + mb(file.size));
   showPlayer();
   setScroll($('title'), book.title);
   $('author').textContent = book.author;
