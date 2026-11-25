@@ -5,6 +5,7 @@ import { logLines } from './log.js';
 import { chapterAt, cur, setMediaSession } from './player.js';
 import { runQueue } from './queue.js';
 import { requoteAll } from './quotes.js';
+import { retuneSounds } from './sounds.js';
 import { DEFAULTS, save, settings } from './state.js';
 import { renderSwatches } from './theme.js';
 import { $, fillRange, fmt, toast } from './ui/dom.js';
@@ -13,11 +14,13 @@ import { closeSheet } from './ui/sheets.js';
 // Each slider: element id, where its value lives, and how to show it.
 const secs = (v) => v + ' s';
 const paras = (v) => '+' + v;
+const percent = (v) => v + '%';
 const SLIDERS = [
   ['nextSecs', settings.next, 'secs', secs], ['prevSecs', settings.prev, 'secs', secs],
   ['skipBack', settings, 'skipBack', secs], ['skipFwd', settings, 'skipFwd', secs],
   ['capBefore', settings.capture, 'before', secs], ['capAfter', settings.capture, 'after', secs],
   ['parasBefore', settings.capture, 'parasBefore', paras], ['parasAfter', settings.capture, 'parasAfter', paras],
+  ['soundVolume', settings, 'soundVolume', percent],
 ];
 const isSkip = (a) => a === 'fwd' || a === 'back';
 export function renderSettings() {
@@ -42,6 +45,8 @@ export function renderSettings() {
   renderCitePreview();
   $('sounds').checked = settings.sounds; $('figAlert').checked = settings.figAlert; $('figPause').checked = settings.figPause;
   $('figPauseRow').hidden = !settings.figAlert;
+  $('soundOptions').hidden = !settings.sounds;
+  $('soundStyle').value = settings.soundStyle; $('soundMark').checked = settings.soundMark; $('soundSkip').checked = settings.soundSkip;
   $('backwardLabel').textContent = settings.skipBack; $('forwardLabel').textContent = settings.skipFwd;
   $('backward').setAttribute('aria-label', 'Back ' + settings.skipBack + ' seconds');
   $('forward').setAttribute('aria-label', 'Forward ' + settings.skipFwd + ' seconds');
@@ -58,7 +63,7 @@ function renderCitePreview() {
     : formatCitation(CITE_SAMPLE, { style: $('citeStyle').value, audioTime: $('citeTime').checked, audioText: wording });
 }
 function readSettings() {
-  const was = JSON.stringify(settings.capture);
+  const was = JSON.stringify(settings.capture), voice = settings.soundStyle + settings.soundVolume;
   for (const [id, obj, key] of SLIDERS) obj[key] = Number($(id).value);
   settings.next.action = $('nextAction').value; settings.prev.action = $('prevAction').value;
   settings.capture.mode = $('capMode').value;
@@ -68,6 +73,8 @@ function readSettings() {
   settings.citeTime = $('citeTime').checked;
   settings.citeTimeText = $('citeTimeText').value.trim() || DEFAULTS.citeTimeText;
   settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;
+  settings.soundStyle = $('soundStyle').value; settings.soundMark = $('soundMark').checked; settings.soundSkip = $('soundSkip').checked;
+  if (settings.sounds && settings.soundStyle + settings.soundVolume !== voice) retuneSounds('mark');
   save(true);
   renderSettings(); setMediaSession(); runQueue();
   if (JSON.stringify(settings.capture) !== was) requoteAll();

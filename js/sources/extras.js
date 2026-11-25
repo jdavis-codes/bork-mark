@@ -44,6 +44,11 @@ export function sameChapter(a, b) {
 const KINDS = 'figure|fig\\.?|table|chart|map|exhibit|worksheet|box|illustration|plate|diagram|graph|handout|form|appendix';
 const CAPTION = new RegExp('^(' + KINDS + ')\\s+((?:[A-Za-z]\\.?)?\\d+(?:[.–-]\\d+)*[a-z]?|[A-Z])(?!\\w|\\.\\d)\\s*[.:–—-]?\\s*(.*)$', 'i');
 const HEADING = /^chapter\s+(\d+|[ivxlc]+|[a-z]+)(?!\w)\s*[.:–—-]?\s*(.*)$/i;
+// Books divide themselves in other ways too: "Part 2", "Rule #3", "Lesson 4", and
+// parts with a name of their own, alone on a line: "Introduction", "Conclusion".
+const DIVISION = /^(part|rule|lesson|step|law|principle|habit|book|week|day|section)\s*#?\s*(\d+|[ivxlc]+|[a-z]+)(?!\w)\s*[.:–—-]?\s*(.*)$/i;
+const NAMED = /^(introduction|prologue|preface|foreword|conclusion|epilogue|afterword|acknowledge?ments)$/i;
+const capital = (s) => s[0].toUpperCase() + s.slice(1).toLowerCase();
 const SPACED = new RegExp('^(' + KINDS.replace('fig\\.?|', '') + '|CHAPTER)(?=.)', 'i');
 // Some books letter-space their captions: "F I G U R E 6 . 1 0 . The relationship…".
 // Close up the spaced run at the start, stopping where the caption's number ends.
@@ -84,6 +89,11 @@ function readLine(raw) {
   if (m && line.length < 80 && opens(m[2]) && toNumber(m[1]) != null) {
     return { kind: 'chapter', label: 'Chapter ' + toNumber(m[1]), title: title(sentenceCase(m[2])), ch: toNumber(m[1]), heading: true };
   }
+  m = DIVISION.exec(line);
+  if (m && line.length < 80 && opens(m[3]) && toNumber(m[2]) != null) {
+    return { kind: 'chapter', label: capital(m[1]) + (/#/.test(line) ? ' #' : ' ') + toNumber(m[2]), title: title(sentenceCase(m[3])), ch: null, heading: true };
+  }
+  if (NAMED.test(line)) return { kind: 'chapter', label: capital(line), title: '', ch: null, heading: true };
   m = CAPTION.exec(line);
   if (!m || !opens(m[3]) || /^\d+$/.test(m[3])) return null;   // "Appendix A   32" is a contents line
   const id = m[2];
@@ -95,7 +105,8 @@ function readLine(raw) {
 }
 
 // From each page's lines, and the PDF's outline if it has one, a list of
-// places worth jumping to: { label, title, page (from 1), ch (chapter or null) }.
+// places worth jumping to: { label, title, page (from 1), ch (chapter number or null),
+// grp (the name of the chapter or other division it falls under, or null) }.
 export function findEntries(pages, outline = []) {
   const found = [];
   for (const o of outline) {
@@ -125,15 +136,18 @@ export function findEntries(pages, outline = []) {
   found.sort((a, b) => a.page - b.page || (b.listed ? 1 : 0) - (a.listed ? 1 : 0));
   // The first mention of each is kept: a table that runs on repeats its caption.
   const seen = new Set(), entries = [];
-  let chapter = null;
+  let chapter = null, group = null;
   for (const e of found) {
     const key = e.kind === 'section' ? 'section ' + e.label.toLowerCase() + ' ' + e.page : e.label.toLowerCase();
-    if (seen.has(key)) { if (e.heading) chapter = e.ch; continue; }
+    const again = seen.has(key);
     seen.add(key);
-    if (e.heading) chapter = e.ch;
+    if (e.heading) { chapter = e.ch; group = e.label; }
     // Appendices and other back matter come after the chapters, not inside the last one.
-    else if (e.ch == null && (e.kind === 'appendix' || e.kind === 'section')) chapter = null;
-    entries.push({ kind: e.kind, label: e.label, title: e.title, page: e.page, ch: e.ch != null ? e.ch : chapter });
+    else if (!again && e.ch == null && (e.kind === 'appendix' || e.kind === 'section')) { chapter = null; group = null; }
+    if (again) continue;
+    // "Table 5.2" says which chapter it belongs to; anything else belongs to the heading above it.
+    const own = !e.heading && e.ch != null ? 'Chapter ' + e.ch : null;
+    entries.push({ kind: e.kind, label: e.label, title: e.title, page: e.page, ch: e.ch != null ? e.ch : chapter, grp: own || group });
   }
   return entries;
 }

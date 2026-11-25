@@ -10,6 +10,7 @@ import { readExtras, sameChapter } from './sources/extras.js';
 import { browsePdf } from './sources/pdf.js';
 import { save } from './state.js';
 import { store, stored } from './storage.js';
+import { busy } from './ui/busy.js';
 import { $, audio, el, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { showViewer } from './viewer.js';
@@ -40,12 +41,16 @@ function chapterNow() {
   const c = chapterAt(cur.book, audio.currentTime || cur.book.position || 0);
   return c.count > 1 ? c.title : '';
 }
-// Entries in the order of the PDF, gathered under the chapter they belong to.
+// Entries in the order of the PDF, gathered under the chapter, part or other
+// division they belong to. Extras read before divisions had names carry only
+// a chapter number.
+const groupOf = (e) => (e.grp !== undefined ? e.grp : e.ch != null ? 'Chapter ' + e.ch : null);
 function groups(entries) {
   const out = [];
   for (const e of entries) {
+    const name = groupOf(e);
     let g = out[out.length - 1];
-    if (!g || g.ch !== e.ch) { g = { ch: e.ch, head: null, rows: [], page: e.page }; out.push(g); }
+    if (!g || g.name !== name) { g = { name, head: null, rows: [], page: e.page }; out.push(g); }
     if (e.kind === 'chapter' && !g.head && !g.rows.length) g.head = e; else g.rows.push(e);
   }
   return out;
@@ -86,9 +91,9 @@ function renderContents() {
   let current = null;
   list.forEach((g, k) => {
     const section = el('section', 'exgroup'), head = el('button', 'exhead');
-    const name = g.ch != null ? 'Chapter ' + g.ch : k === 0 ? 'Before the chapters' : 'After the chapters';
+    const name = g.name || (k === 0 ? 'Before the chapters' : 'After the chapters');
     head.append(el('span', '', name + (g.head && g.head.title ? ' · ' + g.head.title : '')));
-    if (!current && g.ch != null && now && sameChapter(now, 'Chapter ' + g.ch + (g.head && g.head.title ? ': ' + g.head.title : ''))) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); current = current || section; }
+    if (!current && g.name && now && sameChapter(now, g.name + (g.head && g.head.title ? ': ' + g.head.title : ''))) { head.append(el('span', 'exnow', 'Listening')); section.classList.add('now'); current = current || section; }
     head.addEventListener('click', () => showPage(g.page));
     section.append(head);
     for (const e of g.rows) {
@@ -225,7 +230,7 @@ $('extrasFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  const mine = cur, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; };
+  const mine = cur, say = (msg) => { if (cur === mine) $('textStatus').textContent = msg; }, done = busy('Adding the extras…');
   try {
     say('Reading ' + f.name + '…');
     const info = await storeExtras(mine.book, f, (p) => say('Reading ' + f.name + '… ' + Math.round(p * 100) + '%'));
@@ -237,5 +242,5 @@ $('extrasFile').addEventListener('change', async (e) => {
   } catch (err) {
     log('extras failed: ' + ((err && err.message) || err));
     if (cur === mine) { renderInfo(); toast('Could not use that PDF: ' + ((err && err.message) || err)); }
-  }
+  } finally { done(); }
 });

@@ -17,6 +17,7 @@ import { save, settings, state } from './state.js';
 import { stored } from './storage.js';
 import { $, audio, el, fillRange, fmt, setAttr, setText, toast } from './ui/dom.js';
 import { setScroll } from './ui/marquee.js';
+import { busyWhile } from './ui/busy.js';
 import { closeSheet } from './ui/sheets.js';
 import { renderSearchTab } from './search.js';
 
@@ -71,10 +72,10 @@ export async function openBook(id, coverNow) {
     $('cover').src = mine.coverUrl;
     setMediaSession(); renderMini();
   });
-  openAudio(file).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
+  busyWhile('Reading the audio…', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
     .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
-  if (book.hasText) loadBookText(mine);
-  if (book.pageSrcName) loadPageScan(mine);
+  if (book.hasText) busyWhile('Loading the book text…', loadBookText(mine));
+  if (book.pageSrcName) busyWhile('Loading the page scan…', loadPageScan(mine));
   if (book.hasExtras) loadExtras(mine);
 }
 

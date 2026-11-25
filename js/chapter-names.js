@@ -1,5 +1,6 @@
 // Naming the audio's chapters from the book's contents, by listening to the start of each.
 
+import { busyWhile } from './ui/busy.js';
 import { transcribeAround } from './audio/listen.js';
 import { probing } from './figures.js';
 import { renderInfo, setChapStatus } from './info.js';
@@ -58,7 +59,9 @@ export function autoNameChapters() {
   startPass(true);
 }
 
-async function run(auto) {
+// The whole pass shows the background notice.
+function run(auto) { return busyWhile('Naming chapters from the book…', namingPass(auto)); }
+async function namingPass(auto) {
   const mine = cur, b = mine.book;
   const say = (msg) => { if (cur === mine) setChapStatus(msg); };
   let named = 0, from = auto ? Number(b.autoNaming) || 0 : 0, finished = false;
