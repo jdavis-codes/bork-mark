@@ -723,6 +723,8 @@
     padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--bg); border-bottom: 1px solid var(--line);
   }
   .sheethead h2 { font-size: 1.15rem; }
+  .sheethead { min-height: calc(57px + env(safe-area-inset-top)); }   /* the section titles pin just under it */
+  .sheethead .iconbtn { margin: -8px -8px -8px 0; }
   .sheet { padding: 0 0 calc(40px + env(safe-area-inset-bottom)); }
   /* Sections run the full width, with a band of shade between one and the next. A section's
      title leads: the largest and heaviest thing in it, and it stays under the sheet's heading
@@ -908,7 +910,7 @@
 </dialog>
 
 <dialog id="settingsDlg">
-  <div class="sheethead"><h2 tabindex="-1" autofocus>Settings</h2><button id="settingsClose" class="small">Done</button></div>
+  <div class="sheethead"><h2 tabindex="-1" autofocus>Settings</h2><button id="settingsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="sheet">
     <section>
       <h3>Headphone and watch buttons</h3>
