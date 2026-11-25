@@ -737,13 +737,18 @@
     position: sticky; top: calc(57px + env(safe-area-inset-top)); z-index: 1; margin: 0 -16px; padding: 16px 16px 8px;
     background: var(--bg); font-size: 1.12rem; font-weight: 750; color: var(--fg);
   }
-  .field { display: grid; gap: 9px; min-width: 0; padding: 13px 0; }
-  .sheet .field + .field, .sheet .field + .stack > .field:first-child, .sheet .stack + .field, .sheet .stack + .stack > .field:first-child { border-top: 1px solid var(--line); }
-  .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0 0 12px; }
-  .sheet section > h3 + p, .sheet section > h3 + button { margin-top: 10px; }
+  /* No rules between settings: space does the grouping. A setting's name, its control and
+     the note about it sit close together, with a wider gap before the next setting. A note
+     about a whole section sits directly under the section's title. */
+  .sheet section { row-gap: 26px; padding-bottom: 26px; }
+  .stack { row-gap: 26px; }
+  .sheet h3 { margin-bottom: -16px; }
+  .field { display: grid; gap: 8px; min-width: 0; }
+  .field > .muted { margin-top: -2px; }
   .sheet .muted { font-size: 0.82rem; line-height: 1.4; margin: 0; }
-  .sheet section > p.muted { margin: 8px 0 12px; }
-  .sheet section > .field + p.muted { margin-top: 0; }
+  .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0; }
+  .sheet section > h3 + p.muted, .stack > p.muted:first-child { margin-bottom: -12px; }
+  .sheet section > button { margin-top: -12px; }
   /* A field brought into view above the keyboard keeps a little room around it, clear of the heading that stays in place. */
   dialog input, dialog textarea { scroll-margin: 112px 0 16px; }
   .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -936,6 +941,7 @@
 
     <section>
       <h3>Skip buttons</h3>
+      <p class="muted">The round buttons in the player, and the lock screen when it shows skip buttons.</p>
       <div class="field">
         <div class="fieldhead"><label for="skipBack">Back</label><output id="skipBackOut" for="skipBack"></output></div>
         <input id="skipBack" type="range" min="5" max="120" step="5">
@@ -944,7 +950,6 @@
         <div class="fieldhead"><label for="skipFwd">Forward</label><output id="skipFwdOut" for="skipFwd"></output></div>
         <input id="skipFwd" type="range" min="5" max="120" step="5">
       </div>
-      <p class="muted">The round buttons in the player, and the lock screen when it shows skip buttons.</p>
     </section>
 
     <section>
@@ -954,6 +959,7 @@
         <div class="select"><select id="capMode"><option value="time">Time</option><option value="paras">Paragraphs</option></select></div>
       </div>
       <div id="capTime" class="stack">
+        <p class="muted">Longer captures take longer to turn into quotes. Applies to new bookmarks.</p>
         <div class="field">
         <div class="fieldhead"><label for="capBefore">Before the bookmark</label><output id="capBeforeOut" for="capBefore"></output></div>
         <input id="capBefore" type="range" min="10" max="180" step="5">
@@ -962,9 +968,9 @@
         <div class="fieldhead"><label for="capAfter">After the bookmark</label><output id="capAfterOut" for="capAfter"></output></div>
         <input id="capAfter" type="range" min="0" max="60" step="5">
       </div>
-        <p class="muted">Longer captures take longer to turn into quotes. Applies to new bookmarks.</p>
       </div>
       <div id="capParas" class="stack">
+        <p class="muted">The paragraph you bookmarked is always included. Needs the book text; existing quotes update too.</p>
         <div class="field">
         <div class="fieldhead"><label for="parasBefore">Extra paragraphs before</label><output id="parasBeforeOut" for="parasBefore"></output></div>
         <input id="parasBefore" type="range" min="0" max="5" step="1">
@@ -973,7 +979,6 @@
         <div class="fieldhead"><label for="parasAfter">Extra paragraphs after</label><output id="parasAfterOut" for="parasAfter"></output></div>
         <input id="parasAfter" type="range" min="0" max="5" step="1">
       </div>
-        <p class="muted">The paragraph you bookmarked is always included. Needs the book text; existing quotes update too.</p>
       </div>
     </section>
 
