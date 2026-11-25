@@ -13,7 +13,7 @@ const SHELL = [
   'js/storage.js', 'js/store-worker.js', 'js/text/book.js', 'js/text/cleanup.js',
   'js/text/quote.js', 'js/text/search.js', 'js/theme.js', 'js/trim.js', 'js/ui/busy.js', 'js/ui/dom.js',
   'js/ui/marquee.js', 'js/ui/sheets.js', 'js/updates.js', 'js/version.js',
-  'js/viewer.js', 'manifest.webmanifest',
+  'js/viewer.js', 'manifest.webmanifest', 'icons/borky.svg', 'icons/icon-180.png', 'icons/icon-192.png',
 ];
 
 self.addEventListener('install', (e) => {

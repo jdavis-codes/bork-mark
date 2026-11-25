@@ -88,6 +88,7 @@ jobs:
             mkdir -p "$4"
             cp "$src"/*.html "$src"/*.js "$src"/*.json "$src"/manifest.webmanifest "$4/"
             if [ -d "$src/js" ]; then cp -r "$src/js" "$4/"; fi
+            if [ -d "$src/icons" ]; then mkdir -p "$4/icons" && cp "$src"/icons/*.svg "$src"/icons/*.png "$4/icons/"; fi
           }
           build "$RELEASE_REF" "$RELEASE_VERSION" release "$site"
           if [ -n "$DEV_REF" ]; then

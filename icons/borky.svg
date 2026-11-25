@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -1 69 62" fill="none" stroke-width="2.2" stroke-linejoin="miter" stroke-linecap="square">
+  <!-- Borky, the app's icon: the browser tab's icon, dark on light and light on dark -->
+  <style>g { stroke: #1c1b19; } @media (prefers-color-scheme: dark) { g { stroke: #f6f5f1; } }</style>
+  <g><path d="M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5"/><path d="M1 22 L12.5 16.5 L18 18.5 H38.5"/><path d="M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5"/><path d="M48.5 42 V59 L53.5 54.5 L58.5 59 V42"/></g>
+</svg>
