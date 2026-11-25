@@ -1,7 +1,8 @@
-// The Add a book sheet: copies the audio, and the book text and page scan if given, onto the device.
+// The Add a book sheet: copies the audio, and the book text, page scan and extras if given, onto the device.
 
 import { openAudio } from './audio/container.js';
 import { storeText } from './book-files.js';
+import { storeExtras } from './extras.js';
 import { openBook } from './player.js';
 import { readBook } from './sources/index.js';
 import { guessFirstNumbered, readPdfPages } from './sources/pdf.js';
@@ -11,11 +12,12 @@ import { $, fmt, setFill, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { detail, log, mb } from './log.js';
 
-// The three files a book can have. Only the audio is required.
+// The four files a book can have. Only the audio is required.
 const PICKS = [
   { key: 'Audio', hint: 'M4B or MP3 · required' },
   { key: 'Text', hint: 'EPUB or TXT · for exact quotes' },
   { key: 'Pdf', hint: 'PDF of the print edition · page numbers' },
+  { key: 'Extras', hint: 'PDF that came with the audiobook · figures, notes' },
 ];
 function renderPick({ key, hint }) {
   const f = $('add' + key).files[0];
@@ -42,7 +44,7 @@ $('addBtn').addEventListener('click', () => {
 $('addCancel').addEventListener('click', () => closeSheet($('addDlg')));
 for (const pick of PICKS) $('add' + pick.key).addEventListener('change', () => { renderPick(pick); addBusy(false); });
 $('addGo').addEventListener('click', async () => {
-  const af = $('addAudio').files[0], tf = $('addText').files[0], pf = $('addPdf').files[0];
+  const af = $('addAudio').files[0], tf = $('addText').files[0], pf = $('addPdf').files[0], xf = $('addExtras').files[0];
   if (!af || $('addDlg').classList.contains('busy')) return;
   addBusy(true);
   const id = crypto.randomUUID();
@@ -81,6 +83,12 @@ $('addGo').addEventListener('click', async () => {
       hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
     };
+    // Likewise the extras.
+    let extrasProblem = '';
+    if (xf) {
+      try { await storeExtras(book, xf, (p) => addSay('Reading the extras… ' + Math.round(p * 100) + '%', 0.9 + p * 0.1)); detail('extras stored: ' + took()); }
+      catch (err) { extrasProblem = (err && err.message) || String(err); }
+    }
     if (pdf) { book.hasPagePdf = true; book.pageSrcName = pf.name; book.pageFirst = guessFirstNumbered(pdf.pages) || 1; }
     resolveMeta(book);
     state.books.unshift(book);
@@ -91,6 +99,7 @@ $('addGo').addEventListener('click', async () => {
     // ready and something needs it, so the two heavy steps don't overlap.
     await openBook(id);
     if (pdfProblem) toast('Book added, but not the page scan: ' + pdfProblem);
+    else if (extrasProblem) toast('Book added, but not the extras: ' + extrasProblem);
   } catch (err) {
     log('adding failed: ' + ((err && err.message) || err));
     await store('remove', id).catch(() => {});

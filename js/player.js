@@ -3,6 +3,7 @@
 
 import { openAudio } from './audio/container.js';
 import { loadBookText, loadPageScan } from './book-files.js';
+import { loadExtras, renderExtrasTab } from './extras.js';
 import { forgetTrackPosition, renderFigTab, resetFigureTracking, showPendingFigure, trackFigures } from './figures.js';
 import { renderInfo } from './info.js';
 import { detail, log, mb } from './log.js';
@@ -60,7 +61,7 @@ export async function openBook(id, coverNow) {
   audio.src = cur.audioUrl;
   audio.playbackRate = book.speed || 1;
   renderTime(book.position || 0);
-  renderMarks(); setMediaSession(); renderFigTab();
+  renderMarks(); setMediaSession(); renderFigTab(); renderExtrasTab();
 
   const mine = cur;
   if (book.hasCover) stored(id, 'cover').then((f) => {
@@ -73,6 +74,7 @@ export async function openBook(id, coverNow) {
     .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
   if (book.hasText) loadBookText(mine);
   if (book.pageSrcName) loadPageScan(mine);
+  if (book.hasExtras) loadExtras(mine);
 }
 
 export function closeBook() {

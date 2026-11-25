@@ -16,7 +16,7 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 ## Getting started
 
 1. Open the link above in Safari on your iPhone. Tap **•••**, then **Share**, then **Add to Home Screen** (it may be under View More). This matters: Safari clears a website's saved files after about a week without a visit, and only an app on the Home Screen is exempt. Without it, your books and bookmarks can disappear.
-2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, and a PDF of the print edition if you want printed page numbers.
+2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, a PDF of the print edition if you want printed page numbers, and the extras PDF if the audiobook came with one.
 3. Press play. To bookmark, double- or triple-press your headphone button, press next track on a watch, or tap **Bookmark**. It works with the phone locked.
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
 
@@ -36,6 +36,7 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Citations** | Quotes are copied and shared with a citation in a simple style, MLA, APA or Chicago, with or without the place in the audio. |
 | **Page numbers** | Taken from the EPUB when it records them, or found in a PDF of the print edition. |
 | **Figures** | Pictures and tables in the book text are listed, and the app can chime when the reading reaches one. |
+| **Extras** | The PDF of figures, tables or notes that comes with many audiobooks: browse it page by page, or by the figures, tables and chapters found in it, starting at the chapter you are listening to. |
 | **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |
 
 <p>
@@ -78,10 +79,10 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `index.html` | Markup and styles |
 | `app.js` | Starts the app: loads the modules below, then what runs at launch |
 | `js/text/` | The book text, whatever file it came from: the word index used to find heard words (`book.js`), cutting quotes and sentences (`quote.js`), tidying tables and wrapped lines (`cleanup.js`) |
-| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, and PDF page scans. `index.js` describes the shape they all return |
+| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, PDF page scans, and the extras PDF. `index.js` describes the shape they all return |
 | `js/audio/` | Reading M4B and MP3 files and cutting clips (`container.js`), and decoding and transcribing a clip (`listen.js`) |
 | `js/ui/` | Shared interface pieces: DOM helpers, sheets and the swipe-down gesture, scrolling titles |
-| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
+| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `extras`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
 | `js/version.js` | The version and build number, written by `stamp.sh` |
 | `js/speech-worker.js` | The speech model, in a worker |
 | `js/store-worker.js` | Saving files to the browser's private storage |

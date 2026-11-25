@@ -5,7 +5,10 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p fixtures && cd fixtures
-[ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ] && exit 0
+if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
+  [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
+  exit 0
+fi
 
 # A 3-minute tone with two chapters and long titles, plus a text and an EPUB
 # (contents, a picture and a table) to go with it.

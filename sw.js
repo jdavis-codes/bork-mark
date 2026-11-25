@@ -4,6 +4,7 @@ const CACHE = 'borkmark-v2';
 const SHELL = [
   './', 'app.js', 'js/add-book.js', 'js/audio/container.js',
   'js/audio/listen.js', 'js/book-files.js', 'js/chapter-names.js', 'js/cite.js',
+  'js/extras.js', 'js/sources/extras.js',
   'js/figures.js', 'js/info.js', 'js/intro.js', 'js/library.js',
   'js/log.js', 'js/marks.js', 'js/player.js', 'js/queue.js',
   'js/quotes.js', 'js/screens.js', 'js/settings-sheet.js', 'js/sleep.js',

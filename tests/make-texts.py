@@ -36,3 +36,30 @@ rng = random.Random(3)
 open('speech.txt', 'w').write('\n\n'.join([para(rng) for _ in range(5)] + [' '.join(HARVARD[:5]), ' '.join(HARVARD[5:])] + [para(rng) for _ in range(5)]))
 rng = random.Random(4)
 epub('chapters.epub', 'Speech Book', 'A', [('Opening Remarks', ps(6)), ('The Harvard Sentences', '<p>%s</p><p>%s</p>' % (' '.join(HARVARD[:5]), ' '.join(HARVARD[5:])) + ps(4))])
+
+
+# A three-page PDF of extras: a chapter heading and a figure, a letter-spaced
+# caption and a table whose title is on the next line, and an appendix.
+def pdf(name, pages):
+    objs = [b'<< /Type /Catalog /Pages 2 0 R >>', None, b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
+    kids = []
+    for lines in pages:
+        text = 'BT /F1 14 Tf 60 600 Td 28 TL ' + ' '.join('(%s) Tj T*' % l.replace('(', r'\(').replace(')', r'\)') for l in lines) + ' ET'
+        objs.append(('<< /Length %d >>\nstream\n%s\nendstream' % (len(text), text)).encode())
+        objs.append(('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 432 648] /Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>' % len(objs)).encode())
+        kids.append(len(objs))
+    objs[1] = ('<< /Type /Pages /Count %d /Kids [%s] >>' % (len(kids), ' '.join('%d 0 R' % k for k in kids))).encode()
+    out, offsets = b'%PDF-1.4\n', []
+    for i, o in enumerate(objs):
+        offsets.append(len(out))
+        out += ('%d 0 obj\n' % (i + 1)).encode() + o + b'\nendobj\n'
+    xref = len(out)
+    out += ('xref\n0 %d\n0000000000 65535 f \n' % (len(objs) + 1)).encode() + b''.join(('%010d 00000 n \n' % o).encode() for o in offsets)
+    out += ('trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objs) + 1, xref)).encode()
+    open(name, 'wb').write(out)
+
+pdf('extras.pdf', [
+    ['Chapter One', 'Figure 1.1. Sales by region. Darker bars are later years.', 'Table 1.1 shows the same numbers.'],
+    ['CHAPTER 2', 'F I G U R E 2 . 1 . A map of the valley', 'TABLE 2.1', 'MONTHLY RAINFALL'],
+    ['Appendix A', 'Notes on the sources'],
+])
