@@ -1,8 +1,8 @@
 // Extras: the PDF of figures, notes or worksheets that comes with an audiobook. Storing it, looking
-// at a page, and the Figures sheet, which lists the book's own figures, what was found in the
-// extras chapter by chapter, or every page of them.
+// at a page, and the Figures sheet: the book's own figures or the extras, and for the extras
+// either what was found in them chapter by chapter or every page.
 
-import { renderFigList, renderFigTab } from './figures.js';
+import { clearFigures, renderFigGrid, renderFigList, renderFigTab } from './figures.js';
 import { renderInfo } from './info.js';
 import { crumb, detail, log } from './log.js';
 import { chapterAt, cur } from './player.js';
@@ -52,7 +52,9 @@ function groups(entries) {
 }
 
 // While the sheet is open the PDF stays open, so pages draw quickly.
-let pdf = null, opening = null, thumbs = null, urls = [], view = null, showing = 0;
+let pdf = null, opening = null, thumbs = null, urls = [], showing = 0;
+// Which list the sheet shows. It opens on the extras when a book has them; list or grid is remembered per book.
+let source = null, grid = { book: false, extras: false }, forBook = null;
 function openPdfOnce() {
   if (pdf) return Promise.resolve(pdf);
   if (!opening) {
@@ -74,7 +76,8 @@ function closePdf() {
   thumbs = null;
   for (const u of urls) URL.revokeObjectURL(u);
   urls = [];
-  $('extrasGrid').textContent = ''; $('extrasList').textContent = ''; $('figList').textContent = '';
+  $('extrasGrid').textContent = ''; $('extrasList').textContent = '';
+  clearFigures();
 }
 
 function renderContents() {
@@ -136,20 +139,23 @@ function renderGrid() {
     grid.append(cell); thumbs.observe(cell);
   }
 }
-// The sheet's three lists: the book's own figures, what was found in the
-// extras, and every page of the extras. Only those the book has are offered.
-function setView(which) {
+// The switch chooses where the figures come from: the book's text or the
+// extras. The grid button swaps the list by chapter for small pictures of
+// everything. Extras in which nothing was found have only their pages.
+function setView(from, asGrid) {
   const figs = cur.meta.figures.length, ex = cur.extras, found = ex ? ex.entries.length : 0;
-  const can = { book: figs > 0, contents: found > 0, pages: !!ex };
-  view = can[which] ? which : can.book ? 'book' : can.contents ? 'contents' : 'pages';
-  for (const [id, name] of [['exBook', 'book'], ['exContents', 'contents'], ['exPages', 'pages']]) {
-    $(id).hidden = !can[name];
-    $(id).setAttribute('aria-pressed', String(view === name));
-  }
-  $('figsView').hidden = Object.values(can).filter(Boolean).length < 2;
-  $('figBook').hidden = view !== 'book'; $('extrasList').hidden = view !== 'contents'; $('extrasGrid').hidden = view !== 'pages';
-  $('figCount').textContent = view === 'book' ? '(' + figs + ')' : '(' + ex.count + (ex.count === 1 ? ' page)' : ' pages)');
-  if (view === 'pages') renderGrid();
+  source = from === 'book' && figs ? 'book' : ex ? 'extras' : 'book';
+  if (asGrid != null) grid[source] = asGrid;
+  const book = source === 'book', tiles = book ? grid.book : grid.extras || !found;
+  $('figsView').hidden = !(figs && ex);
+  $('exBook').setAttribute('aria-pressed', String(book));
+  $('exExtras').setAttribute('aria-pressed', String(!book));
+  $('exGrid').hidden = !book && !found;
+  $('exGrid').setAttribute('aria-pressed', String(tiles));
+  $('exGrid').setAttribute('aria-label', tiles ? 'Show the list by chapter' : book ? 'Show every figure' : 'Show every page');
+  $('figBook').hidden = !book; $('figList').hidden = tiles; $('figGrid').hidden = !tiles;
+  $('extrasList').hidden = book || tiles; $('extrasGrid').hidden = book || !tiles;
+  if (tiles) { if (book) renderFigGrid(); else renderGrid(); }
   $('figsDlg').scrollTop = 0;
 }
 
@@ -183,19 +189,29 @@ async function showPage(n, label) {
   }
 }
 
+// Where each list should open: the figure coming up or the chapter being listened to.
+let bookSpot = null, extrasSpot = null;
+function goToSpot() {
+  const tiles = source === 'book' ? grid.book : grid.extras;
+  if (tiles) return;
+  if (source === 'book' && bookSpot) bookSpot.scrollIntoView({ block: bookSpot.tagName === 'LI' ? 'center' : 'start' });
+  if (source === 'extras' && extrasSpot) extrasSpot.scrollIntoView({ block: 'start' });
+}
 $('figsBtn').addEventListener('click', () => {
   if (!cur) return;
-  const upNext = cur.meta.figures.length ? renderFigList() : null;
-  const listening = cur.extras ? renderContents() : null;
-  setView(view);
+  if (forBook !== cur.book.id) { forBook = cur.book.id; grid = { book: false, extras: false }; }
+  source = null;   // each time: the extras when there are any
+  bookSpot = cur.meta.figures.length ? renderFigList() : null;
+  extrasSpot = cur.extras ? renderContents() : null;
+  setView(source);
   $('figsDlg').showModal();
   $('figsDlg').scrollTop = 0;
-  // Start at the figure coming up, or at the chapter being listened to.
-  if (view === 'book' && upNext) upNext.scrollIntoView({ block: 'center' });
-  if (view === 'contents' && listening) listening.scrollIntoView({ block: 'start' });
+  goToSpot();
   if (cur.extras) openPdfOnce().catch(() => {});
 });
-for (const [id, name] of [['exBook', 'book'], ['exContents', 'contents'], ['exPages', 'pages']]) $(id).addEventListener('click', () => setView(name));
+$('exBook').addEventListener('click', () => { setView('book'); goToSpot(); });
+$('exExtras').addEventListener('click', () => { setView('extras'); goToSpot(); });
+$('exGrid').addEventListener('click', () => { setView(source, !(source === 'book' ? grid.book : grid.extras)); goToSpot(); });
 $('figsClose').addEventListener('click', () => closeSheet($('figsDlg')));
 $('figsDlg').addEventListener('close', closePdf);
 $('viewDlg').addEventListener('close', () => { showing = 0; $('viewTools').classList.remove('pager'); });

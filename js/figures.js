@@ -4,11 +4,13 @@
 import { transcribeAround } from './audio/listen.js';
 import { naming } from './chapter-names.js';
 import { crumb, log } from './log.js';
-import { cur, pause, seek } from './player.js';
+import { chapterAt, cur, pause, seek } from './player.js';
 import { queueBusy, runQueue } from './queue.js';
 import { sound } from './sounds.js';
 import { modelState, transcribe, warmModel } from './speech.js';
+import { chapterNumber } from './sources/extras.js';
 import { canWork, save, settings } from './state.js';
+import { stored } from './storage.js';
 import { entryAt, findInBook } from './text/book.js';
 import { $, audio, el, fmt, icon, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
@@ -138,17 +140,37 @@ export function renderFigTab() {
   $('figsLabel').textContent = String(n || pages || '');
   $('figsBtn').setAttribute('aria-label', 'Figures' + (n ? ', ' + n + ' in the book' : '') + (pages ? ', ' + pages + ' pages of extras' : ''));
 }
-// Fills the list of the book's figures; returns the next one coming up, if known.
+// The part of the book being listened to, as its contents entry's name: from
+// the place in the text when that is known, otherwise from the audio
+// chapter's number.
+function sectionNow() {
+  const toc = cur.meta.toc, est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
+  if (est != null) { const sec = entryAt(toc, est); return sec ? sec.label : null; }
+  const c = chapterAt(cur.book, audio.currentTime || cur.book.position || 0), n = c.count > 1 ? chapterNumber(c.title) : null;
+  const match = n == null ? null : toc.find((e) => chapterNumber(e.label) === n);
+  return match ? match.label : null;
+}
+// Fills the list of the book's figures, gathered under their chapters.
+// Returns where to scroll to: the next figure coming up, or failing that the
+// chapter being listened to.
 export function renderFigList() {
-  const ol = $('figList'), figs = cur.meta.figures;
-  ol.textContent = '';
+  const box = $('figList'), figs = cur.meta.figures, now = sectionNow();
+  box.textContent = '';
   $('figStatus').textContent = '';
   const est = cur.text ? textAt(audio.currentTime, anchorList()) : null;
-  let nextOne = null;
+  let nextOne = null, listening = null, group = null, name = null;
   figs.forEach((f, i) => {
+    const sec = entryAt(cur.meta.toc, f.at), label = sec ? sec.label : 'Before the contents';
+    if (!group || label !== name) {
+      name = label;
+      const section = el('section', 'exgroup'), head = el('div', 'exhead');
+      head.append(el('span', '', label));
+      if (label === now) { head.append(el('span', 'exnow', 'Listening')); listening = listening || section; }
+      group = el('ol');
+      section.append(head, group); box.append(section);
+    }
     const li = el('li'), view = el('button', 'figrow'), text = el('span', 'figtext');
-    const sec = entryAt(cur.meta.toc, f.at);
-    text.append(el('span', 'figcap', figureName(f, i)), el('span', 'muted', (f.kind === 'table' ? 'Table' : 'Picture') + (sec ? ' · ' + sec.label : '')));
+    text.append(el('span', 'figcap', figureName(f, i)), el('span', 'muted', f.kind === 'table' ? 'Table' : 'Picture'));
     view.append(text);
     view.addEventListener('click', () => openFigure(i));
     const go = el('button', 'round');
@@ -157,9 +179,36 @@ export function renderFigList() {
     go.addEventListener('click', () => jumpToFigure(i));
     li.append(view, go);
     if (est != null && nextOne == null && f.at > est) { nextOne = li; li.classList.add('upnext'); }
-    ol.append(li);
+    group.append(li);
   });
-  return nextOne;
+  return nextOne || listening;
+}
+// The same figures as small pictures. Tables have no picture, so they show their name.
+let figUrls = [];
+export function renderFigGrid() {
+  const grid = $('figGrid'), figs = cur.meta.figures, mine = cur;
+  if (grid.childElementCount === figs.length) return;
+  grid.textContent = '';
+  figs.forEach((f, i) => {
+    const cell = el('button', 'excell'), frame = el('span', 'exthumb', f.kind === 'table' ? 'Table' : '');
+    cell.setAttribute('aria-label', figureName(f, i));
+    cell.append(frame, el('span', 'muted', String(i + 1)));
+    cell.addEventListener('click', () => openFigure(i));
+    grid.append(cell);
+    if (f.kind === 'table') return;
+    stored(mine.book.id, 'img-' + f.img).then((file) => {
+      if (!file || cur !== mine || !frame.isConnected) return;
+      const img = el('img'), url = URL.createObjectURL(file);
+      figUrls.push(url); img.alt = ''; img.loading = 'lazy'; img.src = url;
+      frame.replaceChildren(img);
+    });
+  });
+}
+// Empties the list and grid when the sheet closes, and lets go of the pictures.
+export function clearFigures() {
+  for (const u of figUrls) URL.revokeObjectURL(u);
+  figUrls = [];
+  $('figList').textContent = ''; $('figGrid').textContent = '';
 }
 async function probe(t) {
   if (probing || queueBusy || naming || !canWork() || !cur.source || modelState === 'failed' || Date.now() < probeRest) return;
