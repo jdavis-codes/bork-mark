@@ -44,3 +44,9 @@ When to run what:
 - Big changes only (moving or splitting modules, the player, sheets, gestures, storage, launch): `full`, and `compare <last commit>` for refactors that should change no behaviour.
 - `speech` only when touching transcription, matching, quotes, chapter naming, the speech worker or the queue.
 - None of these is an iPhone. For anything about playback, the lock screen, memory or touch feel, also ask for a check on the dev copy.
+
+## Screenshots
+
+- Playwright's `devices['iPhone 13']` page is 390 × 664: Safari with its bars. The Home Screen app, which is how the app is used, is 390 × 844. Screenshots come out at the page's size times the scale factor (780 × 1328, or 780 × 1688), not at one fixed size.
+- Never resize a screenshot to a width and height written into the script. That is what stretched every contact sheet and the README pictures: 390 × 664 shots were forced into 390 × 844. Scale by one factor for both sides (`im.resize((round(w * k), round(h * k)))`, or `Image.thumbnail`), and lay a contact sheet out from each picture's own size.
+- README pictures (`docs/img/`): viewport 390 × 844 at `deviceScaleFactor: 2`, saved at 0.75 of that (585 × 1266). Keep them to the few that explain the app; the README shows four in one row, each with a caption. Use public-domain sample material, not a user's own files.

@@ -6,12 +6,20 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 
 **Open it:** https://jdavis-codes.github.io/bork-mark/
 
-<p>
-  <img src="docs/img/library.png" width="24%" alt="Library with one book and its progress">
-  <img src="docs/img/player.png" width="24%" alt="Player with cover, chapter, progress and a large Bookmark button">
-  <img src="docs/img/bookmarks.png" width="24%" alt="Bookmarks grouped by chapter, each with its quote">
-  <img src="docs/img/trim.png" width="24%" alt="Trimming a quote by dragging handles over the text">
-</p>
+<table>
+  <tr>
+    <td width="25%"><img src="docs/img/player.png" alt="The player: cover, chapter, progress and one large Bookmark button"></td>
+    <td width="25%"><img src="docs/img/bookmarks.png" alt="Bookmarks grouped by chapter, each showing the passage from the book"></td>
+    <td width="25%"><img src="docs/img/trim.png" alt="Trimming a quote by dragging handles over the text"></td>
+    <td width="25%"><img src="docs/img/extras.png" alt="Extras: the figures that came with the audiobook, listed by chapter"></td>
+  </tr>
+  <tr>
+    <td><b>Listen.</b> One big button, or the one on your headphones.</td>
+    <td><b>Get the words back.</b> Each bookmark becomes the passage, in the book’s own wording.</td>
+    <td><b>Keep what matters.</b> Drag to the sentences you want, then copy or share with a citation.</td>
+    <td><b>See what you’re hearing.</b> The figures that came with the audiobook, by chapter.</td>
+  </tr>
+</table>
 
 ## Getting started
 
@@ -21,10 +29,6 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
 
 Files must be free of copy protection, such as the downloads from Libro.fm. A short guide covers the same steps the first time you open the app; Settings can show it again.
-
-<p>
-  <img src="docs/img/intro.png" width="24%" alt="Intro guide step: why and how to add the app to the Home Screen">
-</p>
 
 ## What it does
 
@@ -39,11 +43,6 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Figures** | Pictures and tables in the book text are listed, and the app can chime when the reading reaches one. |
 | **Extras** | The PDF of figures, tables or notes that comes with many audiobooks: browse it page by page, or by the figures, tables and chapters found in it, starting at the chapter you are listening to. |
 | **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |
-
-<p>
-  <img src="docs/img/citations.png" width="24%" alt="Citation settings with style, audio time and a preview">
-  <img src="docs/img/info.png" width="24%" alt="About this book: title, author, publisher, year and file links">
-</p>
 
 ### Citations
 
