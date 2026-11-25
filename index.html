@@ -52,6 +52,8 @@
   button:disabled { opacity: 0.45; cursor: default; }
   button.primary { background: var(--accent); color: var(--accent-fg); border: none; font-weight: 600; }
   button.plain { border: none; padding: 8px 4px; color: var(--accent); }
+  #backBtn { margin-left: -8px; }
+  #backBtn svg { stroke-width: 2.2; stroke-linejoin: round; }
   button.small { padding: 6px 10px; font-size: 0.85rem; }
   input[type=file] { display: none; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -693,7 +695,7 @@
 
 <main id="player" hidden>
   <div class="row spread">
-    <button id="backBtn" class="plain">‹ Library</button>
+    <button id="backBtn" class="iconbtn" aria-label="Back to the library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <button id="infoBtn" class="iconbtn" aria-label="About this book">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg>
     </button>

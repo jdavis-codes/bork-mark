@@ -57,10 +57,46 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     if (on) renderLibrary();
     renderMini();
   };
-  const clear = () => { player.style.transition = ''; player.style.transform = ''; player.classList.remove('lifted'); };
+  const cover = $('cover');
+  // The rest of the player fades as the cover travels, so the cover doesn't
+  // slide across the title and controls: the parts are collected when a drag starts.
+  let rest = [];
+  const fadeRest = (o, transition) => { for (const n of rest) { n.style.transition = transition || ''; n.style.opacity = o; } };
+  const clear = () => {
+    player.style.transition = ''; player.style.transform = ''; player.classList.remove('lifted');
+    cover.style.transition = ''; cover.style.transform = ''; cover.style.willChange = '';
+    for (const n of rest) { n.style.transition = ''; n.style.opacity = ''; n.style.willChange = ''; }
+    rest = [];
+  };
+  // While the player is pulled down, its cover shrinks and slides toward the
+  // mini player's cover, arriving as the library comes into view (at REACH of
+  // the screen's height), so it looks like the one turning into the other.
+  // Both are measured once when the drag starts; each move is a transform.
+  const REACH = 0.5;
+  let path = null;   // { dx, dy0, s } from the cover's place to the mini cover's, or null
+  const coverAt = (dy, p) => {
+    if (!path) return '';
+    p = Math.max(0, Math.min(1, p));
+    // dy0 is measured with the player at rest; the player itself has moved down by dy
+    return 'translate(' + (path.dx * p) + 'px, ' + ((path.dy0 - dy) * p) + 'px) scale(' + (1 + (path.s - 1) * p) + ')';
+  };
+  const plot = () => {
+    path = null;
+    const mini = $('miniCover');
+    if (calm.matches || mini.hidden || $('mini').hidden) return;
+    const a = cover.getBoundingClientRect(), b = mini.getBoundingClientRect();
+    if (!a.width || !b.width) return;
+    path = { dx: (b.left + b.width / 2) - (a.left + a.width / 2), dy0: (b.top + b.height / 2) - (a.top + a.height / 2), s: b.width / a.width };
+    cover.style.willChange = 'transform';
+    rest = [...player.children].filter((n) => !n.contains(cover) && !n.hidden);
+    for (const n of rest) n.style.willChange = 'opacity';
+  };
   const settle = () => {
     player.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.85, 0.25, 1)';
     player.style.transform = '';
+    cover.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.85, 0.25, 1)';
+    cover.style.transform = '';
+    fadeRest('1', 'opacity 0.2s');
     for (const n of under) { n.style.transition = 'opacity 0.2s'; n.style.opacity = '0'; }
     setTimeout(() => {
       clear();
@@ -71,9 +107,14 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
   swipeDown(player, {
     slop: 10,
     canStart: (e) => window.scrollY <= 0 && !e.target.closest('input, select, textarea'),
-    start() { player.style.transition = 'none'; player.classList.add('lifted'); uncover(true); },
+    start() { player.style.transition = 'none'; cover.style.transition = 'none'; player.classList.add('lifted'); uncover(true); plot(); },
     move(dy) {
       player.style.transform = 'translateY(' + dy + 'px)';
+      if (path) {
+        const p = dy / (window.innerHeight * REACH);
+        cover.style.transform = coverAt(dy, p);
+        fadeRest(String(Math.max(0, 1 - p * 1.6)));
+      }
       const shown = String(Math.min(1, dy / (window.innerHeight * 0.45)));
       for (const n of under) n.style.opacity = shown;
     },
@@ -88,7 +129,9 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       };
       if (calm.matches) { finish(); return; }
       player.style.transition = 'transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1), opacity 0.3s ease-in';
-      player.style.transform = 'translateY(' + Math.max(dy + 160, window.innerHeight * 0.75) + 'px)';
+      const to = Math.max(dy + 160, window.innerHeight * 0.75);
+      player.style.transform = 'translateY(' + to + 'px)';
+      if (path) { cover.style.transition = 'transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1)'; cover.style.transform = coverAt(to, 1); }   // lands on the mini cover as the player fades
       player.style.opacity = '0';
       for (const n of under) { n.style.transition = 'opacity 0.25s'; n.style.opacity = '1'; }
       setTimeout(finish, 310);
