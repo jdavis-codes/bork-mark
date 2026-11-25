@@ -1,4 +1,5 @@
 // Runs Whisper off the main thread so the page stays responsive.
+
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
 
 let asr = null;

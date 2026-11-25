@@ -86,6 +86,7 @@ jobs:
             ( cd "$src" && BUILD=$(git log -1 --format=%ct) ./stamp.sh "$2" "$3" )
             mkdir -p "$4"
             cp "$src"/*.html "$src"/*.js "$src"/*.json "$src"/manifest.webmanifest "$4/"
+            if [ -d "$src/js" ]; then cp -r "$src/js" "$4/"; fi
           }
           build "$RELEASE_REF" "$RELEASE_VERSION" release "$site"
           if [ -n "$DEV_REF" ]; then

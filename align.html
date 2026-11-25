@@ -136,7 +136,11 @@
 </main>
 
 <script type="module">
-import { openAudio, decode, to16kMono, readBook, buildBook, tokenize, locate, passage } from './align.js';
+import { openAudio } from './js/audio/container.js';
+import { decode, to16kMono } from './js/audio/listen.js';
+import { readBook } from './js/sources/index.js';
+import { buildBook, tokenize, locate } from './js/text/book.js';
+import { passage } from './js/text/quote.js';
 
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
@@ -254,7 +258,7 @@ audio.addEventListener('loadedmetadata', () => { $('playerStatus').hidden = true
 let worker = null, pending = null, runId = 0;
 function transcribe(pcm, model, device) {
   if (!worker) {
-    worker = new Worker('./align-worker.js', { type: 'module' });
+    worker = new Worker('./js/speech-worker.js', { type: 'module' });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'progress' && m.total) {

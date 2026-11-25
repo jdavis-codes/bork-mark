@@ -2,7 +2,7 @@
 # Stamps a copy of the app for publishing. Usage: ./stamp.sh [version] [channel]
 #
 # Writes the version, the channel (release or dev) and a build number into
-# app.js and version.json. Settings shows the version; the app compares build
+# js/version.js and version.json. Settings shows the version; the app compares build
 # numbers to notice a newer one. The build number is the time now, or $BUILD
 # when that is set. The deploy workflow runs this; there is no need to run it
 # by hand.
@@ -11,13 +11,13 @@ cd "$(dirname "$0")"
 B=${BUILD:-$(date +%s)}
 V=${1:-$(tr -d ' \n' < VERSION)}
 C=${2:-release}
-sed -i "s/^const BUILD = '[0-9]*';/const BUILD = '$B';/" app.js
-sed -i "s/^const VERSION = '[^']*';/const VERSION = '$V';/" app.js
-sed -i "s/^const CHANNEL = '[^']*';/const CHANNEL = '$C';/" app.js
+sed -i "s/^export const BUILD = '[0-9]*';/export const BUILD = '$B';/" js/version.js
+sed -i "s/^export const VERSION = '[^']*';/export const VERSION = '$V';/" js/version.js
+sed -i "s/^export const CHANNEL = '[^']*';/export const CHANNEL = '$C';/" js/version.js
 printf '{"build":"%s","version":"%s","channel":"%s"}\n' "$B" "$V" "$C" > version.json
-grep -q "const BUILD = '$B';" app.js
-grep -q "const VERSION = '$V';" app.js
-grep -q "const CHANNEL = '$C';" app.js
+grep -q "export const BUILD = '$B';" js/version.js
+grep -q "export const VERSION = '$V';" js/version.js
+grep -q "export const CHANNEL = '$C';" js/version.js
 # The development copy installs under its own name.
 if [ "$C" = dev ]; then
   sed -i 's/"name": "Bork Mark"/"name": "Bork Mark (dev)"/; s/"short_name": "Bork Mark"/"short_name": "Bork dev"/' manifest.webmanifest

@@ -73,15 +73,19 @@ There is no build step: the app is plain HTML, CSS and JavaScript modules.
 python3 -m http.server 8765   # then open http://localhost:8765/
 ```
 
-| File | What it holds |
+| Where | What it holds |
 |---|---|
 | `index.html` | Markup and styles |
-| `app.js` | The interface: library, player, bookmarks, settings |
-| `align.js` | Reading M4B, MP3, EPUB and PDF files, and matching audio to text |
-| `cite.js` | Citation styles |
-| `align-worker.js` | The speech model, in a worker |
-| `store-worker.js` | Saving files to the browser's private storage |
-| `sw.js` | Service worker, so the app opens without signal |
+| `app.js` | Starts the app: loads the modules below, then what runs at launch |
+| `js/text/` | The book text, whatever file it came from: the word index used to find heard words (`book.js`), cutting quotes and sentences (`quote.js`), tidying tables and wrapped lines (`cleanup.js`) |
+| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, and PDF page scans. `index.js` describes the shape they all return |
+| `js/audio/` | Reading M4B and MP3 files and cutting clips (`container.js`), and decoding and transcribing a clip (`listen.js`) |
+| `js/ui/` | Shared interface pieces: DOM helpers, sheets and the swipe-down gesture, scrolling titles |
+| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
+| `js/version.js` | The version and build number, written by `stamp.sh` |
+| `js/speech-worker.js` | The speech model, in a worker |
+| `js/store-worker.js` | Saving files to the browser's private storage |
+| `sw.js` | Service worker, so the app opens without signal. Its list of app files needs updating when a module is added |
 | `buttons.html`, `align.html` | Test pages for media buttons and for alignment |
 
 ### Versions and deploying
@@ -99,4 +103,4 @@ The `VERSION` file holds the first two numbers, such as `0.1`. Every push to `ma
 
 The development copy keeps its own books and settings, separate from the released app, and installs as "Bork Mark (dev)".
 
-The workflow runs `./stamp.sh`, which writes the version and a build number into `app.js` and `version.json`; an installed copy compares build numbers to notice a newer version.
+The workflow runs `./stamp.sh`, which writes the version and a build number into `js/version.js` and `version.json`; an installed copy compares build numbers to notice a newer version.
