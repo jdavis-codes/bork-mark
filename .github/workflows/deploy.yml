@@ -17,20 +17,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write    # tags and releases
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: deploy
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
+    outputs:
+      releasing: ${{ steps.pick.outputs.releasing }}
+      version: ${{ steps.pick.outputs.release_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,12 +98,33 @@ jobs:
         with:
           path: ${{ runner.temp }}/site
 
+  # A job of its own: the deploy step looks the artifact up once the job
+  # that uploaded it has finished.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      actions: read
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
       - id: pages
         uses: actions/deploy-pages@v4
 
+  release:
+    needs: [build, deploy]
+    if: needs.build.outputs.releasing == 'yes'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - name: Tag and publish the release
-        if: steps.pick.outputs.releasing == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.pick.outputs.release_version }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
