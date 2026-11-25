@@ -1,7 +1,7 @@
 // Speech to text: the Whisper worker, loading its model (with retries), and the status line
 // that reports on it.
 
-import { busyWhile } from './ui/busy.js';
+import { busy } from './ui/busy.js';
 import { crumb, detail, log } from './log.js';
 import { runQueue } from './queue.js';
 import { state } from './state.js';
@@ -23,7 +23,7 @@ function ask(message, transfer = []) {
     asrWorker.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'progress' && m.total) {
-        setQueueStatus('Downloading the speech model (one time): ' + Math.round(100 * m.loaded / m.total) + '%');
+        if (modelNotice) modelNotice.say('Model ' + Math.round(100 * m.loaded / m.total) + '%');   // the one-time download
         return;
       }
       if (m.type === 'file') { detail('model file ' + m.status + ': ' + m.file); return; }
@@ -92,7 +92,6 @@ async function loadModel() {
       await forgetRuntime();
       if (attempt >= MODEL_RETRIES.length) { altRuntime = false; throw err; }
       altRuntime = attempt >= 1;   // third try: the other host
-      setQueueStatus('The speech model didn’t load. Trying again…');
       await new Promise((r) => setTimeout(r, MODEL_RETRIES[attempt]));
     }
   }
@@ -104,33 +103,36 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 // Loads the speech model ahead of time, so the first bookmark doesn't have
 // to do it in the middle of playback.
-let warming = null;
+// While it loads, the notice at the top says so; nothing is said when it is
+// ready. Only a failure gets words: a box in the library with a Try again
+// button, and the same line in the Bookmarks sheet.
+let warming = null, modelNotice = null, failText = '';
 export function warmModel() {
   if (modelState === 'ready') return Promise.resolve();
   if (warming) return warming;
   modelState = 'loading';
+  failText = '';
   crumb('loading the speech model');
-  setQueueStatus('Getting the speech model ready…');
-  warming = busyWhile('Loading model', loadModel()).then(() => {
+  setQueueStatus('');
+  modelNotice = busy('Loading model');
+  warming = loadModel().then(() => {
     modelState = 'ready';
   }, (err) => {
     modelState = 'failed';
-    setQueueStatus(/network|load failed|fetch/i.test(err.message)
-      ? 'The speech model didn’t download (network error). Bookmarks are still saved; quotes will be found once it loads.'
-      : 'Speech model could not load: ' + err.message);
+    failText = /network|load failed|fetch/i.test(err.message)
+      ? 'The speech model didn’t download. Bookmarks are still saved; their quotes will be found once it loads.'
+      : 'The speech model could not load: ' + err.message;
     throw err;
   }).finally(() => {
     warming = null; crumb(null);
-    if (modelState === 'ready') setQueueStatus('');
-    renderModelNote();
+    modelNotice(); modelNotice = null;
+    setQueueStatus(failText);
   });
-  renderModelNote();
   return warming;
 }
 
 export function setQueueStatus(msg) {
   $('queueStatus').textContent = msg;
-  $('modelNote').textContent = msg || (modelState === 'ready' ? 'Speech model ready.' : '');
-  $('modelAgain').hidden = modelState !== 'failed';
+  $('modelFail').hidden = modelState !== 'failed';
+  $('modelNote').textContent = failText;
 }
-function renderModelNote() { setQueueStatus($('queueStatus').textContent); }

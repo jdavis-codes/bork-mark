@@ -39,11 +39,14 @@ function update() {
   }
 }
 // Shows the notice with this label until the returned function is called.
+// Its `say` changes the label meanwhile ("Model 40%").
 export function busy(label) {
   const id = ++seq;
   jobs.set(id, label);
   update();
-  return () => { jobs.delete(id); update(); };
+  const done = () => { jobs.delete(id); update(); };
+  done.say = (text) => { if (jobs.has(id)) { jobs.set(id, text); update(); } };
+  return done;
 }
 // The notice for as long as a promise takes, whichever way it ends.
 export function busyWhile(label, promise) {
