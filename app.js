@@ -32,6 +32,8 @@ for (const b of state.books) {
   for (const m of b.marks) {
     if (m.status === 'working') { m.status = 'error'; m.error = 'The app closed while finding this quote. Tap Retry to try again.'; }
   }
+  // Likewise naming chapters by itself; the button in About this book still works.
+  if (lastCrash && /^naming chapters/.test(lastCrash.stage) && typeof b.autoNaming === 'number') b.autoNaming = 'done';
 }
 save(true);
 

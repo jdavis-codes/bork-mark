@@ -44,3 +44,8 @@ export function crumb(stage) {
   flushLog();
 }
 crumb(null);
+// Leaving the page normally (closing it, or reloading for an update) is not a
+// crash, even partway through a step: the page gets to say goodbye. Only an
+// ending without that, such as iOS stopping the app for memory, leaves the
+// note for the next launch.
+window.addEventListener('pagehide', () => crumb(null));

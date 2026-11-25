@@ -1,7 +1,7 @@
 // The bookmark queue: finds each new bookmark's quote by listening to the audio around it.
 
 import { transcribeAround } from './audio/listen.js';
-import { naming } from './chapter-names.js';
+import { autoNameChapters, naming } from './chapter-names.js';
 import { probing } from './figures.js';
 import { crumb } from './log.js';
 import { renderMarks } from './marks.js';
@@ -45,4 +45,5 @@ export async function runQueue() {
     crumb(null);
     if (modelState !== 'failed') setQueueStatus('');
   }
+  autoNameChapters();
 }

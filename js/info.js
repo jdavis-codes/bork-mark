@@ -1,6 +1,6 @@
 // The About this book sheet: editable details, the chapter list, file links, removing the book.
 
-import { chaptersChanged, keepAudioChapters, nameChapters, naming } from './chapter-names.js';
+import { chaptersChanged, keepAudioChapters, nameChapters, namingChapters } from './chapter-names.js';
 import { closeBook, cur, setMediaSession } from './player.js';
 import { findPages } from './quotes.js';
 import { showLibrary } from './screens.js';
@@ -83,7 +83,7 @@ export function renderInfo() {
       const tools = el('div', 'row');
       if (cur.text && cur.meta.toc.length) {
         const auto = el('button', 'small', 'Name from book text');
-        auto.disabled = naming;
+        auto.disabled = namingChapters();
         auto.addEventListener('click', nameChapters);
         tools.append(auto);
       }

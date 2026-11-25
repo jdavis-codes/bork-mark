@@ -90,7 +90,7 @@ $('textFile').addEventListener('change', async (e) => {
     b.fromText = fromDoc(doc);
     // Saved positions pointed into the old text, so they can't be re-cut against the new one.
     for (const m of b.marks) { delete m.loc; delete m.figs; delete m.trim; }
-    delete b.anchors;
+    delete b.anchors; delete b.autoNaming;
     resolveMeta(b); save(true);
     if (cur !== mine) return;
     mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true };
