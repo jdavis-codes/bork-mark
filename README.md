@@ -104,7 +104,7 @@ Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`.
 
 Pages serves one site per repository, so every run publishes both copies together: the latest release at the top and the head of `develop` under `dev/`. A push to `develop` republishes the latest release unchanged.
 
-The `VERSION` file holds the first two numbers, such as `0.1`. Every push to `main` gets the next free third number (`v0.1.0`, `v0.1.1`, …) as its tag and release. To start a new series, change `VERSION` to `0.2` or `1.0`. Development builds are named after the release they lead to, with a count of changes since the last release: after `v0.1.3`, the eighth change on `develop` is `0.1.4-dev.8`. Settings, App shows which version is running and the commit it was built from, linked to GitHub.
+The `VERSION` file holds the first two numbers, such as `0.2`. Every push to `main` gets the next free third number (`v0.2.0`, `v0.2.1`, …) as its tag and release. To start a new series, change `VERSION` to `0.2` or `1.0`. Development builds are named after the release they lead to, with a count of changes since the last release: after `v0.1.3`, the eighth change on `develop` is `0.1.4-dev.8`. Settings, App shows which version is running and the commit it was built from, linked to GitHub.
 
 The development copy keeps its own books and settings, separate from the released app, and installs as "Bork Mark (dev)".
 

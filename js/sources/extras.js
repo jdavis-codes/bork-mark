@@ -54,7 +54,21 @@ const PART = /^\s*(part|book)\s+(\d+|[ivxlc]+|[a-z]+)\b/i;
 const BACK = /^\s*(conclusion|epilogue|afterword|acknowledge?ments|notes|appendix|appendices|index|bibliography|references|glossary|about the|also by|copyright|credits|closing)\b/i;
 // A contents list kept from before nesting was recorded is flat. If it names
 // parts, the entries after each one are inside it, until the back of the book.
-function withNesting(toc) {
+// Some contents lists put every chapter inside one entry named after the book.
+// That entry is a wrapper, not a part: its chapters count as top-level.
+function withoutWrapper(toc) {
+  const parents = [];
+  let inside = 0, top = -1;
+  toc.forEach((e, k) => { if (!(e.depth > 0)) top = k; else { if (!parents.includes(top)) parents.push(top); inside++; } });
+  if (parents.length !== 1 || parents[0] < 0 || inside < toc.length * 0.6) return toc;
+  let under = false;
+  return toc.map((e, k) => {
+    if (!(e.depth > 0)) { under = k === parents[0]; return e; }
+    return under ? { ...e, depth: e.depth - 1 } : e;
+  });
+}
+function withNesting(list) {
+  const toc = withoutWrapper(list);
   if (toc.some((e) => e.depth > 0) || !toc.some((e) => PART.test(e.label))) return toc;
   let inPart = false;
   return toc.map((e) => {
