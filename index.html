@@ -719,7 +719,7 @@
     border: none; border-radius: 0; padding: 0; background: var(--bg); overflow-y: auto;
   }
   .sheethead {
-    position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 3; display: flex; justify-content: space-between; align-items: center;   /* above the section titles, which slide up under it as their section leaves */
     padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--bg); border-bottom: 1px solid var(--line);
   }
   .sheethead h2 { font-size: 1.15rem; }
