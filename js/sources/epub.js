@@ -116,13 +116,17 @@ export async function readEpub(file) {
     if (!anchors.has(path)) anchors.set(path, []);
     anchors.get(path).push({ id, kind, label: clean(label) });
   };
+  // How deep each contents entry is nested (0 at the top), by its name.
+  const depthOf = new Map();
+  const nesting = (node, tag, stop) => { let d = 0; for (let n = node.parentNode; n && n !== stop; n = n.parentNode) if (n.localName === tag) d++; return d; };
+  const deep = (label, depth) => { const name = clean(label); if (name && !depthOf.has(name)) depthOf.set(name, Math.max(0, depth)); };
   try {
     const ncxPath = spineEl && items[spineEl.getAttribute('toc')];
     if (navPath && zip[navPath]) {          // EPUB 3
       const nav = new DOMParser().parseFromString(read(navPath), 'application/xhtml+xml');
       for (const n of byTag(nav, 'nav')) {
         const kind = /page-list/.test(epubType(n)) ? 'P' : /\btoc\b/.test(epubType(n)) ? 'T' : null;
-        if (kind) byTag(n, 'a').forEach((a) => note(dirOf(navPath), a.getAttribute('href'), kind, a.textContent));
+        if (kind) byTag(n, 'a').forEach((a) => { note(dirOf(navPath), a.getAttribute('href'), kind, a.textContent); if (kind === 'T') deep(a.textContent, nesting(a, 'ol', n) - 1); });
       }
     }
     if (ncxPath && zip[ncxPath]) {          // EPUB 2, and page lists some EPUB 3 files keep here
@@ -130,7 +134,7 @@ export async function readEpub(file) {
       const have = (kind) => [...anchors.values()].some((list) => list.some((a) => a.kind === kind));
       const add = (tag, kind) => byTag(ncx, tag).forEach((pt) => {
         const label = byTag(pt, 'text')[0], content = byTag(pt, 'content')[0];
-        if (label && content) note(dirOf(ncxPath), content.getAttribute('src'), kind, label.textContent);
+        if (label && content) { note(dirOf(ncxPath), content.getAttribute('src'), kind, label.textContent); if (kind === 'T') deep(label.textContent, nesting(pt, 'navPoint', null)); }
       });
       if (!have('T')) add('navPoint', 'T');
       if (!have('P')) add('pageTarget', 'P');
@@ -183,7 +187,7 @@ export async function readEpub(file) {
   figures.length = 0; figures.push(...kept);
   const meta = byTag(opf, 'metadata')[0] || opf;
   return {
-    text, toc: dedupe(toc), pages: dedupe(pages), figures, images,
+    text, toc: dedupe(toc).map((e) => ({ ...e, depth: depthOf.get(e.label) || 0 })), pages: dedupe(pages), figures, images,
     title: clean((byTag(meta, 'title')[0] || {}).textContent),
     author: byTag(meta, 'creator').map((c) => clean(c.textContent)).filter(Boolean).join(', '),
     publisher: clean((byTag(meta, 'publisher')[0] || {}).textContent),
