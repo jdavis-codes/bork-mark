@@ -468,12 +468,16 @@
     border: none; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 0 8px; background: var(--card);
     text-align: left; font-size: 0.98rem; font-weight: 650;
   }
-  .exhead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* long chapter names wrap onto more lines rather than being cut off */
+  .exhead span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  .exgroup.now .exhead span:first-child { color: var(--accent); font-weight: 800; }
+  .exgroup.now .exhead { border-bottom-color: var(--accent); }
   .exnow { flex: none; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: var(--tint); border-radius: 999px; padding: 2px 8px; }
   .exrow { width: 100%; display: flex; align-items: center; gap: 10px; border: none; border-radius: 0; padding: 11px 2px; text-align: left; }
   .exrow + .exrow { border-top: 1px solid var(--line); }
   .exrow .figtext { flex: 1; }
   .exrow .muted:empty { display: none; }
+  .exrow .figtext .muted { white-space: normal; overflow-wrap: anywhere; }
   .expage { flex: none; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
   .exgrid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
   .exgrid[hidden], #extrasList[hidden], #figList[hidden], #figsView[hidden], #figBook[hidden], #exGrid[hidden] { display: none; }

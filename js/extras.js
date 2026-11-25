@@ -192,10 +192,14 @@ async function showPage(n, label) {
 // Where each list should open: the figure coming up or the chapter being listened to.
 let bookSpot = null, extrasSpot = null;
 function goToSpot() {
-  const tiles = source === 'book' ? grid.book : grid.extras;
-  if (tiles) return;
-  if (source === 'book' && bookSpot) bookSpot.scrollIntoView({ block: bookSpot.tagName === 'LI' ? 'center' : 'start' });
-  if (source === 'extras' && extrasSpot) extrasSpot.scrollIntoView({ block: 'start' });
+  const tiles = source === 'book' ? grid.book : grid.extras, spot = source === 'book' ? bookSpot : extrasSpot;
+  if (tiles || !spot) return;
+  // Put it a third of the way down the part of the sheet below the heading,
+  // which stays in place and would otherwise cover it. Done by hand because
+  // scrollIntoView counts the covered strip as visible.
+  const sheet = $('figsDlg'), head = sheet.querySelector('.markshead').getBoundingClientRect().bottom;
+  const room = sheet.getBoundingClientRect().bottom - head;
+  sheet.scrollTop += spot.getBoundingClientRect().top - head - Math.max(0, (room - spot.firstElementChild.getBoundingClientRect().height) / 3);
 }
 $('figsBtn').addEventListener('click', () => {
   if (!cur) return;
