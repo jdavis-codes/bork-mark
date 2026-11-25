@@ -317,24 +317,26 @@
 /* bottom bar in the player: speed, sleep, settings within thumb reach */
   /* Pulling the player down: the big player turns into the mini player. Everything follows --p, from
      0 (the player) to 1 (the mini player), which screens.js sets as the finger moves and lets go of to
-     0 or 1 (animated by the transition on .gliding). --end is how far down the mini player's top is; the
-     --cover-* and --title-* distances are measured in the player's own frame, so they move with the
-     sheet and never ahead of it. The title moves across early and up late, so it stays clear of the
-     cover until it settles beside it. */
+     0 or 1 (animated by the transition on .gliding). --end is how far down the mini player's top is.
+     The cover and title ride down with the sheet; in the sheet they only shrink (the cover about its
+     own middle) and slide left, mostly early on (--e), and each stops when it reaches its place in the
+     mini player (--*-stick below where it started), the sheet carrying on underneath. */
   @property --p { syntax: '<number>'; inherits: true; initial-value: 0; }
   html.gliding { transition: --p 0.26s cubic-bezier(0.3, 0.6, 0.35, 1); }
+  html.pulling { --e: calc(var(--p) * (2 - var(--p))); }
   html.pulling #player {
     transform: translateY(calc(var(--p) * var(--end))); will-change: transform;
     border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
   }
   html.pulling #cover {
-    transform: translate(calc(var(--p) * var(--cover-x, 0px)), calc(var(--p) * var(--cover-y, 0px))) scale(calc(1 + var(--p) * (var(--cover-s, 1) - 1)));
+    transform: translate(calc(var(--e) * var(--cover-x, 0px)), min(0px, calc(var(--cover-stick, 9999px) - var(--p) * var(--end))))
+      scale(calc(1 + var(--e) * (var(--cover-s, 1) - 1)));
     will-change: transform;
   }
   html.pulling #title {
     transform-origin: left center; will-change: transform;
-    transform: translate(calc(var(--p) * (2 - var(--p)) * var(--title-x, 0px) - var(--p) * var(--title-in, 0px)), calc(var(--p) * var(--p) * var(--title-y, 0px)))
-      scale(calc(1 + var(--p) * (var(--title-s, 1) - 1)));
+    transform: translate(calc(var(--e) * (var(--title-x, 0px) - var(--title-in, 0px))), min(0px, calc(var(--title-stick, 9999px) - var(--p) * var(--end))))
+      scale(calc(1 + var(--e) * (var(--title-s, 1) - 1)));
   }
   html.pulling #player > :not(.coverwrap):not(#title) { opacity: calc(1 - var(--p) * 1.8); }
   html.pulling #library, html.pulling #libFoot { opacity: min(1, calc(var(--p) * 1.2)); }

@@ -75,6 +75,9 @@ for (const d of document.querySelectorAll('dialog')) {
 export function swipeDown(target, { slop, canStart, start, move, end }) {
   let g = null;
   target.addEventListener('touchstart', (e) => {
+    // Another finger landing mid-swipe ends the swipe as if cancelled, so it
+    // always finishes (end is never skipped, which left a sheet half way).
+    if (g && g.dragging) { const was = g; g = null; end(was.dy, 0, false); return; }
     g = null;
     if (e.touches.length !== 1 || !canStart(e)) return;
     g = { x: e.touches[0].clientX, y: e.touches[0].clientY, at: e.timeStamp, dy: 0, dragging: false };

@@ -58,8 +58,9 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
   let end = 0, state = 'idle';   // idle | pulling | gliding
   const set = (p) => root.style.setProperty('--p', String(Math.max(0, Math.min(1, p))));
 
-  // Where the cover and title go: as distances in the player's own frame, so
-  // they move with the sheet and never ahead of it.
+    // Where the cover and title go: how far each slides across, how much it
+  // shrinks, and how far down it is from its place in the mini player (where
+  // it stops while the sheet carries on).
   function measure() {
     const mini = $('mini'), cover = $('cover'), title = $('title'), miniCover = $('miniCover'), miniTitle = $('miniTitle');
     end = mini.hidden ? window.innerHeight * 0.75 : mini.getBoundingClientRect().top;
@@ -67,7 +68,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
     const a = cover.getBoundingClientRect(), b = miniCover.getBoundingClientRect();
     if (!miniCover.hidden && a.width && b.width) {
       v['--cover-x'] = (b.left + b.width / 2) - (a.left + a.width / 2) + 'px';
-      v['--cover-y'] = (b.top + b.height / 2 - end) - (a.top + a.height / 2) + 'px';
+      v['--cover-stick'] = (b.top + b.height / 2) - (a.top + a.height / 2) + 'px';   // how far down until it reaches its place
       v['--cover-s'] = String(b.width / a.width);
     }
     // The title's text, centred or not, travels to the mini title's text.
@@ -77,7 +78,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
       const s = parseFloat(getComputedStyle(miniTitle).fontSize) / parseFloat(getComputedStyle(title).fontSize), inset = ta.left - box.left;
       v['--title-x'] = (tb.left - ta.left) + 'px';
       v['--title-in'] = inset * (s - 1) + 'px';                 // what scaling from the line's left edge moves the text by
-      v['--title-y'] = (tb.top + tb.height / 2 - end) - (ta.top + ta.height / 2) + 'px';
+      v['--title-stick'] = (tb.top + tb.height / 2) - (ta.top + ta.height / 2) + 'px';
       v['--title-s'] = String(s);
     }
     for (const [k, x] of Object.entries(v)) player.style.setProperty(k, x);
@@ -85,7 +86,7 @@ $('backBtn').addEventListener('click', () => morph(showLibrary));
   function done(toLibrary) {
     root.classList.remove('pulling', 'gliding');
     root.style.removeProperty('--p');
-    for (const k of ['--end', '--cover-x', '--cover-y', '--cover-s', '--title-x', '--title-in', '--title-y', '--title-s']) player.style.removeProperty(k);
+    for (const k of ['--end', '--cover-x', '--cover-stick', '--cover-s', '--title-x', '--title-in', '--title-stick', '--title-s']) player.style.removeProperty(k);
     for (const n of [$('title'), $('miniTitle')]) n.classList.remove('still');
     state = 'idle';
     if (toLibrary) { showLibrary(); return; }
