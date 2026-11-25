@@ -23,7 +23,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 
 ## Tests
 
-`tests/run.sh <level>` builds the test media once (ffmpeg, python3), serves the app and runs headless Chromium suites. Each check prints `ok` or `FAIL`.
+`tests/run.sh <level>` builds the test media once (ffmpeg, python3), serves the app and runs headless Chromium and WebKit suites. Each check prints `ok` or `FAIL`.
 
 | Level | What | Time |
 |---|---|---|
