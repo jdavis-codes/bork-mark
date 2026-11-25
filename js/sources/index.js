@@ -13,8 +13,10 @@
 // A new kind of file (a PDF of the book, say) needs only a reader here.
 
 import { readEpub } from './epub.js';
+import { readMarkdown } from './markdown.js';
 import { readPlainText } from './plain-text.js';
 
 export function readBook(file) {
-  return /\.epub$/i.test(file.name) ? readEpub(file) : readPlainText(file);
+  if (/\.epub$/i.test(file.name)) return readEpub(file);
+  return /\.(md|markdown|mdown)$/i.test(file.name) ? readMarkdown(file) : readPlainText(file);
 }

@@ -15,7 +15,7 @@ import { detail, log, mb } from './log.js';
 // The four files a book can have. Only the audio is required.
 const PICKS = [
   { key: 'Audio', hint: 'M4B or MP3 · required' },
-  { key: 'Text', hint: 'EPUB or TXT · for exact quotes' },
+  { key: 'Text', hint: 'EPUB, Markdown or text · exact quotes' },
   { key: 'Pdf', hint: 'PDF of the print edition · page numbers' },
   { key: 'Extras', hint: 'PDF that came with the audiobook · figures, notes' },
 ];

@@ -86,6 +86,15 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('.book'); await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(1200);
   say('reopened', await page.$eval('#title', (n) => n.dataset.text), await page.textContent('#speedLabel'), 'figures', await page.textContent('#figsLabel'));
   await page.click('#markBtn'); await page.waitForTimeout(300); say('bookmarks', await page.textContent('#marksLabel'));
+  // Markdown: a book's text read from it, and bookmarks written out and read back.
+  { const r = await page.evaluate(async () => {
+      const { readBook } = await import('./js/sources/index.js'), { bookmarksMarkdown, readBookmarks, sameBook } = await import('./js/exchange.js'), { cur } = await import('./js/player.js');
+      const doc = await readBook(new File(['---\ntitle: T\nauthor: A\n---\n\n# T\n\n## Part One\n\n### Chapter 1\n\nSome *plain* [words](http://x.y).\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n## Part Two\n'], 'book.md'));
+      const md = bookmarksMarkdown(cur.book), back = readBookmarks(md);
+      return { doc: [doc.title, doc.author, doc.toc.map((e) => e.depth + ' ' + e.label).join(','), doc.figures.length, /Some plain words\./.test(doc.text)].join(' | '),
+        marks: back.marks.length, have: cur.book.marks.length, same: sameBook(back.meta, cur.book), other: sameBook({ ...back.meta, title: 'Another book', duration: 9999 }, cur.book) }; });
+    say('markdown book', r.doc);
+    check('bookmarks exported to Markdown are read back, for this book only', r.marks === r.have && r.marks > 0 && r.same && !r.other, r.marks + ' of ' + r.have); }
   await page.click('#marksBtn'); await page.waitForTimeout(300); say('card', (await text('#marks')).replace(/\d+:\d\d/g, 'T'));
   await page.click('#marksClose'); await page.waitForTimeout(300);
   // Extras: add the PDF from About this book, then the sheet, a page and the page grid.

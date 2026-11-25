@@ -37,6 +37,7 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Hands-free bookmarks** | The next and previous track buttons on headphones, watches and the lock screen can each bookmark, skip, or change chapter. |
 | **Exact quotes** | A small speech model (Whisper, running on the phone) listens to the seconds around a bookmark, and the app finds those words in the EPUB. Without an EPUB you get what the model heard. |
 | **Trimming** | Tap a sentence, drag the handles, or press and hold to cut a quote down. Ends can snap to whole sentences. |
+| **Markdown** | A Markdown file can be the book's text, with its headings as the contents. Bookmarks export as a Markdown file that reads well on its own, and another device can import that file for the same book. |
 | **Citations** | Quotes are copied and shared with a citation in a simple style, MLA, APA or Chicago, with or without the place in the audio. |
 | **Page numbers** | Taken from the EPUB when it records them, or found in a PDF of the print edition. |
 | **Search** | Search the book's text: each result shows its chapter and two lines, opens to its paragraph, and can play from there or become a bookmark. Recent searches are kept per book. The bookmarks list can be searched too, and also shows bookmarks related by meaning: “boat” finds a quote about a canoe. |
@@ -79,7 +80,7 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `index.html` | Markup and styles |
 | `app.js` | Starts the app: loads the modules below, then what runs at launch |
 | `js/text/` | The book text, whatever file it came from: the word index used to find heard words (`book.js`), cutting quotes and sentences (`quote.js`), tidying tables and wrapped lines (`cleanup.js`) |
-| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, plain text, PDF page scans, and the extras PDF. `index.js` describes the shape they all return |
+| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, Markdown, plain text, PDF page scans, and the extras PDF. `index.js` describes the shape they all return |
 | `js/audio/` | Reading M4B and MP3 files and cutting clips (`container.js`), and decoding and transcribing a clip (`listen.js`) |
 | `js/ui/` | Shared interface pieces: DOM helpers, sheets and the swipe-down gesture, scrolling titles |
 | `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `extras`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |

@@ -469,7 +469,7 @@
   .searchfield input::-webkit-search-decoration { -webkit-appearance: none; }
   .searchfield.wide { margin-top: 12px; }
   #marksSearch, #marksSearchCancel { display: none; }
-  #marksDlg.searching .markshead > h2, #marksDlg.searching #markSort, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksClose { display: none; }
+  #marksDlg.searching .markshead > h2, #marksDlg.searching #markSort, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksExport, #marksDlg.searching #marksClose { display: none; }
   #marksDlg.searching #marksSearch { display: flex; flex: 1; }
   #marksDlg.searching #marksSearchCancel { display: block; flex: none; }
   /* search matches: find-in-page yellow, a different colour from the accent tint that marks a bookmarked sentence */
@@ -1134,6 +1134,7 @@
         <option value="attention">Needs attention</option>
       </select>
     </label>
+    <button id="marksExport" class="iconbtn" aria-label="Export bookmarks as a Markdown file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg></button>
     <button id="marksSearchBtn" class="iconbtn" aria-label="Search bookmarks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button>
     <button id="marksClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     <div id="marksSearch" class="searchfield">
@@ -1155,6 +1156,7 @@
     <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
     <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
     <label class="filebtn"><span id="extrasBtnLabel">Add extras</span><input id="extrasFile" type="file"></label>
+    <label class="filebtn"><span>Import bookmarks</span><input id="marksFile" type="file"></label>
     <button id="removeBtn">Remove book</button>
   </div>
 </dialog>
