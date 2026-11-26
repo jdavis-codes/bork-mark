@@ -139,5 +139,11 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await addBook(page, 'tagged.mp3'); await page.waitForTimeout(1000);
   const mp3 = await page.evaluate(() => ({ title: document.getElementById('title').textContent, cover: document.getElementById('cover').getAttribute('src') }));
   check('an MP3’s ID3 tag gives the title and cover', /Tagged Book/.test(mp3.title) && !/Track/.test(mp3.title) && !!mp3.cover, mp3.title);
+  // An M4A (AAC in MP4) is read like an M4B.
+  await addBook(page, 'plain.m4a'); await page.waitForTimeout(1000);
+  await page.click('#playBtn'); await page.waitForTimeout(1500);
+  const m4a = await page.evaluate(() => ({ title: document.getElementById('title').textContent, t: document.querySelector('audio') ? document.querySelector('audio').currentTime : -1 }));
+  await page.click('#playBtn');
+  check('an M4A is added with its title and plays', /Plain M4A/.test(m4a.title) && m4a.t > 0.5, m4a.title + ', ' + m4a.t.toFixed(1) + ' s');
   done(page); await browser.close();
 })();

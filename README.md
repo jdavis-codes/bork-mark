@@ -24,7 +24,7 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 ## Getting started
 
 1. Open the link above in Safari on your iPhone. Tap **•••**, then **Share**, then **Add to Home Screen** (it may be under View More). This matters: Safari clears a website's saved files after about a week without a visit, and only an app on the Home Screen is exempt. Without it, your books and bookmarks can disappear.
-2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, a PDF of the print edition if you want printed page numbers, and the extras PDF if the audiobook came with one.
+2. Tap **Add a book** and pick the audio file (M4B, M4A or MP3). Add the EPUB too if you have it, a PDF of the print edition if you want printed page numbers, and the extras PDF if the audiobook came with one.
 3. Press play. To bookmark, double- or triple-press your headphone button, press next track on a watch, or tap **Bookmark**. It works with the phone locked.
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
 
@@ -88,7 +88,7 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `js/speech-worker.js` | The speech model, in a worker |
 | `js/store-worker.js` | Saving files to the browser's private storage |
 | `sw.js` | Service worker, so the app opens without signal. Its list of app files needs updating when a module is added |
-| `buttons.html`, `align.html` | Test pages for media buttons and for alignment |
+| `buttons.html`, `align.html`, `formats.html` | Test pages for media buttons, for alignment, and for which audio formats the browser plays |
 
 ### Tests
 

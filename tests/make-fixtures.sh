@@ -11,8 +11,11 @@ tagged() {
     -map 0 -map 1 -c:a libmp3lame -b:a 32k -c:v mjpeg -id3v2_version 3 -metadata title="Tagged Book - Track 002" \
     -metadata album="Tagged Book" -metadata artist="Tag Author" -metadata:s:v comment="Cover (front)" tagged.mp3
 }
+# A plain M4A (AAC in MP4, no chapters), as music apps and some stores give.
+m4a() { ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=262:duration=20" -c:a aac -b:a 32k -metadata title="Plain M4A" -metadata artist="M Author" plain.m4a; }
 if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
   [ -f tagged.mp3 ] || tagged
+  [ -f plain.m4a ] || m4a
   [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
   [ -f pages.epub ] || python3 ../make-pages-epub.py pages.epub
   exit 0
@@ -35,3 +38,4 @@ ffmpeg -loglevel error -y -f lavfi -t 15 -i anullsrc=r=8000:cl=mono -i osr.wav -
 python3 ../make-texts.py
 python3 ../make-pages-epub.py pages.epub
 tagged
+m4a
