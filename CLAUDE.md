@@ -41,7 +41,7 @@ An audiobook player that turns bookmarks into quotes. It runs entirely in the br
 WebKit (Safari's engine) runs as an iPhone. `run.sh` downloads it into `tests/.browsers` the first time, along with the system libraries it needs (apt, as root), which takes a minute or two. Its tests use a real profile folder, because WebKit has no on-device file storage in a throwaway one. No test browser shows an iPhone keyboard, so `keyboard.js` simulates the way iOS reports one (a shorter visible area, scrolled down).
 
 When to run what:
-- Nothing for changes outside the app itself (test pages such as `formats.html`, the README, docs, scripts): just deploy.
+- Nothing for changes outside the app itself (test pages such as `tests.html`, the README, docs, scripts): just deploy.
 - Always for the app: `lint`. It's fast and catches most mistakes after moving code.
 - Any change to the interface: test it in WebKit too, not only Chromium (`quick` does both). iOS Safari is where the app is used, and the two differ.
 - A new sheet or text field: add it to `keyboard.js`. On iOS the keyboard covers the bottom of the page and slides it up, rather than shrinking it.

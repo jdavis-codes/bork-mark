@@ -88,7 +88,7 @@ python3 -m http.server 8765   # then open http://localhost:8765/
 | `js/speech-worker.js` | The speech model, in a worker |
 | `js/store-worker.js` | Saving files to the browser's private storage |
 | `sw.js` | Service worker, so the app opens without signal. Its list of app files needs updating when a module is added |
-| `buttons.html`, `align.html`, `formats.html` | Test pages for media buttons, for alignment, and for which audio formats the browser plays |
+| `buttons.html`, `tests.html` | Test pages: media buttons; alignment and which audio formats the browser plays |
 
 ### Tests
 

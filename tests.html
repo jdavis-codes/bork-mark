@@ -3,18 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Bork Mark – audio format test</title>
+<title>Bork Mark – tests</title>
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#14532d">
 <style>
   :root {
     color-scheme: light dark;
     --bg: #f6f5f1; --fg: #1c1b19; --muted: #6b6860; --card: #ffffff;
     --line: #dddad2; --accent: #14532d; --accent-fg: #ffffff; --warn: #9a3412;
+    --mark: #fde68a;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151614; --fg: #ecebe6; --muted: #9c998f; --card: #1f201d;
       --line: #34352f; --accent: #4ade80; --accent-fg: #0b2212; --warn: #fdba74;
+      --mark: #854d0e;
     }
   }
   * { box-sizing: border-box; }
@@ -27,55 +30,124 @@
   h1 { font-size: 1.4rem; margin: 0 0 4px; }
   h2 { font-size: 1rem; margin: 0 0 10px; }
   p { margin: 0 0 10px; }
+  a { color: var(--accent); }
   .muted { color: var(--muted); font-size: 0.875rem; }
+  .warn { color: var(--warn); }
   section {
     background: var(--card); border: 1px solid var(--line);
     border-radius: 12px; padding: 14px; margin-top: 14px;
   }
   audio { width: 100%; margin-top: 10px; }
-  button, .filebtn {
+  button, .filebtn, select, input[type=number] {
     font: inherit; border-radius: 10px; border: 1px solid var(--line);
-    background: transparent; color: var(--fg); padding: 10px 14px; cursor: pointer;
+    background: transparent; color: var(--fg); padding: 10px 14px;
   }
+  button, .filebtn { cursor: pointer; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  input[type=number], input[type=text] { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: transparent; color: var(--fg); width: 5.5em; padding: 8px 10px; }
+  select { width: 100%; min-width: 0; }
+  #audioStatus, #bookStatus, #playerStatus { overflow-wrap: anywhere; }
+  #playerStatus { margin: 10px 0 0; font-size: 0.875rem; }
+  input[type=file] { display: none; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  #mark {
-    width: 100%; margin-top: 12px; padding: 22px; font-size: 1.25rem; font-weight: 600;
+  .grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+  #go {
+    width: 100%; margin-top: 12px; padding: 18px; font-size: 1.1rem; font-weight: 600;
     background: var(--accent); color: var(--accent-fg); border: none;
   }
-  #mark.flash { opacity: 0.55; }
-  input[type=file] { display: none; }
-  label.check { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
-  ol, ul { margin: 0; padding: 0; list-style: none; }
-  li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.9rem; }
-  li:first-child { border-top: none; }
-  .pos { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 8px; }
-  .tag {
-    font-size: 0.75rem; border: 1px solid var(--line); border-radius: 6px;
-    padding: 1px 6px; margin-left: 6px; color: var(--muted);
+  #passage { white-space: pre-wrap; font-family: Georgia, "Iowan Old Style", serif; font-size: 1.02rem; line-height: 1.55; }
+  #passage .pin {
+    background: var(--mark); border-radius: 4px; padding: 0 5px; margin: 0 2px;
+    font: 600 0.75rem/1.6 -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap;
   }
-  #log li { font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; padding: 4px 0; overflow-wrap: anywhere; }
-  #log { max-height: 260px; overflow-y: auto; }
-  .warn { color: var(--warn); }
-  .empty { color: var(--muted); font-size: 0.875rem; }
-  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.85rem; }
-  dt { color: var(--muted); } dd { margin: 0; overflow-wrap: anywhere; }
-</style>
-<style>
-  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 12px 0; }
-  td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .yes { color: var(--accent); font-weight: 600; } .no { color: var(--warn); font-weight: 600; }
-  button { font: inherit; padding: 12px 18px; border-radius: 12px; border: none; background: var(--accent); color: var(--accent-fg); margin-right: 8px; }
-  p.muted { color: var(--muted); }
+  #transcript { font-size: 0.875rem; color: var(--muted); }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 0.9rem; }
+  dt { color: var(--muted); } dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  [hidden] { display: none !important; }
+  #formats table { border-collapse: collapse; width: 100%; font-size: 0.9rem; margin: 12px 0; }
+  #formats td, #formats th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #formats .yes { color: var(--accent); font-weight: 600; } #formats .no { color: var(--warn); font-weight: 600; }
 </style>
 </head>
 <body>
-<!-- Which audio formats this browser plays (the audio element) and decodes (Web Audio, which
-     finding quotes uses). Short tones are built in; run it on an iPhone to see what it supports. -->
-<h1>Audio formats</h1>
-<p class="muted">Tap Run. Each short tone is tried three ways: what the browser says it can play, playing it, and decoding it the way quotes are found.</p>
-<p><button id="run">Run</button><button id="copy" hidden>Copy results</button></p>
-<table><thead><tr><th>Format</th><th>Says</th><th>Plays</th><th>Decodes</th></tr></thead><tbody id="out"></tbody></table>
-<p class="muted" id="ua"></p>
+<main>
+  <h1>Bork Mark · tests</h1>
+  <p class="muted">Alignment: finds the book passage for a moment in the audio, entirely on this device. Audio formats: which ones this browser plays. <a href="./">App</a> · <a href="buttons.html">Button test</a></p>
+
+  <section>
+    <h2>1. Audio and book</h2>
+    <div class="row">
+      <label class="filebtn">Choose audio (M4B or MP3)<input id="audioFile" type="file"></label>
+      <label class="filebtn">Choose EPUB or TXT<input id="bookFile" type="file"></label>
+    </div>
+    <p id="audioStatus" class="muted" style="margin-top:10px">No audio loaded.</p>
+    <p id="bookStatus" class="muted">No book loaded. Without one you still get the transcript and timings.</p>
+  </section>
+
+  <section>
+    <h2>2. Move to a spot you'd bookmark</h2>
+    <audio id="audio" controls preload="metadata"></audio>
+    <div class="row" style="margin-top:10px">
+      <button data-jump="-300">−5 min</button>
+      <button data-jump="-30">−30 s</button>
+      <button data-jump="30">+30 s</button>
+      <button data-jump="300">+5 min</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label for="pos">Position</label>
+      <input id="pos" type="text" inputmode="numeric" value="0:00" style="width:7em" aria-describedby="posHelp">
+      <span id="posHelp" class="muted">h:mm:ss, follows the player or type your own</span>
+    </div>
+    <p id="playerStatus" class="warn" hidden></p>
+  </section>
+
+  <section>
+    <h2>3. Align</h2>
+    <div class="grid">
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="onnx-community/whisper-tiny.en_timestamped">Whisper tiny (English, ~40 MB)</option>
+        <option value="onnx-community/whisper-base.en_timestamped">Whisper base (English, ~80 MB)</option>
+      </select>
+      <label for="device">Engine</label>
+      <select id="device">
+        <option value="wasm">WASM (CPU)</option>
+        <option value="webgpu">WebGPU</option>
+      </select>
+      <label for="before">Seconds before</label>
+      <input id="before" type="number" min="5" max="180" value="45">
+      <label for="after">Seconds after</label>
+      <input id="after" type="number" min="0" max="60" value="15">
+    </div>
+    <button id="go" disabled>Align at current position</button>
+    <p id="status" class="muted" style="margin-top:10px"></p>
+  </section>
+
+  <section id="resultCard" hidden>
+    <div class="row" style="justify-content:space-between">
+      <h2 style="margin:0">Result</h2>
+      <button id="copy">Copy</button>
+    </div>
+    <div id="passageWrap" style="margin-top:12px">
+      <p class="muted">Book passage</p>
+      <div id="passage"></div>
+    </div>
+    <p class="muted" style="margin-top:14px">Raw transcript</p>
+    <div id="transcript"></div>
+    <dl id="stats" style="margin-top:14px"></dl>
+  </section>
+
+  <!-- Which audio formats this browser plays (the audio element) and decodes (Web Audio, which
+       finding quotes uses). Short tones are built in. -->
+  <section id="formats">
+    <h2>Audio formats</h2>
+    <p class="muted">Each short tone is tried three ways: what the browser says it can play, playing it, and decoding it the way quotes are found.</p>
+    <div class="row"><button id="fmtRun">Run</button><button id="fmtCopy" hidden>Copy results</button></div>
+    <table><thead><tr><th>Format</th><th>Says</th><th>Plays</th><th>Decodes</th></tr></thead><tbody id="fmtOut"></tbody></table>
+    <p class="muted" id="fmtUa"></p>
+  </section>
+</main>
+
 <script>
 const SAMPLES = [
   { name: 'MP3 (works today)', type: 'audio/mpeg', data: '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' },
@@ -87,7 +159,7 @@ const SAMPLES = [
 ];
 const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const cell = (ok, text) => '<td class="' + (ok ? 'yes' : 'no') + '">' + text + '</td>';
-document.getElementById('ua').textContent = navigator.userAgent;
+document.getElementById('fmtUa').textContent = navigator.userAgent;
 const lines = [];
 function plays(s) {
   return new Promise((done) => {
@@ -104,8 +176,8 @@ async function decodes(ctx, s) {
   try { const buf = await ctx.decodeAudioData(bytes(s.data).buffer); return [true, 'yes, ' + buf.duration.toFixed(1) + ' s']; }
   catch (e) { return [false, (e && e.name) || 'no']; }
 }
-document.getElementById('run').addEventListener('click', async () => {
-  const out = document.getElementById('out'); out.textContent = ''; lines.length = 0;
+document.getElementById('fmtRun').addEventListener('click', async () => {
+  const out = document.getElementById('fmtOut'); out.textContent = ''; lines.length = 0;
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   for (const s of SAMPLES) {
     const says = new Audio().canPlayType(s.type) || 'no';
@@ -115,9 +187,258 @@ document.getElementById('run').addEventListener('click', async () => {
     out.append(tr);
     lines.push(s.name + ': says ' + says + ', plays ' + p[1] + ', decodes ' + d[1]);
   }
-  document.getElementById('copy').hidden = false;
+  document.getElementById('fmtCopy').hidden = false;
 });
-document.getElementById('copy').addEventListener('click', () => navigator.clipboard.writeText(lines.join('\n') + '\n' + navigator.userAgent));
+document.getElementById('fmtCopy').addEventListener('click', () => navigator.clipboard.writeText(lines.join('\n') + '\n' + navigator.userAgent));
+</script>
+
+<script type="module">
+import { openAudio } from './js/audio/container.js';
+import { decode, to16kMono } from './js/audio/listen.js';
+import { readBook } from './js/sources/index.js';
+import { buildBook, tokenize, locate } from './js/text/book.js';
+import { passage } from './js/text/quote.js';
+
+const $ = (id) => document.getElementById(id);
+const audio = $('audio');
+const say = (msg, warn) => { $('status').textContent = msg; $('status').className = warn ? 'warn' : 'muted'; };
+const fmtPos = (s) => {
+  s = Math.max(0, Math.floor(s));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+};
+const secs = (ms) => (ms / 1000).toFixed(ms < 10000 ? 2 : 1) + ' s';
+
+const WHOLE_FILE_LIMIT = 40 << 20;
+let audioFile = null, source = null, book = null, bookName = '';
+let playType = '';
+let busy = false, lastResult = null, audioUrl = null;
+
+if (!navigator.gpu) {
+  const opt = $('device').querySelector('[value=webgpu]');
+  opt.disabled = true; opt.textContent = 'WebGPU (not available here)';
+}
+
+// iOS gives .m4b files no usable MIME type, and Safari won't play a blob
+// without one, so label the blob from its first bytes.
+async function playable(f) {
+  const h = new Uint8Array(await f.slice(0, 12).arrayBuffer());
+  const tag = String.fromCharCode(...h.subarray(4, 8));
+  if (tag === 'ftyp') return f.slice(0, f.size, 'audio/mp4');
+  if ((h[0] === 0x49 && h[1] === 0x44 && h[2] === 0x33) || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0)) return f.slice(0, f.size, 'audio/mpeg');
+  return f;
+}
+
+const refresh = () => { $('go').disabled = busy || !audioFile; };
+
+$('audioFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  audioFile = null; source = null; refresh();
+  if (audioUrl) URL.revokeObjectURL(audioUrl);
+  const pf = await playable(f);
+  playType = pf.type;
+  $('playerStatus').hidden = true;
+  audioUrl = URL.createObjectURL(pf);
+  audio.src = audioUrl;
+  const mb = (f.size / 1048576).toFixed(1) + ' MB';
+  const status = $('audioStatus');
+  status.className = 'muted';
+  status.textContent = 'Indexing ' + f.name + '…';
+  try {
+    const t0 = performance.now();
+    try {
+      source = await openAudio(f, (p) => { status.textContent = 'Indexing ' + f.name + '… ' + Math.round(p * 100) + '%'; });
+      status.textContent = f.name + ' · ' + mb + ' · ' + source.kind + ' · ' + fmtPos(source.duration) + ' · indexed in ' + secs(performance.now() - t0);
+    } catch (err) {
+      if (f.size > WHOLE_FILE_LIMIT) throw err;
+      status.textContent = f.name + ' · ' + mb + ' · cannot be sliced (' + err.message + '), so the whole file is decoded for each run (slow).';
+    }
+    audioFile = f;
+  } catch (err) {
+    status.textContent = 'Cannot use ' + f.name + ': ' + err.message;
+    status.className = 'warn';
+  }
+  refresh();
+});
+
+$('bookFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const status = $('bookStatus');
+  status.className = 'muted';
+  status.textContent = 'Reading ' + f.name + '…';
+  try {
+    const t0 = performance.now();
+    const text = (await readBook(f)).text;
+    book = buildBook(text); bookName = f.name;
+    status.textContent = f.name + ' · ' + book.words.length.toLocaleString() + ' words · read in ' + secs(performance.now() - t0);
+  } catch (err) {
+    book = null;
+    status.textContent = 'Cannot read ' + f.name + ': ' + err.message;
+    status.className = 'warn';
+  }
+});
+
+// The position field is the source of truth, so alignment can still be
+// tested when the player itself refuses the file.
+let position = 0;
+const maxPos = () => (source ? source.duration : isFinite(audio.duration) ? audio.duration : 1e9);
+const parsePos = (str) => {
+  const parts = str.trim().split(':').map(Number);
+  if (!parts.length || parts.some((n) => !isFinite(n) || n < 0)) return null;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+};
+function setPosition(t, fromPlayer) {
+  position = Math.max(0, Math.min(maxPos(), t));
+  if (document.activeElement !== $('pos')) $('pos').value = fmtPos(position);
+  if (!fromPlayer && !audio.error) { try { audio.currentTime = position; } catch (e) {} }
+}
+audio.addEventListener('timeupdate', () => setPosition(audio.currentTime, true));
+$('pos').addEventListener('change', () => {
+  const t = parsePos($('pos').value);
+  $('pos').blur();
+  setPosition(t === null ? position : t);
+});
+document.querySelectorAll('[data-jump]').forEach((b) => b.addEventListener('click', () => {
+  setPosition(position + Number(b.dataset.jump));
+}));
+audio.addEventListener('error', () => {
+  const e = audio.error, st = $('playerStatus');
+  st.hidden = false;
+  st.textContent = 'The player cannot play this file (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '')
+    + '; labelled ' + (playType || 'no type') + '). You can still type a position above and align.';
+});
+audio.addEventListener('loadedmetadata', () => { $('playerStatus').hidden = true; });
+
+// ---- worker ----
+let worker = null, pending = null, runId = 0;
+function transcribe(pcm, model, device) {
+  if (!worker) {
+    worker = new Worker('./js/speech-worker.js', { type: 'module' });
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === 'progress' && m.total) {
+        say('Downloading model: ' + m.file.split('/').pop() + ' ' + Math.round(100 * m.loaded / m.total) + '%');
+      } else if (m.type === 'stage') {
+        say('Transcribing…');
+      } else if (pending && m.id === pending.id) {
+        const p = pending; pending = null;
+        if (m.type === 'done') p.resolve(m); else p.reject(new Error(m.message));
+      }
+    };
+    worker.onerror = (e) => {
+      if (pending) { const p = pending; pending = null; p.reject(new Error(e.message || 'worker failed to start')); }
+      worker = null;
+    };
+  }
+  return new Promise((resolve, reject) => {
+    pending = { id: ++runId, resolve, reject };
+    worker.postMessage({ id: pending.id, audio: pcm, model, device }, [pcm.buffer]);
+  });
+}
+
+// ---- main run ----
+$('go').addEventListener('click', async () => {
+  if (busy || !audioFile) return;
+  busy = true; refresh();
+  const typed = parsePos($('pos').value);
+  if (typed !== null) setPosition(typed);
+  const T = position;
+  const before = Math.max(5, Number($('before').value) || 45);
+  const after = Math.max(0, Number($('after').value) || 0);
+  const model = $('model').value, device = $('device').value;
+  try {
+    say('Cutting the clip…');
+    const t0 = performance.now();
+    let pcm, clipStart;
+    if (source) {
+      const c = await source.clip(T - before, T + after);
+      clipStart = c.startTime;
+      pcm = to16kMono(await decode(c.buffer));
+    } else {
+      const all = to16kMono(await decode(await audioFile.arrayBuffer()));
+      clipStart = Math.max(0, T - before);
+      pcm = all.slice(Math.floor(clipStart * 16000), Math.floor((T + after) * 16000));
+    }
+    const clipSeconds = pcm.length / 16000;
+    const cutMs = performance.now() - t0;
+
+    say('Loading model…');
+    const out = await transcribe(pcm, model, device);
+
+    // Transcript words, each tagged with the time it was spoken in the clip.
+    const tw = [], twTime = [];
+    for (const c of out.chunks) {
+      const start = c.timestamp && c.timestamp[0] != null ? c.timestamp[0] : 0;
+      for (const w of tokenize(c.text).words) { tw.push(w); twTime.push(start); }
+    }
+    const markOffset = T - clipStart;
+    let split = twTime.findIndex((t) => t >= markOffset);
+    if (split < 0) split = tw.length;
+
+    const t2 = performance.now();
+    let loc = null, pas = null;
+    if (book) { loc = locate(book, tw, split); if (loc && loc.found) pas = passage(book, loc); }
+    const matchMs = performance.now() - t2;
+
+    lastResult = {
+      position: T, clipSeconds, model, device,
+      timings: { cutMs: Math.round(cutMs), modelLoadMs: Math.round(out.loadMs), transcribeMs: Math.round(out.runMs), matchMs: Math.round(matchMs) },
+      speed: clipSeconds / (out.runMs / 1000),
+      confidence: loc ? loc.confidence : null,
+      book: book ? bookName : null,
+      transcript: out.text.trim(),
+      before: pas ? pas.before : null, after: pas ? pas.after : null,
+      playerError: audio.error ? { code: audio.error.code, message: audio.error.message || '', type: playType } : null,
+      ua: navigator.userAgent, crossOriginIsolated: self.crossOriginIsolated === true,
+    };
+    render(lastResult, !!book);
+    say('Done.');
+  } catch (err) {
+    say('Failed: ' + ((err && err.message) || err), true);
+  }
+  busy = false; refresh();
+});
+
+function render(r, hadBook) {
+  $('resultCard').hidden = false;
+  const box = $('passage');
+  box.textContent = '';
+  $('passageWrap').hidden = !hadBook;
+  if (hadBook) {
+    if (r.before === null) {
+      box.textContent = 'No match found. Is this the right book for this audio?';
+    } else {
+      const pin = document.createElement('span');
+      pin.className = 'pin'; pin.textContent = 'bookmark ' + fmtPos(r.position);
+      box.append(document.createTextNode(r.before), pin, document.createTextNode(r.after));
+    }
+  }
+  $('transcript').textContent = r.transcript || '(empty)';
+  const rows = {
+    'Position': fmtPos(r.position),
+    'Clip length': r.clipSeconds.toFixed(1) + ' s',
+    'Cut + decode': secs(r.timings.cutMs),
+    'Model load': r.timings.modelLoadMs ? secs(r.timings.modelLoadMs) : 'already loaded',
+    'Transcribe': secs(r.timings.transcribeMs) + ' (' + r.speed.toFixed(1) + '× real time)',
+    'Match': r.timings.matchMs + ' ms',
+    'Match confidence': r.confidence === null ? '–' : Math.round(r.confidence * 100) + '% of transcript phrases found',
+    'Engine': r.device + ' · ' + r.model.split('/').pop(),
+  };
+  const dl = $('stats');
+  dl.textContent = '';
+  for (const [k, v] of Object.entries(rows)) {
+    const dt = document.createElement('dt'), dd = document.createElement('dd');
+    dt.textContent = k; dd.textContent = v; dl.append(dt, dd);
+  }
+}
+
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(JSON.stringify(lastResult, null, 2)); $('copy').textContent = 'Copied'; }
+  catch (e) { $('copy').textContent = 'Copy failed'; }
+  setTimeout(() => { $('copy').textContent = 'Copy'; }, 1500);
+});
 </script>
 </body>
 </html>

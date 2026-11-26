@@ -123,8 +123,8 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.waitForTimeout(1500);
   const sw = await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!(r && r.active); });
   check('service worker installed (every file in its list exists)', sw);
-  await page.goto(BASE + 'align.html'); await page.waitForTimeout(800);
-  check('alignment test page loads', /alignment/.test(await page.title()));
+  await page.goto(BASE + 'tests.html'); await page.waitForTimeout(800);
+  check('test page loads', /tests/.test(await page.title()));
 
   // Search results in a book with long chapter titles and "page 62."-style page labels.
   await addBook(page, 'book.m4b', 'pages.epub'); await page.waitForTimeout(1000);
