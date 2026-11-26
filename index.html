@@ -678,7 +678,7 @@
   #mini .bar { margin: 0; border-radius: 0; height: 3px; }
   .minirow { display: flex; align-items: center; gap: 6px; max-width: 560px; margin: 0 auto; padding: 8px 10px 8px 12px; }
   #miniOpen {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: none; padding: 0; text-align: left; border-radius: 8px;
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; border: none; padding: 0; text-align: left; border-radius: 8px;
   }
   #miniCover { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--soft); flex: none; }
   .minitext { min-width: 0; display: grid; }
@@ -686,8 +686,12 @@
   #miniTime { flex: none; white-space: pre; font-variant-numeric: tabular-nums; }
   #miniChap { flex: 1 1 0; }
   #miniTitle { font-weight: 600; }
-  /* a title that slides rests a fade's width in; reaching back by as much lines it up with the time below */
-  #miniTitle.scrolls, #miniChap.scrolls { margin-left: calc(-1 * var(--pad)); }
+  /* A title that slides rests a fade's width in; reaching back by as much lines it up with the time
+     below. A shorter fade here keeps the sliding text 6px clear of the cover. */
+  #miniTitle.scrolls { --fade: 8px; --pad: 10px; }
+  #miniChap { padding-left: 0.3em; }
+  #miniChap.scrolls { --fade: 6px; --pad: 4px; padding-left: 0; margin-left: 5px; }   /* clear of the dot while it slides */
+  #miniTitle.scrolls { margin-left: calc(-1 * var(--pad)); }   /* the chapter follows the time, so it stays put */
   .round { border: none; border-radius: 50%; padding: 10px; line-height: 0; flex: none; }
   .round svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
   /* form controls: drawn by us so they follow the theme in every browser */

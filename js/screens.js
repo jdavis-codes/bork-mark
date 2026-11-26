@@ -197,7 +197,7 @@ export function renderMini() {
   if (!show) return;
   const b = cur.book, t = audio.currentTime || b.position || 0, c = chapterAt(b, t);
   setScroll($('miniTitle'), b.title);
-  setText($('miniTime'), fmt(t) + (c.count > 1 ? ' · ' : ''));
+  setText($('miniTime'), fmt(t) + (c.count > 1 ? ' ·' : ''));   // the chapter keeps its own gap
   setScroll($('miniChap'), c.count > 1 ? c.title : '');
   // with no cover, the image has no src and shows Borky instead (see --nocover)
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
