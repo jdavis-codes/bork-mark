@@ -1,5 +1,5 @@
-// Reading audiobook files without decoding them: an MP3 frame index, MP4 / M4B boxes
-// (duration, chapters, tags, cover), and cutting out a short clip at any time.
+// Reading audiobook files without decoding them: an MP3 frame index and its ID3 tag, MP4 / M4B
+// boxes (duration, chapters, tags, cover), and cutting out a short clip at any time.
 
 // ---------- MP3 frame index ----------
 const BR_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
@@ -53,6 +53,75 @@ async function indexMp3(file, onProgress) {
     t += f.seconds; pos += f.size; frames++;
   }
   return { times, bytes, duration: t, frames };
+}
+
+// ---------- MP3 tags (ID3v2.2 to 2.4) ----------
+// The book's title, author and cover picture. An audiobook in MP3 parts names
+// each part in the title ("… - Track 002"), so the album is taken as the title.
+const syncsafe = (b, i) => ((b[i] & 0x7f) << 21) | ((b[i + 1] & 0x7f) << 14) | ((b[i + 2] & 0x7f) << 7) | (b[i + 3] & 0x7f);
+// Removes the 0x00 that unsynchronisation puts after every 0xFF.
+function resync(b) {
+  const out = new Uint8Array(b.length);
+  let n = 0;
+  for (let i = 0; i < b.length; i++) { out[n++] = b[i]; if (b[i] === 0xff && b[i + 1] === 0) i++; }
+  return out.subarray(0, n);
+}
+// Where a string in this encoding ends (its terminator), from i.
+function textEnd(b, i, enc) {
+  if (enc === 1 || enc === 2) { while (i + 1 < b.length && (b[i] || b[i + 1])) i += 2; return i; }
+  while (i < b.length && b[i]) i++;
+  return i;
+}
+function text(b, enc) {
+  const label = enc === 0 ? 'latin1' : enc === 1 ? 'utf-16' : enc === 2 ? 'utf-16be' : 'utf-8';
+  return new TextDecoder(label).decode(b).replace(/\0[\s\S]*$/, '').trim();
+}
+const V22 = { TT2: 'TIT2', TAL: 'TALB', TP1: 'TPE1', TP2: 'TPE2' };   // ID3v2.2's three-letter names
+async function readId3(file) {
+  const tags = { title: '', author: '', cover: null };
+  const head = new Uint8Array(await file.slice(0, 10).arrayBuffer());
+  if (head.length < 10 || head[0] !== 0x49 || head[1] !== 0x44 || head[2] !== 0x33) return tags;
+  const ver = head[3], flags = head[5], size = syncsafe(head, 6);
+  if (ver < 2 || ver > 4 || size > (64 << 20)) return tags;
+  let b = new Uint8Array(await file.slice(10, 10 + size).arrayBuffer());
+  if ((flags & 0x80) && ver < 4) b = resync(b);
+  let p = 0;
+  if ((flags & 0x40) && ver > 2) p = ver === 4 ? syncsafe(b, 0) : 4 + ((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]);
+  const idLen = ver === 2 ? 3 : 4, headLen = ver === 2 ? 6 : 10;
+  const found = {};
+  let picture = null;
+  while (p + headLen <= b.length && b[p]) {
+    const id = String.fromCharCode(...b.subarray(p, p + idLen));
+    const len = ver === 2 ? (b[p + 3] << 16) | (b[p + 4] << 8) | b[p + 5]
+      : ver === 4 ? syncsafe(b, p + 4) : ((b[p + 4] << 24) | (b[p + 5] << 16) | (b[p + 6] << 8) | b[p + 7]) >>> 0;
+    if (!/^[A-Z0-9]+$/.test(id) || len <= 0 || p + headLen + len > b.length) break;
+    let body = b.subarray(p + headLen, p + headLen + len);
+    if (ver === 4) {
+      const fmt = b[p + 9];
+      if (fmt & 0x0c) { p += headLen + len; continue; }   // compressed or encrypted: skip
+      if (fmt & 0x01) body = body.subarray(4);             // a data-length field comes first
+      if ((fmt & 0x02) || (flags & 0x80)) body = resync(body);
+    }
+    p += headLen + len;
+    const enc = body[0];
+    const name = V22[id] || id;
+    if (/^(TIT2|TALB|TPE1|TPE2)$/.test(name)) found[name] = found[name] || text(body.subarray(1), enc);
+    else if ((id === 'APIC' || id === 'PIC') && body.length > 8) {
+      let i = 1, mime;
+      if (id === 'PIC') { mime = String.fromCharCode(...body.subarray(1, 4)).toLowerCase() === 'png' ? 'image/png' : 'image/jpeg'; i = 4; }
+      else { const e = textEnd(body, 1, 0); mime = String.fromCharCode(...body.subarray(1, e)).toLowerCase(); i = e + 1; }
+      const kind = body[i++];
+      i = textEnd(body, i, enc) + (enc === 1 || enc === 2 ? 2 : 1);   // past the description
+      if (i >= body.length) continue;
+      if (!/^image\//.test(mime)) mime = body[i] === 0x89 ? 'image/png' : 'image/jpeg';
+      // the front cover (type 3) wins over any other picture
+      if (!picture || (kind === 3 && picture.kind !== 3)) picture = { kind, blob: new Blob([body.slice(i)], { type: mime }) };
+    }
+  }
+  tags.title = found.TALB || found.TIT2 || '';
+  tags.author = found.TPE1 || found.TPE2 || '';
+  tags.cover = picture ? picture.blob : null;
+  return tags;
 }
 
 // Byte range covering [t0, t1], plus the real start time of that range.
@@ -306,8 +375,10 @@ export async function openAudio(file, onProgress) {
   if (head.byteLength >= 12 && fourcc(head, 4) === 'ftyp') return await indexMp4(file);
   const idx = await indexMp3(file, onProgress);
   if (idx.frames < 20) throw new Error('not an MP3, M4B or M4A file');
+  let tags = { title: '', author: '', cover: null };
+  try { tags = await readId3(file); } catch (err) { /* a broken tag only loses the title and cover */ }
   return {
-    kind: 'MP3', duration: idx.duration, chapters: [], tags: { title: '', author: '', cover: null },
+    kind: 'MP3', duration: idx.duration, chapters: [], tags,
     async clip(t0, t1) {
       const r = byteRange(idx, Math.max(0, t0), t1, file.size);
       return { buffer: await file.slice(r.start, r.end).arrayBuffer(), startTime: r.startTime };

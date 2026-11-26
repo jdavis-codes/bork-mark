@@ -5,7 +5,14 @@
 set -e
 cd "$(dirname "$0")"
 mkdir -p fixtures && cd fixtures
+# An MP3 part of an audiobook, tagged the way stores do: ID3 title, album, artist, cover.
+tagged() {
+  ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=330:duration=20" -f lavfi -i "color=c=0x2563eb:s=300x300:d=0.04" \
+    -map 0 -map 1 -c:a libmp3lame -b:a 32k -c:v mjpeg -id3v2_version 3 -metadata title="Tagged Book - Track 002" \
+    -metadata album="Tagged Book" -metadata artist="Tag Author" -metadata:s:v comment="Cover (front)" tagged.mp3
+}
 if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
+  [ -f tagged.mp3 ] || tagged
   [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
   [ -f pages.epub ] || python3 ../make-pages-epub.py pages.epub
   exit 0
@@ -27,3 +34,4 @@ ffmpeg -loglevel error -y -f lavfi -t 15 -i anullsrc=r=8000:cl=mono -i osr.wav -
 
 python3 ../make-texts.py
 python3 ../make-pages-epub.py pages.epub
+tagged

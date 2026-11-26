@@ -37,7 +37,7 @@ export function openPlayer(show, from) {
   const b = cover.getBoundingClientRect();     // where the cover ends up
   player.classList.add('rising');
   player.style.transition = 'none'; player.style.transform = 'translateY(' + start + 'px)';
-  const flies = !!(a && a.width && b.width && cover.getAttribute('src'));
+  const flies = !!(a && a.width && b.width);
   if (flies) {
     cover.style.transition = 'none';
     cover.style.transform = 'translate(' + ((a.left + a.width / 2) - (b.left + b.width / 2)) + 'px, '
@@ -197,8 +197,9 @@ export function renderMini() {
   setScroll($('miniTitle'), b.title);
   setText($('miniTime'), fmt(t) + (c.count > 1 ? ' · ' : ''));
   setScroll($('miniChap'), c.count > 1 ? c.title : '');
-  if ($('miniCover').hidden !== !cur.coverUrl) $('miniCover').hidden = !cur.coverUrl;
+  // with no cover, the image has no src and shows Borky instead (see --nocover)
   if (cur.coverUrl && $('miniCover').getAttribute('src') !== cur.coverUrl) $('miniCover').src = cur.coverUrl;
+  else if (!cur.coverUrl && $('miniCover').hasAttribute('src')) $('miniCover').removeAttribute('src');
   setFill($('miniFill'), t / (b.duration || 1));
 }
 $('miniOpen').addEventListener('click', () => openPlayer(showPlayer, $('miniCover')));

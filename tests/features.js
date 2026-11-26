@@ -134,5 +134,22 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
       && h.querySelector('.hitmain').getBoundingClientRect().right <= h.querySelector('.acts').getBoundingClientRect().left + 1 }));
   check('a result with a long chapter title fits beside its buttons', hit.fits);
   check('page labels read “p. 60”, not “page 60.”', hit.page === 'p. 60', hit.page);
+
+  // An MP3 takes its title (the album), author and cover from its ID3 tag.
+  await addBook(page, 'tagged.mp3'); await page.waitForTimeout(1000);
+  const mp3 = await page.evaluate(() => ({ title: document.getElementById('title').textContent, cover: document.getElementById('cover').getAttribute('src') }));
+  check('an MP3’s ID3 tag gives the title and cover', /Tagged Book/.test(mp3.title) && !/Track/.test(mp3.title) && !!mp3.cover, mp3.title);
+  // One added before tags were read gets them when it is opened.
+  await page.goto(BASE + 'buttons.html');
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('borkmark.v1')), b = s.books.find((x) => x.audioName === 'tagged.mp3');
+    b.hasCover = false; b.fromAudio = { title: '', author: '' }; b.title = 'tagged'; b.author = '';
+    localStorage.setItem('borkmark.v1', JSON.stringify(s));
+  });
+  await page.goto(BASE); await page.waitForSelector('.book');
+  const before = await page.$eval('.book', (n) => ({ name: n.querySelector('.name').textContent, cover: n.querySelector('img').hasAttribute('src') }));
+  await page.click('.book'); await page.waitForTimeout(2500);
+  const later = await page.evaluate(() => ({ title: document.getElementById('title').textContent, cover: !!document.getElementById('cover').getAttribute('src') }));
+  check('an older MP3 book takes its title and cover from the tag on opening', before.name === 'tagged' && !before.cover && /Tagged Book/.test(later.title) && later.cover, before.name + ' → ' + later.title);
   done(page); await browser.close();
 })();

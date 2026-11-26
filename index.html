@@ -22,12 +22,14 @@
     --bg: #f6f5f1; --fg: #1c1b19; --muted: #6b6860; --card: #ffffff;
     --line: #dddad2; --accent: var(--accent-light, #14532d); --accent-fg: var(--accent-fg-light, #ffffff); --warn: #9a3412;
     --mark: #fde68a; --soft: #eceae3;
+    --nocover: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -1 69 62' fill='none' stroke='%23c4c1b7' stroke-width='2.4' stroke-linejoin='miter' stroke-linecap='square'%3E%3Cpath d='M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5'/%3E%3Cpath d='M1 22 L12.5 16.5 L18 18.5 H38.5'/%3E%3Cpath d='M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5'/%3E%3Cpath d='M48.5 42 V59 L53.5 54.5 L58.5 59 V42'/%3E%3C/svg%3E");   /* Borky, faint, where a book has no cover */
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151614; --fg: #ecebe6; --muted: #9c998f; --card: #1f201d;
       --line: #34352f; --accent: var(--accent-dark, #4ade80); --accent-fg: var(--accent-fg-dark, #0b2212); --warn: #fdba74;
       --mark: #854d0e; --soft: #292a26;
+      --nocover: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -1 69 62' fill='none' stroke='%234b4c46' stroke-width='2.4' stroke-linejoin='miter' stroke-linecap='square'%3E%3Cpath d='M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5'/%3E%3Cpath d='M1 22 L12.5 16.5 L18 18.5 H38.5'/%3E%3Cpath d='M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5'/%3E%3Cpath d='M48.5 42 V59 L53.5 54.5 L58.5 59 V42'/%3E%3C/svg%3E");
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -79,6 +81,8 @@
     aspect-ratio: 1; border-radius: 8px; background: var(--soft); object-fit: cover; display: block;
   }
   .book .thumb { width: 64px; }
+  /* No cover: Borky stands in, so the layout is the same as with one */
+  .book .thumb:not([src]), #cover:not([src]), #miniCover:not([src]) { background: var(--soft) var(--nocover) center / 62% no-repeat; }
   .book .name { font-weight: 600; overflow-wrap: anywhere; }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   /* Fills are full width and scaled from the left (set from script), so moving
@@ -682,6 +686,8 @@
   #miniTime { flex: none; white-space: pre; font-variant-numeric: tabular-nums; }
   #miniChap { flex: 1 1 0; }
   #miniTitle { font-weight: 600; }
+  /* a title that slides rests a fade's width in; reaching back by as much lines it up with the time below */
+  #miniTitle.scrolls, #miniChap.scrolls { margin-left: calc(-1 * var(--pad)); }
   .round { border: none; border-radius: 50%; padding: 10px; line-height: 0; flex: none; }
   .round svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
   /* form controls: drawn by us so they follow the theme in every browser */
