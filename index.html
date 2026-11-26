@@ -793,15 +793,15 @@
   /* Notices and notifications line up with the middle of the icons in the top row: the settings
      icon in the library, the back and info buttons over the player. */
   html { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
-  /* In the library they sit in the space between Borky and the settings icon (--notice-x), and
-     spring across when the screen changes. A transition of their own variable, so only they restyle. */
+  /* In the library they sit in the space between Borky and the settings icon (--notice-x). They
+     move between their places with the player: following the pull and the collapse (--p), and
+     the player's rise when it opens (html.rising, in openPlayer). */
   @property --notice-x { syntax: '<length>'; inherits: true; initial-value: 0px; }
   #busy, #toast { --notice-x: 36px; }
   html.has-bar #busy, html.has-bar #toast { --notice-x: 0px; }
-  :root { --spring: linear(0, 0.037, 0.13, 0.259, 0.405, 0.553, 0.692, 0.815, 0.917, 0.998, 1.057, 1.096, 1.118, 1.126, 1.123, 1.112, 1.097, 1.078, 1.06, 1.042, 1.026, 1.012, 1.002, 0.994, 0.988, 0.985, 0.984, 0.984, 1); }
+  html.pulling #busy, html.pulling #toast { --notice-x: calc(var(--p) * 36px); }
   #busy {
     position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(calc(-50% + var(--notice-x)));
-    transition: --notice-x 0.7s var(--spring);
     max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
     background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
   }
@@ -822,10 +822,12 @@
     position: fixed; left: 50%; top: var(--notice-top); transform: translate(calc(-50% + var(--notice-x)), -12px);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    opacity: 0; transition: opacity 0.2s, transform 0.2s, --notice-x 0.7s var(--spring); pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap;
   }
   #toast.show { opacity: 1; transform: translate(calc(-50% + var(--notice-x)), 0); }
-  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(calc(-50% + var(--notice-x)), 0); } #busy { transition: none; } }
+  html.rising #busy { transition: --notice-x 0.38s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  html.rising #toast { transition: opacity 0.2s, transform 0.2s, --notice-x 0.38s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(calc(-50% + var(--notice-x)), 0); } }
 </style>
 </head>
 <body>

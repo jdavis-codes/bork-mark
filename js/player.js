@@ -13,8 +13,8 @@ import { afterMotion, renderMini, showPlayer } from './screens.js';
 import { checkSleep, setSleep, sleep } from './sleep.js';
 import { keepAlive, keepAliveLater, keepOn, primeSounds, sound } from './sounds.js';
 import { setQueueStatus } from './speech.js';
-import { resolveMeta, save, settings, state } from './state.js';
-import { store, stored } from './storage.js';
+import { save, settings, state } from './state.js';
+import { stored } from './storage.js';
 import { $, audio, el, fillRange, fmt, setAttr, setText, toast } from './ui/dom.js';
 import { setScroll } from './ui/marquee.js';
 import { outline } from './sources/extras.js';
@@ -102,33 +102,12 @@ function showBook(book, file, blob, coverAt) {
   const mine = cur;
   afterMotion(() => {
     if (cur !== mine) return;
-    busyWhile('Reading audio', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); fillFromTags(mine, s.tags); } })
+    busyWhile('Reading audio', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
       .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
     if (book.hasText) busyWhile('Loading text', loadBookText(mine));
     if (book.pageSrcName) busyWhile('Loading pages', loadPageScan(mine));
     if (book.hasExtras) loadExtras(mine);
   });
-}
-
-// A book added before its MP3 tag was read takes the title, author and cover
-// from it now, unless it already has them.
-async function fillFromTags(c, tags) {
-  const b = c.book;
-  let changed = false;
-  for (const f of ['title', 'author']) if (tags[f] && !b.fromAudio[f]) { b.fromAudio[f] = tags[f]; changed = true; }
-  if (tags.cover && !b.hasCover) {
-    try {
-      await store('write', b.id, 'cover', tags.cover);
-      b.hasCover = changed = true;
-      const u = await coverUrl(b);
-      if (cur === c && u) { c.coverUrl = u; $('cover').src = u; }
-    } catch (e) { log('could not keep the cover from the audio tag: ' + ((e && e.message) || e)); }
-  }
-  if (!changed) return;
-  resolveMeta(b);
-  save(true);
-  if (cur === c) { setScroll($('title'), b.title); $('author').textContent = b.author; renderInfo(); setMediaSession(); }
-  log('details taken from the audio tag: ' + b.title);
 }
 
 export function closeBook() {

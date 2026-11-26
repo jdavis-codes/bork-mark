@@ -32,6 +32,7 @@ export function openPlayer(show, from) {
   const fromMini = from === $('miniCover');
   const start = fromMini ? $('mini').getBoundingClientRect().top : window.innerHeight;
   const a = from && !from.hidden ? from.getBoundingClientRect() : null;
+  document.documentElement.classList.add('rising');   // before show(): notices then move with the player
   show();
   for (const n of under) n.hidden = false;   // the library stays in view behind the rising sheet
   const b = cover.getBoundingClientRect();     // where the cover ends up
@@ -50,6 +51,7 @@ export function openPlayer(show, from) {
   if (flies) { cover.style.transition = t; cover.style.transform = ''; }
   motion = new Promise((done) => setTimeout(() => {
     player.classList.remove('rising');
+    document.documentElement.classList.remove('rising');
     player.style.transition = ''; cover.style.transition = ''; cover.style.transform = '';
     if (from) from.style.visibility = '';
     if (!player.hidden) for (const n of under) n.hidden = true;
