@@ -9,7 +9,7 @@ const INTRO = [
   { art: 'M7 4h10v16l-5-4-5 4z', title: 'Bookmark without touching your phone',
     body: 'Bork Mark plays your audiobooks. Press a button on your headphones and it saves the passage you just heard, in the book’s own words. Everything stays on this device.' },
   { art: 'M12 5v14M5 12h14', title: 'Add a book',
-    body: 'Pick the audio file (M4B or MP3). Add the EPUB as well to get exact quotes, and a PDF if you want the printed page numbers. Files need to be free of copy protection.' },
+    body: 'Pick the audio file (M4B, M4A or MP3). Add the EPUB as well to get exact quotes, and a PDF if you want the printed page numbers. Files need to be free of copy protection.' },
   { art: 'M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z', title: 'Bookmark from anywhere',
     body: 'Double- or triple-press your headphone button, press next track on a watch, or tap Bookmark. It works with the phone locked. Settings decides what each button does.' },
   { art: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12', title: 'Trim, cite and share',
