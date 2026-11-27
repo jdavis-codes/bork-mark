@@ -40,7 +40,7 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   m = (await saved(page)).books[0].marks[0];
   check('bookmark from search quotes that text', m.status === 'done' && /chopped corn/.test(m.after), (m.after || '').slice(0, 40));
   check('…with the model loaded again from the device', (await logLines(page, /ready in .* from the copy on this device/)).length === 1, (await logLines(page, /ready in/)).map((l) => l.slice(13)).join(' | '));
-  check('…and given 10 s to settle before transcribing', (await logLines(page, /waiting .* s after the model loaded/)).length >= 1);
+  check('…and given time to settle before transcribing', (await logLines(page, /waiting .* s after the model loaded/)).length >= 1);
   check('…at the time it is read (about 0:22)', m.t > 16 && m.t < 30, m.t.toFixed(1));
   await page.click('#searchResults .hit .acts button[aria-label="Play from here"]');
   await page.waitForFunction(() => !document.getElementById('searchDlg').open, null, { timeout: 120000 });

@@ -6,6 +6,7 @@ import { crumb, detail, log } from './log.js';
 import { runQueue } from './queue.js';
 import { settings, state } from './state.js';
 import { $ } from './ui/dom.js';
+import { CHANNEL } from './version.js';
 
 const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
 
@@ -58,14 +59,18 @@ export async function embed(texts) {
   detail('meaning of ' + texts.length + (texts.length === 1 ? ' text' : ' texts') + ' in ' + Math.round(r.runMs) + ' ms' + (r.loadMs > 50 ? ', model loaded in ' + Math.round(r.loadMs) + ' ms' : ''));
   return texts.map((_, i) => r.vectors.subarray(i * r.size, (i + 1) * r.size));
 }
-// Every crash on an iPhone so far came while transcribing within five seconds
-// of the model loading (three of three, one of them a 30 s clip), and none of
-// the transcriptions that began 25 s or more after it, however long the clip.
-// Loading leaves a lot behind for the browser to clear away (the model's files
-// are read whole, then copied into the runtime), and transcribing on top of
-// that is one heavy step overlapping another. So the first transcription
-// after a load waits until the model has been ready for SETTLE.
-const SETTLE = 10000;
+// Every crash on an iPhone so far (four) came while transcribing soon after
+// the model loaded: the transcription began 1 to 10 s after the load, 5 to 12 s
+// after the app opened. None of those that began 26 s or more after a load
+// crashed, however long the clip. What it is about those first seconds isn't
+// known (what loading leaves behind to be cleared away, or iOS still making
+// room after starting the app), and waiting 10 s was not enough. So the first
+// transcription after a load waits until the model has been ready for SETTLE.
+// Each transcription logs how long after the load and the launch it began, so
+// a crash log shows whether this holds. The local copy, which the tests use,
+// waits only briefly.
+const SETTLE = CHANNEL === 'local' ? 3000 : 30000;
+const launchedAt = Date.now();
 let readyAt = 0, settling = 0;
 export async function transcribe(pcm) {
   settling++;
@@ -77,6 +82,8 @@ export async function transcribe(pcm) {
       await new Promise((r) => setTimeout(r, wait));
     }
   } finally { settling--; }
+  const ago = (t) => Math.round((Date.now() - t) / 1000) + ' s';
+  detail('transcribing ' + Math.round(pcm.length / 16000) + ' s of audio, ' + ago(readyAt) + ' after the model loaded, ' + ago(launchedAt) + ' after the app opened');
   const secs = Math.round(pcm.length / 16000);   // read now: sending the audio to the worker empties it here
   const r = await asrRequest(pcm);
   log('transcribed ' + secs + ' s of audio in ' + (r.runMs / 1000).toFixed(1) + ' s');
