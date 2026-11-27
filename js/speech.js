@@ -58,8 +58,25 @@ export async function embed(texts) {
   detail('meaning of ' + texts.length + (texts.length === 1 ? ' text' : ' texts') + ' in ' + Math.round(r.runMs) + ' ms' + (r.loadMs > 50 ? ', model loaded in ' + Math.round(r.loadMs) + ' ms' : ''));
   return texts.map((_, i) => r.vectors.subarray(i * r.size, (i + 1) * r.size));
 }
+// Every crash on an iPhone so far came while transcribing within five seconds
+// of the model loading (three of three, one of them a 30 s clip), and none of
+// the transcriptions that began 25 s or more after it, however long the clip.
+// Loading leaves a lot behind for the browser to clear away (the model's files
+// are read whole, then copied into the runtime), and transcribing on top of
+// that is one heavy step overlapping another. So the first transcription
+// after a load waits until the model has been ready for SETTLE.
+const SETTLE = 10000;
+let readyAt = 0, settling = 0;
 export async function transcribe(pcm) {
-  if (modelState !== 'ready') await warmModel();   // let go in the background, or never loaded
+  settling++;
+  try {
+    if (modelState !== 'ready') await warmModel();   // let go in the background, or never loaded
+    const wait = readyAt + SETTLE - Date.now();
+    if (wait > 0) {
+      detail('waiting ' + (wait / 1000).toFixed(1) + ' s after the model loaded before transcribing');
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  } finally { settling--; }
   const secs = Math.round(pcm.length / 16000);   // read now: sending the audio to the worker empties it here
   const r = await asrRequest(pcm);
   log('transcribed ' + secs + ' s of audio in ' + (r.runMs / 1000).toFixed(1) + ' s');
@@ -112,13 +129,13 @@ let warming = null, modelNotice = null, failText = '';
 export function warmModel() {
   if (modelState === 'ready') return Promise.resolve();
   if (warming) return warming;
-  modelState = 'loading';
+  modelState = 'loading'; letGone = false;
   failText = '';
   crumb('loading the speech model');
   setQueueStatus('');
   modelNotice = busy('Loading model');
   warming = loadModel().then(() => {
-    modelState = 'ready';
+    modelState = 'ready'; readyAt = Date.now();
   }, (err) => {
     modelState = 'failed';
     failText = 'Speech model didn’t load';   // the log has the reason
@@ -137,16 +154,16 @@ export function warmModel() {
 // leaving the screen, and every return was a fresh start. So when the app is
 // hidden and the worker has nothing to do, the worker is ended, which gives
 // the memory back. The model is read again from the copy on the device (a few
-// seconds) when the next quote needs it, not on coming back: most returns are
-// to pause or skip, and loading is the heaviest step there is.
+// seconds) shortly after the app is back on screen, so that it has settled by
+// the time a bookmark is made (see SETTLE).
 //
 // With "Find quotes while locked" on, work can carry on while hidden, so the
 // worker is given a moment after each job in case another follows.
-const LET_GO_AFTER = 4000;
-let letGoTimer = null;
+const LET_GO_AFTER = 4000, BACK_AFTER = 1500;   // BACK_AFTER: a glance at the app doesn't load it
+let letGoTimer = null, letGone = false;
 function letGo() {
-  if (document.visibilityState !== 'hidden' || !asrWorker || asrJobs.size || warming) return;
-  asrWorker.terminate(); asrWorker = null; modelState = 'idle';
+  if (document.visibilityState !== 'hidden' || !asrWorker || asrJobs.size || warming || settling) return;
+  asrWorker.terminate(); asrWorker = null; letGone = modelState === 'ready'; modelState = 'idle';
   detail('speech model let go while in the background');
 }
 function letGoLater(ms) {
@@ -155,7 +172,10 @@ function letGoLater(ms) {
 }
 document.addEventListener('visibilitychange', () => {
   clearTimeout(letGoTimer);
-  if (document.visibilityState !== 'hidden') return;
+  if (document.visibilityState !== 'hidden') {
+    if (letGone) letGoTimer = setTimeout(() => { if (letGone && modelState === 'idle') warmModel().catch(() => {}); }, BACK_AFTER);
+    return;
+  }
   if (settings.bgQuotes) letGoLater(LET_GO_AFTER); else letGo();
 });
 
