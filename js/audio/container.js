@@ -1,5 +1,5 @@
 // Reading audiobook files without decoding them: an MP3 frame index and its ID3 tag, MP4 / M4B
-// boxes (duration, chapters, tags, cover), and cutting out a short clip at any time.
+// boxes (duration, chapters, tags, cover; AAC or Opus audio), and cutting out a short clip at any time.
 
 // ---------- MP3 frame index ----------
 const BR_V1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
@@ -306,6 +306,71 @@ function readTags(v, moov) {
   return tags;
 }
 
+// ---------- Opus in MP4, re-wrapped as Ogg ----------
+// The dOps box holds what Ogg's OpusHead holds, big-endian instead of little.
+function parseDops(v, d) {
+  const channels = v.getUint8(d.start + 1), family = v.getUint8(d.start + 9);
+  const head = new Uint8Array(19 + (family ? 2 + channels : 0));
+  const hv = new DataView(head.buffer);
+  head.set([0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64, 1, channels]);   // "OpusHead", version 1
+  const preSkip = v.getUint16(d.start + 2);
+  hv.setUint16(10, preSkip, true);
+  hv.setUint32(12, v.getUint32(d.start + 4), true);    // the original sample rate, for information
+  hv.setInt16(16, v.getInt16(d.start + 8), true);      // output gain
+  head[18] = family;
+  for (let i = 0; i < (family ? 2 + channels : 0); i++) head[19 + i] = v.getUint8(d.start + 10 + i);
+  return { head, preSkip };
+}
+
+const CRC = new Uint32Array(256);
+for (let i = 0; i < 256; i++) { let r = i << 24; for (let k = 0; k < 8; k++) r = r & 0x80000000 ? (r << 1) ^ 0x04c11db7 : r << 1; CRC[i] = r >>> 0; }
+
+// One Ogg page holding whole packets.
+function oggPage(packets, granule, seq, flags) {
+  const lacing = [];
+  for (const p of packets) { let n = p.length; while (n >= 255) { lacing.push(255); n -= 255; } lacing.push(n); }
+  const body = packets.reduce((n, p) => n + p.length, 0);
+  const page = new Uint8Array(27 + lacing.length + body), pv = new DataView(page.buffer);
+  page.set([0x4f, 0x67, 0x67, 0x53, 0, flags]);   // "OggS"
+  pv.setUint32(6, granule % 4294967296, true); pv.setUint32(10, Math.floor(granule / 4294967296), true);
+  pv.setUint32(14, 0x426f726b, true);              // stream serial number: "Bork"
+  pv.setUint32(18, seq, true);
+  page[26] = lacing.length; page.set(lacing, 27);
+  let o = 27 + lacing.length;
+  for (const p of packets) { page.set(p, o); o += p.length; }
+  let crc = 0;
+  for (let i = 0; i < page.length; i++) crc = ((crc << 8) ^ CRC[((crc >>> 24) ^ page[i]) & 0xff]) >>> 0;
+  pv.setUint32(22, crc, true);
+  return page;
+}
+
+// Samples a..b (their bytes in src, which starts at file offset `from`) as an Ogg Opus stream.
+// Only a clip from the very start keeps the encoder's pre-skip; later clips start on their first sample.
+function oggOpus(opus, audio, a, b, src, from) {
+  const head = opus.head.slice();
+  const skip = a === 0 ? opus.preSkip : 0;
+  new DataView(head.buffer).setUint16(10, skip, true);
+  const vendor = new TextEncoder().encode('Bork Mark');
+  const tags = new Uint8Array(8 + 4 + vendor.length + 4), tv = new DataView(tags.buffer);
+  tags.set([0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73]);   // "OpusTags", no comments
+  tv.setUint32(8, vendor.length, true); tags.set(vendor, 12);
+  const pages = [oggPage([head], 0, 0, 2), oggPage([tags], 0, 1, 0)];
+  let packets = [], lace = 0, granule = 0;   // granule: 48 kHz samples decoded so far, as Ogg counts Opus time
+  for (let i = a; i <= b; i++) {
+    const p = src.subarray(audio.offsets[i] - from, audio.offsets[i] - from + audio.sizes[i]);
+    const need = Math.floor(p.length / 255) + 1;
+    if (lace + need > 255) { pages.push(oggPage(packets, granule, pages.length, 0)); packets = []; lace = 0; }
+    packets.push(p); lace += need;
+    granule = Math.round((audio.timeOf(i + 1) - audio.timeOf(a)) * 48000);
+  }
+  pages.push(oggPage(packets, granule, pages.length, 4));
+  const out = new Uint8Array(pages.reduce((n, p) => n + p.length, 0));
+  let o = 0;
+  for (const p of pages) { out.set(p, o); o += p.length; }
+  const startTime = a === 0 ? 0 : Math.max(0, audio.timeOf(a) - opus.preSkip / 48000);
+  return { buffer: out.buffer, startTime };
+}
+
 async function indexMp4(file) {
   // Find the moov box; in audiobooks it is often at the very end of the file.
   let pos = 0, moovAt = -1, moovSize = 0;
@@ -328,23 +393,31 @@ async function indexMp4(file) {
   if (!audio.n) throw new Error('incomplete sample tables');
   const stsd = child(v, audio.stbl, 'stsd');
   const entry = boxes(v, stsd.start + 8, stsd.end)[0];
-  if (!entry || entry.type !== 'mp4a') throw new Error('audio codec ' + (entry ? entry.type : '?') + ' is not supported');
-  const esds = boxes(v, entry.start + 28, entry.end).find((b) => b.type === 'esds');
-  if (!esds) throw new Error('missing AAC configuration');
-  const cfg = parseEsds(v, esds);
+  if (!entry || (entry.type !== 'mp4a' && entry.type !== 'Opus')) throw new Error('audio codec ' + (entry ? entry.type : '?') + ' is not supported');
   const { sizes, offsets } = audio;
+  let cfg = null, opus = null;
+  if (entry.type === 'Opus') {
+    const dOps = boxes(v, entry.start + 28, entry.end).find((b) => b.type === 'dOps');
+    if (!dOps) throw new Error('missing Opus configuration');
+    opus = parseDops(v, dOps);
+  } else {
+    const esds = boxes(v, entry.start + 28, entry.end).find((b) => b.type === 'esds');
+    if (!esds) throw new Error('missing AAC configuration');
+    cfg = parseEsds(v, esds);
+  }
 
   let chapters = [], tags = { title: '', author: '', cover: null };
   try { chapters = await readChapters(file, v, moov, tracks, audio); } catch (e) { /* chapters are optional */ }
   try { tags = readTags(v, moov); } catch (e) { /* tags are optional */ }
 
   return {
-    kind: cfg.mp3 ? 'MP3 in MP4' : 'AAC', duration: audio.duration, chapters, tags,
-    // Re-wraps the wanted AAC frames as an ADTS stream, which browsers decode directly.
+    kind: opus ? 'Opus' : cfg.mp3 ? 'MP3 in MP4' : 'AAC', duration: audio.duration, chapters, tags,
+    // Re-wraps the wanted frames as a stream browsers decode directly: ADTS for AAC, Ogg for Opus.
     async clip(t0, t1) {
       const a = audio.sampleAt(Math.max(0, t0)), b = Math.max(a, audio.sampleAt(t1));
       const from = offsets[a], to = offsets[b] + sizes[b];
       const src = new Uint8Array(await file.slice(from, to).arrayBuffer());
+      if (opus) return oggOpus(opus, audio, a, b, src, from);
       const hdr = cfg.mp3 ? 0 : 7;
       let len = 0;
       for (let i = a; i <= b; i++) len += sizes[i] + hdr;

@@ -13,9 +13,15 @@ tagged() {
 }
 # A plain M4A (AAC in MP4, no chapters), as music apps and some stores give.
 m4a() { ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=262:duration=20" -c:a aac -b:a 32k -metadata title="Plain M4A" -metadata artist="M Author" plain.m4a; }
+# An M4B with Opus audio and two chapters.
+opus() {
+  printf ';FFMETADATA1\ntitle=Opus Book\nartist=O Author\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=10000\ntitle=Opus One\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=10000\nEND=20000\ntitle=Opus Two\n' > opus-meta.txt
+  ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=294:duration=20" -i opus-meta.txt -map_metadata 1 -map_chapters 1 -c:a libopus -b:a 32k -f mp4 opus.m4b
+}
 if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
   [ -f tagged.mp3 ] || tagged
   [ -f plain.m4a ] || m4a
+  [ -f opus.m4b ] || opus
   [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
   [ -f pages.epub ] || python3 ../make-pages-epub.py pages.epub
   exit 0
@@ -39,3 +45,4 @@ python3 ../make-texts.py
 python3 ../make-pages-epub.py pages.epub
 tagged
 m4a
+opus

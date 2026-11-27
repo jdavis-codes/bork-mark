@@ -145,5 +145,18 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   const m4a = await page.evaluate(() => ({ title: document.getElementById('title').textContent, t: document.querySelector('audio') ? document.querySelector('audio').currentTime : -1 }));
   await page.click('#playBtn');
   check('an M4A is added with its title and plays', /Plain M4A/.test(m4a.title) && m4a.t > 0.5, m4a.title + ', ' + m4a.t.toFixed(1) + ' s');
+  // Opus in an M4B: read like AAC, and its clips (how quotes are found) re-wrapped as Ogg, which must decode.
+  const clip = await page.evaluate(async () => {
+    const { openAudio } = await import('./js/audio/container.js');
+    const file = await (await fetch('tests/fixtures/opus.m4b')).blob();
+    const s = await openAudio(file);
+    const c = await s.clip(12, 14);
+    const buf = await new AudioContext().decodeAudioData(c.buffer);
+    return { kind: s.kind, chapters: s.chapters.map((x) => x.title).join(', '), start: c.startTime, seconds: buf.duration };
+  }).catch((e) => ({ error: String(e) }));
+  check('an Opus M4B is read and its clips decode', clip.kind === 'Opus' && clip.chapters === 'Opus One, Opus Two' && clip.seconds > 1.5 && Math.abs(clip.start - 12) < 0.1, JSON.stringify(clip));
+  await addBook(page, 'opus.m4b'); await page.waitForTimeout(1000);
+  const opusTitle = await page.evaluate(() => document.getElementById('title').textContent);
+  check('an Opus M4B is added with its title', /Opus Book/.test(opusTitle), opusTitle);
   done(page); await browser.close();
 })();
