@@ -18,11 +18,19 @@ opus() {
   printf ';FFMETADATA1\ntitle=Opus Book\nartist=O Author\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=0\nEND=10000\ntitle=Opus One\n[CHAPTER]\nTIMEBASE=1/1000\nSTART=10000\nEND=20000\ntitle=Opus Two\n' > opus-meta.txt
   ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=294:duration=20" -i opus-meta.txt -map_metadata 1 -map_chapters 1 -c:a libopus -b:a 32k -f mp4 opus.m4b
 }
+# Two and a quarter minutes of spoken sentences (Harvard lists 1 to 4), for a long capture.
+long() {
+  for n in 10 11 12 13; do curl -sfL -o osr$n.wav https://www.voiptroubleshooter.com/open_speech/american/OSR_us_000_00${n}_8k.wav; done
+  ffmpeg -loglevel error -y -i osr10.wav -i osr11.wav -i osr12.wav -i osr13.wav \
+    -filter_complex "[0][1][2][3]concat=n=4:v=0:a=1,aresample=44100,pan=stereo|c0=c0|c1=c0" -c:a aac -b:a 64k -metadata title="Long Speech" long.m4b
+}
 if [ -f book.m4b ] && [ -f speech.m4b ] && [ -f chapters.m4b ]; then
+  [ -f long.m4b ] || long
   [ -f tagged.mp3 ] || tagged
   [ -f plain.m4a ] || m4a
   [ -f opus.m4b ] || opus
   [ -f extras.pdf ] || python3 ../make-texts.py   # added later than the media
+  [ -f long.txt ] || python3 ../make-texts.py
   [ -f pages.epub ] || python3 ../make-pages-epub.py pages.epub
   exit 0
 fi
@@ -46,3 +54,4 @@ python3 ../make-pages-epub.py pages.epub
 tagged
 m4a
 opus
+long

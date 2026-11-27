@@ -65,3 +65,9 @@ pdf('extras.pdf', [
     ['Rule #3', 'Figure 9. A flow chart'],
     ['Appendix A', 'Notes on the sources'],
 ])
+# The sentences of long.m4b, with other paragraphs either side.
+HARVARD_2_4 = ["The boy was there when the sun rose. A rod is used to catch pink salmon. The source of the huge river is the clear spring. Kick the ball straight and follow through. Help the woman get back to her feet. A pot of tea helps to pass the evening. Smoky fires lack flame and heat. The soft cushion broke the man's fall. The salt breeze came across from the sea. The girl at the booth sold fifty bonds.",
+               "The small pup gnawed a hole in the sock. The fish twisted and turned on the bent hook. Press the pants and sew a button on the vest. The swan dive was far short of perfect. The beauty of the view stunned the young boy. Two blue fish swam in the tank. Her purse was full of useless trash. The colt reared and threw the tall rider. It snowed, rained, and hailed the same morning. Read verse out loud for pleasure.",
+               "Hoist the load to your left shoulder. Take the winding path to reach the lake. Note closely the size of the gas tank. Wipe the grease off his dirty face. Mend the coat before you go out. The wrist was badly strained and hung limp. The stray cat gave birth to kittens. The young girl gave no clear response. The meal was cooked before the bell rang. What joy there is in living."]
+rng = random.Random(4)
+open('long.txt', 'w').write('\n\n'.join([para(rng) for _ in range(5)] + [' '.join(HARVARD)] + HARVARD_2_4 + [para(rng) for _ in range(5)]))

@@ -12,6 +12,10 @@ import { fmt } from './ui/dom.js';
 export function applyQuote(m, text) {
   const loc = findInBook(text, m.words, m.split);
   if (!loc) { m.status = 'nomatch'; return; }
+  applyPlace(m, loc, text);
+}
+// The quote for a bookmark whose place in the book is known.
+export function applyPlace(m, loc, text) {
   // The place in the book is kept, so the quote can be re-cut if the capture setting changes.
   m.status = 'done'; m.loc = [loc.start, loc.split, loc.end]; m.confidence = loc.confidence;
   requote(m, text);

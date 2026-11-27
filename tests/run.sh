@@ -5,8 +5,9 @@
 #   quick    lint; smoke and gestures in Chromium; smoke and the
 #            keyboard in WebKit (Safari's engine)                       ~2 min
 #   full     quick, then features in both, and crash                    ~3 min
-#   speech   the real speech model end to end (needs the network)      ~2 min
-#   all      full, then speech                                          ~5 min
+#   speech   the real speech model end to end, in Chromium and WebKit
+#            (needs the network)                                       ~6 min
+#   all      full, then speech                                          ~9 min
 #   webkit   only the WebKit suites                                      ~1.5 min
 #   compare <git ref>
 #            features on that version and on this one, then the differences
@@ -54,8 +55,8 @@ case "$LEVEL" in
   quick) lint; serve "$ROOT" 8765; suite smoke; suite gestures; webkit smoke; webkit keyboard ;;
   full) lint; serve "$ROOT" 8765; suite smoke; suite gestures; webkit smoke; webkit keyboard; suite features; webkit features; suite crash ;;
   webkit) serve "$ROOT" 8765; webkit smoke; webkit keyboard; webkit features ;;
-  speech) serve "$ROOT" 8765; suite speech ;;
-  all) lint; serve "$ROOT" 8765; suite smoke; suite gestures; webkit smoke; webkit keyboard; suite features; webkit features; suite crash; suite speech ;;
+  speech) serve "$ROOT" 8765; suite speech; webkit speech ;;
+  all) lint; serve "$ROOT" 8765; suite smoke; suite gestures; webkit smoke; webkit keyboard; suite features; webkit features; suite crash; suite speech; webkit speech ;;
   compare)
     REF=${2:?usage: run.sh compare <git ref>}
     OLD=$(mktemp -d)

@@ -4,6 +4,8 @@
 //   2. chapters are named from the EPUB by themselves, after a bookmark made
 //      straight away has its quote, and not again on reopening
 //   3. a naming run cut short carries on from the next chapter
+//   4. bookmarks related by meaning
+//   5. a long capture is quoted from its two ends
 const { BASE, open, addBook, saved, logLines, check, done } = require('./lib');
 
 const settled = (page) => page.waitForFunction(() => !JSON.parse(localStorage.getItem('borkmark.v1')).books[0].marks.some((m) => m.status === 'pending' || m.status === 'working'), null, { timeout: 120000 });
@@ -93,5 +95,28 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   r = await related('zebra');
   check('“zebra” finds nothing', r === '', r || '(none)');
   check('each quote’s meaning is kept', (await saved(page)).books[0].marks.every((m) => m.vec && m.vec.v.length === 512));
+  done(page); await browser.close();
+
+  // 5. A long capture (two minutes) is placed from its two ends: only those
+  //    are listened to, and the quote is the book's text between them.
+  ({ browser, page } = await open({ model: true }));
+  await addBook(page, 'long.m4b', 'long.txt');
+  await page.goto(BASE + 'buttons.html');
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('borkmark.v1'));
+    s.settings.capture = { mode: 'time', before: 110, after: 15, parasBefore: 1, parasAfter: 1 };
+    s.books[0].marks = [{ id: 'long', t: 125, created: 1, status: 'pending' }];
+    localStorage.setItem('borkmark.v1', JSON.stringify(s));
+  });
+  await page.goto(BASE); await page.click('.book');
+  await settled(page);
+  m = (await saved(page)).books[0].marks[0];
+  const quote = (m.before || '') + (m.after || '');
+  check('long capture: quote found', m.status === 'done', m.status + ' ' + (m.error || ''));
+  check('…from its two ends, a minute of listening', (await logLines(page, /placed from its ends, 60 s heard/)).length === 1 && (await logLines(page, /transcribed 30 s/)).length === 2,
+    (await logLines(page, /quote:|transcribed/)).map((l) => l.slice(13)).join(' | '));
+  check('…with the text between them, which was never heard', /pink salmon/.test(quote) && /useless trash/.test(quote), quote.length + ' characters');
+  check('…starting and ending where the capture does', /^.{0,160}(chicken leg|Rice is often|juice of lemons)/.test(quote) && /(dirty face|Mend the coat|badly strained|birth to kittens)[^.]*\.?.{0,120}$/.test(quote), quote.slice(0, 50) + ' … ' + quote.slice(-50));
+  check('…split at the bookmark', /(birth to kittens|no clear response|meal was cooked)/.test(m.before.slice(-60) + m.after.slice(0, 60)), m.before.slice(-40) + ' | ' + m.after.slice(0, 40));
   done(page); await browser.close();
 })();
