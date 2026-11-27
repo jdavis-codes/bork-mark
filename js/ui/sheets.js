@@ -59,7 +59,9 @@ if (vv) {
 for (const d of document.querySelectorAll('dialog')) {
   d.addEventListener('close', () => { if (fitted === d) fitSheet(); });
   const locked = () => d.classList.contains('busy');   // the add-book sheet while a book is being copied in
-  d.addEventListener('cancel', (e) => { e.preventDefault(); if (!locked()) closeSheet(d); });
+  // Only the sheet's own cancel (Escape): a file picker inside it that is dismissed
+  // sends a cancel too, which reaches the sheet and must leave it open.
+  d.addEventListener('cancel', (e) => { if (e.target !== d) return; e.preventDefault(); if (!locked()) closeSheet(d); });
   d.addEventListener('click', (e) => {
     if (e.target !== d || locked()) return;
     const r = d.getBoundingClientRect();

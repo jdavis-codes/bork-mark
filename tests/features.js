@@ -194,6 +194,12 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.mouse.up(); await page.waitForTimeout(250);
   const afterLift = !!(await page.$('#menu'));
   check('holding a piece’s tile opens its menu before letting go', whileHeld && afterLift, 'held ' + whileHeld + ', after ' + afterLift);
+  // A file picker dismissed without a pick sends a cancel; the sheet stays open.
+  const stays = await page.evaluate(() => {
+    document.getElementById('pageFile').dispatchEvent(new Event('cancel', { bubbles: true }));
+    return document.getElementById('infoDlg').open;
+  });
+  check('dismissing a file picker leaves About this book open', stays, String(stays));
   await page.click('#menu button.danger'); await page.waitForTimeout(800);
   const gone = await page.evaluate(() => ({ tile: document.getElementById('coverAct').classList.contains('has'), player: document.getElementById('cover').hasAttribute('src') }));
   await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
