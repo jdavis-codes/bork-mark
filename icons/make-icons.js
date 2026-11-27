@@ -1,7 +1,8 @@
 // Draws Borky's icons from his drawing (ART, Inkscape's units, 37.09 × 32.70):
-// borky.svg (the browser tab's icon) and the Home Screen PNGs, all as white
-// lines on the blue tile, and prints the heading's version (text colour lines,
-// no shadows) for index.html. Run once after changing the drawing:
+// borky.svg (the browser tab's icon: Borky alone, dark or light to suit the
+// browser), the Home Screen PNGs (white lines on the blue tile), and prints the
+// heading's version (text colour lines, no shadows) for index.html. Run once
+// after changing the drawing:
 //   node icons/make-icons.js
 const fs = require('fs');
 const { chromium } = require('playwright');
@@ -32,7 +33,12 @@ const tile = (size, width, round) => {
     + '<g transform="translate(' + x.toFixed(2) + ' ' + y.toFixed(2) + ') scale(' + k.toFixed(4) + ')">' + art('#fff', true) + '</g></svg>';
 };
 
-fs.writeFileSync(__dirname + '/borky.svg', tile(0, 80, true).replace('>', '>\n  <!-- Borky, the browser tab\'s icon. Made by make-icons.js -->\n  ') + '\n');
+// The browser tab's icon: Borky alone, no tile, dark lines on a light browser and light on a dark one.
+const side = W + 2;
+fs.writeFileSync(__dirname + '/borky.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 ' + (-(side - H) / 2).toFixed(2) + ' ' + side.toFixed(2) + ' ' + side.toFixed(2) + '">\n'
+  + '  <!-- Borky, the browser tab\'s icon. Made by make-icons.js -->\n'
+  + '  <style>svg { color: #1c1b19; } @media (prefers-color-scheme: dark) { svg { color: #f6f5f1; } }</style>\n'
+  + '  ' + art('currentColor', false) + '\n</svg>\n');
 console.log('heading:\n<svg class="borky" viewBox="-1 -1 ' + (W + 2).toFixed(2) + ' ' + (H + 2).toFixed(2) + '" aria-hidden="true">' + art('currentColor', false) + '</svg>');
 
 (async () => {

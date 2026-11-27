@@ -137,6 +137,11 @@
   /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
      down past its top, and the page is told not to bounce at all. */
   html { overscroll-behavior-y: none; touch-action: manipulation; }   /* no double-tap zoom (pinch: see app.js) */
+  /* A held press highlights nothing (button labels, times, icons), except the book's title and author
+     in the player, and whatever is being typed */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, [contenteditable], #title, #author { -webkit-user-select: text; user-select: text; }
+  #title, #author { -webkit-touch-callout: default; }
   .libhead {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
     /* 3.5px less than the player's, so the middle of the top row is at the same height on both */
