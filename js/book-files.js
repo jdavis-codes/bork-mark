@@ -17,7 +17,7 @@ import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
 import { busy } from './ui/busy.js';
 import { $, toast } from './ui/dom.js';
-import { detail } from './log.js';
+import { detail, log, mb } from './log.js';
 import { renderSearchTab } from './search.js';
 
 // The book text, plus where its contents entries and print pages fall in it.
@@ -122,8 +122,12 @@ $('coverFile').addEventListener('change', async (e) => {
   e.target.value = '';
   if (!f || !cur) return;
   const mine = cur, had = mine.book.hasCover;
-  try { (await createImageBitmap(f)).close(); } catch (err) { toast('That picture can’t be shown here', 'warn'); return; }
-  try { await showCover(mine, f); } catch (err) { toast('Cover not saved', 'warn'); return; }
+  log('cover picked: ' + f.name + ' (' + (f.type || 'no type') + ', ' + mb(f.size) + ')');
+  try { const bmp = await createImageBitmap(f); detail('cover is ' + bmp.width + '×' + bmp.height); bmp.close(); } catch (err) {
+    log('cover not usable: ' + ((err && err.message) || err)); toast('That picture can’t be shown here', 'warn'); return;
+  }
+  try { await showCover(mine, f); } catch (err) { log('cover not saved: ' + ((err && err.message) || err)); toast('Cover not saved', 'warn'); return; }
+  log('cover ' + (had ? 'changed' : 'added') + (cur === mine && mine.coverUrl ? '' : ', but not shown'));
   if (cur === mine) renderInfo();
   toast(had ? 'Cover changed' : 'Cover added');
 });

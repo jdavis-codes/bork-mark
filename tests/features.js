@@ -174,6 +174,13 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   const label = await page.textContent('#coverBtnLabel');
   await page.setInputFiles('#coverFile', FIX + '/../../icons/icon-180.png'); await page.waitForTimeout(1500);
   const w = await page.evaluate(() => document.getElementById('cover').naturalWidth);
+  // Changing the cover touches only the cover: the book's audio is still stored.
+  const kept = await page.evaluate(async () => {
+    const { stored } = await import('./js/storage.js'), { cur } = await import('./js/player.js');
+    const a = await stored(cur.book.id, 'audio');
+    return a ? a.size : 0;
+  });
+  check('changing the cover keeps the book’s audio', kept > 1000, kept + ' bytes');
   await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
   const row = await page.evaluate(() => { const i = document.querySelector('#books .thumb'); return i.getAttribute('src') && i.naturalWidth; });
   check('About this book changes the cover', label === 'Change cover' && w === 180 && row === 180, label + ', player ' + w + ', library ' + row);

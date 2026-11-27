@@ -21,7 +21,7 @@ import { outline } from './sources/extras.js';
 import { busyWhile } from './ui/busy.js';
 import { closeSheet } from './ui/sheets.js';
 import { renderSearchTab } from './search.js';
-import { coverUrl } from './library.js';
+import { coverUrl, hueOf } from './library.js';
 
 // ---------- player ----------
 // iOS gives .m4b files no usable MIME type, and Safari won't play a blob
@@ -85,6 +85,7 @@ function showBook(book, file, blob, coverAt) {
   cur = { book, source: null, text: null, meta: { toc: [], pages: [], figures: [] }, pageSrc: null, audioUrl: null, coverUrl: coverAt, openedAt: Date.now() };
   detail('opening ' + book.title + ': audio ' + mb(file.size));
   if (coverAt) $('cover').src = coverAt; else $('cover').removeAttribute('src');
+  for (const img of [$('cover'), $('miniCover')]) img.style.setProperty('--hue', hueOf(book));
   showPlayer();
   setScroll($('title'), book.title);
   $('author').textContent = book.author;
@@ -102,7 +103,7 @@ function showBook(book, file, blob, coverAt) {
   const mine = cur;
   afterMotion(() => {
     if (cur !== mine) return;
-    busyWhile('Reading audio', openAudio(file)).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
+    busyWhile('Reading audio', openAudio(file, null, () => stored(book.id, 'audio'))).then((s) => { if (cur === mine) { mine.source = s; runQueue(); } })
       .catch((e) => { if (cur === mine) setQueueStatus('Cannot read this audio for quotes: ' + e.message); });
     if (book.hasText) busyWhile('Loading text', loadBookText(mine));
     if (book.pageSrcName) busyWhile('Loading pages', loadPageScan(mine));

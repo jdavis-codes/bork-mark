@@ -56,6 +56,25 @@ function forgetCover(id) {
   if (p) p.then((u) => { if (u) URL.revokeObjectURL(u); });
 }
 
+// A book without a cover shows Borky on its own colour, so several such books
+// can be told apart. hueOf gives that colour's hue; freeHue picks a new book's,
+// as far as it can from the hues the other books already have.
+export function hueOf(b) {
+  if (b.hue != null) return b.hue;
+  let h = 0;
+  for (const c of b.id) h = (h * 31 + c.charCodeAt(0)) % 360;
+  return h;
+}
+export function freeHue(books) {
+  const taken = books.map(hueOf);
+  let best = Math.floor(Math.random() * 360), far = -1;
+  for (let h = 0; h < 360; h += 5) {
+    const near = taken.reduce((m, t) => Math.min(m, Math.abs(((h - t + 540) % 360) - 180)), 180);
+    if (near > far) { far = near; best = h; }
+  }
+  return taken.length ? best : Math.floor(Math.random() * 72) * 5;
+}
+
 // Stores a book's cover, new or in place of the old one, and shows it in its library row. Resolves to its address.
 export async function setCover(b, blob) {
   await store('write', b.id, 'cover', blob);
@@ -74,6 +93,7 @@ function libRow(b) {
   const r = { li: el('li'), img: el('img', 'thumb'), name: el('div', 'name'), meta: el('div', 'muted'), fill: el('div') };
   const btn = el('button', 'book'), info = el('div'), bar = el('div', 'bar');
   r.img.alt = '';
+  r.img.style.setProperty('--hue', hueOf(b));
   bar.append(r.fill); info.append(r.name, r.meta, bar);
   btn.append(r.img, info); r.li.append(btn);
   // The tapped cover grows into the player's cover. If this book is the

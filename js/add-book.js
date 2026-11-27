@@ -3,6 +3,7 @@
 import { openAudio } from './audio/container.js';
 import { storeText } from './book-files.js';
 import { storeExtras } from './extras.js';
+import { freeHue } from './library.js';
 import { openBook } from './player.js';
 import { readBook } from './sources/index.js';
 import { guessFirstNumbered, pdfCover, readPdfPages } from './sources/pdf.js';
@@ -52,7 +53,7 @@ $('addGo').addEventListener('click', async () => {
   try {
     let t0 = performance.now();
     const took = () => { const ms = Math.round(performance.now() - t0); t0 = performance.now(); return ms + ' ms'; };
-    log('adding a book: ' + af.name + ' (' + mb(af.size) + ')' + (tf ? ' + ' + tf.name + ' (' + mb(tf.size) + ')' : '') + (pf ? ' + ' + pf.name + ' (' + mb(pf.size) + ')' : ''));
+    log('adding a book: ' + af.name + ' (' + mb(af.size) + ')' + (tf ? ' + ' + tf.name + ' (' + mb(tf.size) + ')' : '') + (pf ? ' + ' + pf.name + ' (' + mb(pf.size) + ')' : '') + (cf ? ' + cover ' + cf.name + ' (' + mb(cf.size) + ')' : '') + (xf ? ' + extras ' + xf.name : ''));
     addSay('Reading the audiobook…', 0);
     const src = await openAudio(af, (p) => addSay('Reading the audiobook…', p * 0.1));
     detail('audio read: ' + src.kind + ', ' + fmt(src.duration) + ', ' + src.chapters.length + ' chapters, cover ' + (src.tags.cover ? mb(src.tags.cover.size) : 'none') + ', ' + took());
@@ -81,13 +82,13 @@ $('addGo').addEventListener('click', async () => {
     if (!cover && pdf) {
       try { cover = await pdfCover(pf); detail('cover from the page scan: ' + mb(cover.size)); } catch (err) { /* no cover then */ }
     }
-    if (cover) await store('write', id, 'cover', cover);
+    if (cover) { await store('write', id, 'cover', cover); detail('cover stored: ' + (cover === cf ? 'picked' : cover === src.tags.cover ? 'from the audio' : doc && cover === doc.cover ? 'from the EPUB' : 'from the page scan') + ', ' + mb(cover.size)); }
     const book = {
       id, fromAudio: { title: src.tags.title || '', author: src.tags.author || '' },
       fromText: fromDoc(doc),
       audioName: af.name, kind: src.kind, duration: src.duration, chapters: src.chapters,
       hasCover: !!cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
-      position: 0, speed: 1, added: Date.now(), marks: [],
+      position: 0, speed: 1, added: Date.now(), marks: [], hue: freeHue(state.books),
     };
     // Likewise the extras.
     let extrasProblem = '';

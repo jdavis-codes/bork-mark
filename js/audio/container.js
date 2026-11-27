@@ -371,7 +371,7 @@ function oggOpus(opus, audio, a, b, src, from) {
   return { buffer: out.buffer, startTime };
 }
 
-async function indexMp4(file) {
+async function indexMp4(file, bytes) {
   // Find the moov box; in audiobooks it is often at the very end of the file.
   let pos = 0, moovAt = -1, moovSize = 0;
   while (pos + 8 <= file.size) {
@@ -416,7 +416,7 @@ async function indexMp4(file) {
     async clip(t0, t1) {
       const a = audio.sampleAt(Math.max(0, t0)), b = Math.max(a, audio.sampleAt(t1));
       const from = offsets[a], to = offsets[b] + sizes[b];
-      const src = new Uint8Array(await file.slice(from, to).arrayBuffer());
+      const src = new Uint8Array(await bytes(from, to));
       if (opus) return oggOpus(opus, audio, a, b, src, from);
       const hdr = cfg.mp3 ? 0 : 7;
       let len = 0;
@@ -443,9 +443,22 @@ async function indexMp4(file) {
 
 // Opens an audio file for clipping: {kind, duration, chapters, tags, clip(t0, t1)}.
 // clip() resolves to {buffer, startTime}: a small decodable piece of the file.
-export async function openAudio(file, onProgress) {
+// reopen(), if given, fetches the file again: on iOS a stored file read earlier can
+// stop being readable ("The object can not be found here"), so a clip that fails
+// to read tries once more with a fresh copy.
+export async function openAudio(file, onProgress, reopen) {
+  let current = file;
+  const bytes = async (a, b) => {
+    try { return await current.slice(a, b).arrayBuffer(); } catch (err) {
+      if (!reopen) throw err;
+      const again = await reopen();
+      if (!again) throw new Error('the audio file is no longer on this device');
+      current = again;
+      return await current.slice(a, b).arrayBuffer();
+    }
+  };
   const head = new DataView(await file.slice(0, 12).arrayBuffer());
-  if (head.byteLength >= 12 && fourcc(head, 4) === 'ftyp') return await indexMp4(file);
+  if (head.byteLength >= 12 && fourcc(head, 4) === 'ftyp') return await indexMp4(file, bytes);
   const idx = await indexMp3(file, onProgress);
   if (idx.frames < 20) throw new Error('not an MP3, M4B or M4A file');
   let tags = { title: '', author: '', cover: null };
@@ -454,7 +467,7 @@ export async function openAudio(file, onProgress) {
     kind: 'MP3', duration: idx.duration, chapters: [], tags,
     async clip(t0, t1) {
       const r = byteRange(idx, Math.max(0, t0), t1, file.size);
-      return { buffer: await file.slice(r.start, r.end).arrayBuffer(), startTime: r.startTime };
+      return { buffer: await bytes(r.start, r.end), startTime: r.startTime };
     },
   };
 }
