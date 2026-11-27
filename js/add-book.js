@@ -12,12 +12,13 @@ import { $, fmt, setFill, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 import { detail, log, mb } from './log.js';
 
-// The four files a book can have. Only the audio is required.
+// The five files a book can have. Only the audio is required.
 const PICKS = [
   { key: 'Audio', hint: 'M4B, M4A or MP3 · required' },
   { key: 'Text', hint: 'EPUB, Markdown or text · exact quotes' },
   { key: 'Pdf', hint: 'PDF of the print edition · page numbers' },
   { key: 'Extras', hint: 'PDF that came with the audiobook · figures, notes' },
+  { key: 'Cover', hint: 'Picture · else taken from the files' },
 ];
 function renderPick({ key, hint }) {
   const f = $('add' + key).files[0];
@@ -44,7 +45,7 @@ $('addBtn').addEventListener('click', () => {
 $('addCancel').addEventListener('click', () => closeSheet($('addDlg')));
 for (const pick of PICKS) $('add' + pick.key).addEventListener('change', () => { renderPick(pick); addBusy(false); });
 $('addGo').addEventListener('click', async () => {
-  const af = $('addAudio').files[0], tf = $('addText').files[0], pf = $('addPdf').files[0], xf = $('addExtras').files[0];
+  const af = $('addAudio').files[0], tf = $('addText').files[0], pf = $('addPdf').files[0], xf = $('addExtras').files[0], cf = $('addCover').files[0];
   if (!af || $('addDlg').classList.contains('busy')) return;
   addBusy(true);
   const id = crypto.randomUUID();
@@ -75,8 +76,8 @@ $('addGo').addEventListener('click', async () => {
         detail('page scan read: ' + pdf.pages.length + ' pages, ' + took());
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
-    // The cover: the audio's, else the EPUB's, else the page scan's first page.
-    let cover = src.tags.cover || (doc && doc.cover) || null;
+    // The cover: the one picked, else the audio's, else the EPUB's, else the page scan's first page.
+    let cover = cf || src.tags.cover || (doc && doc.cover) || null;
     if (!cover && pdf) {
       try { cover = await pdfCover(pf); detail('cover from the page scan: ' + mb(cover.size)); } catch (err) { /* no cover then */ }
     }

@@ -24,7 +24,10 @@ self.onmessage = async (e) => {
       } finally {
         h.close();
       }
-    } else if (op === 'remove') {
+    } else if (op === 'remove' && name) {   // one file
+      const d = await root.getDirectoryHandle(dir).catch(() => null);
+      if (d) await d.removeEntry(name).catch(() => {});
+    } else if (op === 'remove') {             // the book's whole folder
       await root.removeEntry(dir, { recursive: true }).catch(() => {});
     }
     self.postMessage({ id, done: true });

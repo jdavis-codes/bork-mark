@@ -10,7 +10,7 @@ import { findPages, rematch, requote } from './quotes.js';
 import { isOrnament } from './sources/epub.js';
 import { readBook } from './sources/index.js';
 import { buildPageIndex, guessFirstNumbered, pdfCover, readPdfPages } from './sources/pdf.js';
-import { giveCover } from './library.js';
+import { setCover } from './library.js';
 import { fromDoc, resolveMeta, save } from './state.js';
 import { store, stored } from './storage.js';
 import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
@@ -108,10 +108,25 @@ async function coverIfNone(mine, get) {
   try {
     const blob = await get();
     if (!blob) return;
-    const u = await giveCover(mine.book, blob);
-    if (cur === mine && u) { mine.coverUrl = u; $('cover').src = u; }
+    await showCover(mine, blob);
   } catch (e) { /* no cover then */ }
 }
+async function showCover(mine, blob) {
+  const u = await setCover(mine.book, blob);
+  if (cur === mine && u) { mine.coverUrl = u; $('cover').src = u; }
+}
+
+// A cover picked by hand, in place of any other.
+$('coverFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f || !cur) return;
+  const mine = cur, had = mine.book.hasCover;
+  try { (await createImageBitmap(f)).close(); } catch (err) { toast('That picture can’t be shown here', 'warn'); return; }
+  try { await showCover(mine, f); } catch (err) { toast('Cover not saved', 'warn'); return; }
+  if (cur === mine) renderInfo();
+  toast(had ? 'Cover changed' : 'Cover added');
+});
 
 // Adding or replacing the text or page scan from About this book.
 $('textFile').addEventListener('change', async (e) => {

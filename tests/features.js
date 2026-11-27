@@ -164,5 +164,18 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#addGo'); await page.waitForSelector('#player:not([hidden])', { timeout: 60000 }); await page.waitForTimeout(500);
   const pdfCover = await page.evaluate(() => document.getElementById('cover').getAttribute('src'));
   check('a page scan gives a cover when the audio has none', !!pdfCover, String(pdfCover));
+  // A cover picked in the add sheet is used; one picked in About this book replaces it.
+  await page.goto(BASE); await page.click('#addBtn');
+  await page.setInputFiles('#addAudio', FIX + '/plain.m4a'); await page.setInputFiles('#addCover', FIX + '/../../icons/icon-512.png');
+  await page.click('#addGo'); await page.waitForSelector('#player:not([hidden])'); await page.waitForTimeout(500);
+  const picked = await page.evaluate(() => { const c = document.getElementById('cover'); return c.getAttribute('src') && c.naturalWidth; });
+  check('a cover picked when adding is shown', picked > 0, String(picked));
+  await page.click('#infoBtn'); await page.waitForTimeout(300);
+  const label = await page.textContent('#coverBtnLabel');
+  await page.setInputFiles('#coverFile', FIX + '/../../icons/icon-180.png'); await page.waitForTimeout(1500);
+  const w = await page.evaluate(() => document.getElementById('cover').naturalWidth);
+  await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
+  const row = await page.evaluate(() => { const i = document.querySelector('#books .thumb'); return i.getAttribute('src') && i.naturalWidth; });
+  check('About this book changes the cover', label === 'Change cover' && w === 180 && row === 180, label + ', player ' + w + ', library ' + row);
   done(page); await browser.close();
 })();

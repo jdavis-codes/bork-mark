@@ -82,7 +82,11 @@
   }
   .book .thumb { width: 64px; }
   /* No cover: Borky stands in, so the layout is the same as with one */
-  .book .thumb:not([src]), #cover:not([src]), #miniCover:not([src]) { background: var(--soft) var(--nocover) center / 62% no-repeat; }
+  .book .thumb:not([src]), #cover:not([src]), #miniCover:not([src]) {
+    background: var(--soft) var(--nocover) center / 62% no-repeat;
+    /* a see-through picture in place of none: Safari outlines an image that has none */
+    content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+  }
   .book .name { font-weight: 600; overflow-wrap: anywhere; }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   /* Fills are full width and scaled from the left (set from script), so moving
@@ -953,6 +957,12 @@
       <span class="picktext"><span class="pickname">Extras</span><span id="addExtrasName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
+    <label class="pick" id="pickCover">
+      <input id="addCover" type="file" accept="image/*">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 16l5-5 5 5 2-2 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg></span>
+      <span class="picktext"><span class="pickname">Cover</span><span id="addCoverName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
   </div>
   <div id="addProgress" class="bar" style="visibility:hidden"><div id="addFill"></div></div>
   <p id="addStatus" class="muted"></p>
@@ -1192,6 +1202,7 @@
     <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
     <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
     <label class="filebtn"><span id="extrasBtnLabel">Add extras</span><input id="extrasFile" type="file"></label>
+    <label class="filebtn"><span id="coverBtnLabel">Add cover</span><input id="coverFile" type="file" accept="image/*"></label>
     <label class="filebtn"><span>Import bookmarks</span><input id="marksFile" type="file"></label>
     <button id="removeBtn">Remove book</button>
   </div>

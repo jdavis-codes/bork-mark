@@ -56,9 +56,10 @@ function forgetCover(id) {
   if (p) p.then((u) => { if (u) URL.revokeObjectURL(u); });
 }
 
-// Stores a cover for a book that had none, and shows it in its library row. Resolves to its address.
-export async function giveCover(b, blob) {
+// Stores a book's cover, new or in place of the old one, and shows it in its library row. Resolves to its address.
+export async function setCover(b, blob) {
   await store('write', b.id, 'cover', blob);
+  await store('remove', b.id, 'cover-display');   // the old cover's smaller copy
   b.hasCover = true;
   save(true);
   forgetCover(b.id);

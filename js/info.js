@@ -147,6 +147,7 @@ export function renderInfo() {
   row('Added', new Date(b.added).toLocaleDateString());
   $('pageBtnLabel').textContent = b.pageSrcName ? 'Replace page PDF' : 'Add page PDF';
   $('extrasBtnLabel').textContent = b.hasExtras ? 'Replace extras' : 'Add extras';
+  $('coverBtnLabel').textContent = b.hasCover ? 'Change cover' : 'Add cover';
   $('textStatus').textContent = b.hasText
     ? 'Bookmarks quote the book’s own wording.'
     : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
