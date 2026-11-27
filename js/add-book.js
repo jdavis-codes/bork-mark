@@ -75,9 +75,10 @@ $('addGo').addEventListener('click', async () => {
         detail('page scan read: ' + pdf.pages.length + ' pages, ' + took());
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
-    // The cover: the audio's, else the EPUB's, else the page scan's first page.
+    // The cover: the audio's, else the EPUB's, else the page scan's first page
+    // (even from a scan that can't give page numbers, having no text layer).
     let cover = src.tags.cover || (doc && doc.cover) || null;
-    if (!cover && pdf) {
+    if (!cover && pf) {
       try { cover = await pdfCover(pf); detail('cover from the page scan: ' + mb(cover.size)); } catch (err) { /* no cover then */ }
     }
     if (cover) await store('write', id, 'cover', cover);
