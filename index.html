@@ -46,9 +46,9 @@
   main { max-width: 560px; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin: 0; text-wrap: balance; }
   /* the name sits on two lines, leaving the middle of the top row for notices */
-  .libhead h1 { line-height: 1.02; letter-spacing: -0.01em; display: flex; align-items: center; gap: 3px; }
+  .libhead h1 { line-height: 1.02; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
   /* Borky, the app's icon, after the name and as tall as its two lines, looking back at it */
-  .borky { flex: none; height: 2.6rem; width: auto; aspect-ratio: 69 / 62; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: square; }
+  .borky { flex: none; height: 2.75rem; width: auto; aspect-ratio: 39.09 / 34.7; }
   h2 { font-size: 1rem; margin: 0; }
   p { margin: 0; }
   a { color: var(--accent); }
@@ -838,7 +838,7 @@
 
 <main id="library">
   <div class="libhead">
-    <div class="row spread"><h1 aria-label="Bork Mark"><span>Bork<br>Mark</span><svg class="borky" viewBox="-2 -1 69 62" aria-hidden="true"><path d="M21.5 18 L42 1.5 L38.5 19.5 L39.5 23 L44 28.5 H61.5 Q64 28.5 64 31 V35.5 L62 41.5 H37 L48.5 47.5"/><path d="M1 22 L12.5 16.5 L18 18.5 H38.5"/><path d="M1 22.5 Q0 24 1.5 26 L10 49 L17.5 29.5"/><path d="M48.5 42 V59 L53.5 54.5 L58.5 59 V42"/></svg></h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
+    <div class="row spread"><h1 aria-label="Bork Mark"><span>Bork<br>Mark</span><svg class="borky" viewBox="-1 -1 39.09 34.70" aria-hidden="true"><g transform="translate(-61.633 -193.39)" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" transform="translate(52.13 -1.405)" d="m 28.070869,201.24522 c -0.81683,-0.21687 -1.724581,-0.25094 -2.61527,-0.005 -0.09498,0.0262 -0.234451,0.10756 -0.263701,0.2001 -0.04268,0.13504 -0.03763,0.31408 -0.03777,0.45759 -1.84e-4,0.85092 0.718358,1.54078 1.60467,1.54061 0.886074,-1.5e-4 1.604244,-0.68991 1.60406,-1.54061 -8e-6,-0.13754 -0.03781,-0.31579 -0.07584,-0.44878 -0.02537,-0.0887 -0.126203,-0.18004 -0.216148,-0.20393 z"/><path fill="none" stroke="currentColor" stroke-width="1.424" d="m 75.788707,198.51325 c 2.676437,-0.8875 3.667472,-0.87452 6.362162,0.28781"/><path fill="none" stroke="currentColor" stroke-width="1.424" d="m 66.858991,207.32674 -1.909662,13.56333"/><path fill="none" stroke="currentColor" stroke-width="0.5705" transform="matrix(2.3102249,0,0,2.6970604,41.705315,120.659)" d="m 12.334532,27.252007 5.486021,0.0062 2.016653,1.799922 4.557208,-0.03269 a 7.4282586,7.4282586 104.79891 0 1 -0.895786,3.390674 l -0.03343,0.06474 -7.39825,-0.03714 5.488991,2.813165"/><path fill="#ff96dd" d="m 81.633966,208.98905 8.093751,2.55924 -0.0066,12.3837 -4.078854,-2.96862 -4.008325,2.96862 z"/><path fill="currentColor" stroke="currentColor" stroke-width="1.424" d="m 70.242577,194.12543 -7.897672,15.18399 11.997441,-1.945 z"/><path fill="currentColor" stroke="currentColor" stroke-width="1.42" d="m 95.934295,208.02912 1.93889,-8.98702 -3.048725,3.27641 z"/></g></svg></h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
     <p id="storage" hidden><span id="storagePie" aria-hidden="true"></span><span id="storageText"></span></p>
     <div id="modelFail" hidden><span id="modelNote"></span><button id="modelAgain">Try again</button></div>
   </div>
