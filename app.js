@@ -7,6 +7,7 @@ import { detail, lastCrash, mb } from './js/log.js';
 import { renderSettings } from './js/settings-sheet.js';
 import { retryModel, warmModel } from './js/speech.js';
 import { save, state } from './js/state.js';
+import { purgeTrash } from './js/trash.js';
 import { $ } from './js/ui/dom.js';
 import { autoUpdate } from './js/updates.js';
 
@@ -62,6 +63,7 @@ if (state.books.length && !crashedLoading) warmModel().catch(() => {});
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+purgeTrash();   // what was deleted over ten days ago goes for good
 renderLibrary();
 if (navigator.storage && navigator.storage.estimate) {
   navigator.storage.estimate().then(({ usage, quota }) => detail('launch: ' + state.books.length + ' books, storage ' + mb(usage || 0) + ' of ' + mb(quota || 0)

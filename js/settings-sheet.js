@@ -8,6 +8,7 @@ import { requoteAll } from './quotes.js';
 import { retuneSounds } from './sounds.js';
 import { DEFAULTS, save, settings } from './state.js';
 import { renderSwatches } from './theme.js';
+import { renderTrash } from './trash.js';
 import { $, fillRange, fmt, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
 
@@ -27,6 +28,7 @@ const isSkip = (a) => a === 'fwd' || a === 'back';
 const EVENT_SOUNDS = ['soundMark', 'soundSkip', 'soundFigure'];
 const soundChoice = (id) => (settings[id] === false ? 'none' : typeof settings[id] === 'string' ? settings[id] : settings.soundStyle || 'chime');
 export function renderSettings() {
+  renderTrash();
   for (const [id, obj, key, show] of SLIDERS) {
     const input = $(id);
     input.value = Math.max(Number(input.min), Math.min(Number(input.max), obj[key]));

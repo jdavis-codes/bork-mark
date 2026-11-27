@@ -5,6 +5,7 @@ import { runQueue } from './queue.js';
 import { requote, shareText } from './quotes.js';
 import { sound } from './sounds.js';
 import { save, settings } from './state.js';
+import { trashMark } from './trash.js';
 import { endTrim, paintTrim, pinIcon, startTrim, trim, trimEditor } from './trim.js';
 import { $, audio, calm, el, fmt, icon, toast } from './ui/dom.js';
 import { closeSheet } from './ui/sheets.js';
@@ -282,7 +283,7 @@ export function easeCard(id, change, settle) {
 // Deleting: the card fades and folds away, and the ones below slide up into
 // its place. If it was the only one under its chapter heading, the heading goes with it.
 function removeCard(b, m) {
-  const finish = () => { b.marks = b.marks.filter((x) => x !== m); save(true); renderMarks(); };
+  const finish = () => { b.marks = b.marks.filter((x) => x !== m); trashMark(b, m); renderMarks(); toast('Moved to Recently deleted'); };
   const card = cardFor(m.id);
   if (!card || calm.matches) { finish(); return; }
   const group = card.parentNode, gone = group.querySelectorAll('.mark').length === 1 && b.marks.length > 1 ? group : card;
@@ -309,7 +310,6 @@ function markCard(b, m, showChapter) {
 
   const remove = iconButton('trash', 'Delete bookmark');
   remove.addEventListener('click', () => {
-    if (!confirm('Delete the bookmark at ' + fmt(m.t) + '?')) return;
     endTrim(m);
     removeCard(b, m);
   });

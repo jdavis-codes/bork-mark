@@ -31,6 +31,7 @@ export function resolveMeta(b) {
   }
 }
 state.books.forEach(resolveMeta);
+state.trash = state.trash || [];   // Recently deleted (trash.js)
 
 // What each button does. `next` and `prev` are the track buttons a headset or
 // watch sends; an action is mark | fwd | back | nextChapter | prevChapter | none.

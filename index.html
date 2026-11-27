@@ -118,8 +118,16 @@
   .tile.has .tilename { color: var(--fg); }
   #removeBtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 14px 0 0; padding: 10px; border: none; background: none; font: inherit; }
   #removeBtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  #removeBtn.danger, #menu .danger { color: #d92d20; }
-  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger { color: #ff6b5e; } }
+  #trashList { list-style: none; margin: 4px 0 0; padding: 0; }
+  #trashList li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  #trashList li:first-child { border-top: none; }
+  #trashList svg { width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .trashtext { display: grid; min-width: 0; }
+  .trashtext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .trashtext .muted { font-size: 0.82rem; }
+  #trashEmpty { margin-top: 4px; }
+  #removeBtn.danger, #menu .danger, #trashEmpty.danger { color: #d92d20; }
+  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger, #trashEmpty.danger { color: #ff6b5e; } }
   @keyframes fadein { from { opacity: 0; } }
   @keyframes menuin { from { opacity: 0; transform: scale(0.9); } }
   @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #menu, #menuShade { animation: none; } }
@@ -1162,6 +1170,13 @@
         </div>
         <p class="muted">Used for the progress bar, buttons and highlights. Very light or dark picks are adjusted so they stay readable in both themes.</p>
       </div>
+    </section>
+
+    <section>
+      <h3>Recently deleted</h3>
+      <p id="trashNote" class="muted"></p>
+      <ul id="trashList"></ul>
+      <button id="trashEmpty" class="plain danger" hidden>Empty now</button>
     </section>
 
     <section>

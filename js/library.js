@@ -3,7 +3,8 @@
 import { closeBook, cur, prepareBook } from './player.js';
 import { save, state } from './state.js';
 import { store, stored } from './storage.js';
-import { $, el, fmt, setFill, setText } from './ui/dom.js';
+import { trashBook } from './trash.js';
+import { $, el, fmt, setFill, setText, toast } from './ui/dom.js';
 import { closeMenu, menuOpen, showMenu } from './ui/menu.js';
 import { detail } from './log.js';
 import { openPlayer } from './screens.js';
@@ -148,16 +149,14 @@ export async function renderLibrary() {
   }
 }
 
-// Removes a book and everything stored with it, once the reader agrees. Resolves to whether it went.
+// Deletes a book: it goes to Recently deleted, with its files, for ten days (trash.js).
 export async function removeBook(b) {
-  const n = b.marks.length;
-  if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return false;
   if (cur && cur.book === b) closeBook();
   const i = state.books.indexOf(b);
   if (i >= 0) state.books.splice(i, 1);
-  save(true);
-  await store('remove', b.id).catch(() => {});
+  trashBook(b);
   renderLibrary();
+  toast('Moved to Recently deleted');
   return true;
 }
 

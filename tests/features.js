@@ -208,5 +208,33 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#menu button'); await page.waitForTimeout(600);
   const left = (await page.$$('#books .book')).length;
   check('the hold menu takes a book off the device', left === n - 1 && !(await page.$('#menu')), n + ' -> ' + left);
+  // Recently deleted: the book is there, and Restore brings it back with its audio.
+  await page.click('#settingsBtn'); await page.waitForTimeout(400);
+  const listed = await page.$$eval('#trashList li', (li) => li.length);
+  await page.click('#trashList li button'); await page.waitForTimeout(400);
+  const back = await page.evaluate(async () => {
+    const { state } = await import('./js/state.js'), { stored } = await import('./js/storage.js');
+    const a = await stored(state.books[0].id, 'audio');
+    return { books: state.books.length, trash: state.trash.length, audio: a ? a.size : 0 };
+  });
+  check('a deleted book is restored from Recently deleted, files and all', listed >= 1 && back.books === n && back.trash === listed - 1 && back.audio > 1000, listed + ' listed, ' + JSON.stringify(back));
+  // A deleted bookmark comes back to its book; anything older than ten days is gone for good at launch.
+  const marks = await page.evaluate(async () => {
+    const { state } = await import('./js/state.js'), { trashMark, purgeTrash, renderTrash } = await import('./js/trash.js'), { stored } = await import('./js/storage.js');
+    const b = state.books.find((x) => x.marks.length) || state.books[0];
+    if (!b.marks.length) b.marks.push({ id: 'm-test', t: 12, status: 'heard', transcript: 'a test bookmark', created: Date.now() });
+    const m = b.marks.pop(); trashMark(b, m); renderTrash();
+    document.querySelector('#trashList li button').click();
+    const restored = b.marks.includes(m);
+    // ten days on: a deleted book and its files go for good
+    const old = state.books[state.books.length - 1];
+    state.books.splice(state.books.indexOf(old), 1);
+    state.trash.unshift({ kind: 'book', book: old, at: Date.now() - 11 * 86400000 });
+    purgeTrash();
+    await new Promise((r) => setTimeout(r, 500));
+    return { restored, purged: !state.trash.some((x) => x.book === old), files: !!(await stored(old.id, 'audio')) };
+  });
+  check('a deleted bookmark is restored; after ten days a book goes for good', marks.restored && marks.purged && !marks.files, JSON.stringify(marks));
+  await page.click('#settingsClose');
   done(page); await browser.close();
 })();
