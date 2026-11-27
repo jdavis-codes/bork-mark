@@ -982,25 +982,25 @@
   <p class="muted" style="margin:6px 0 14px">Files are copied into this app on your device. Nothing is uploaded.</p>
   <div class="picks">
     <label class="pick" id="pickAudio">
-      <input id="addAudio" type="file">
+      <input id="addAudio" type="file" accept=".m4b,.m4a,.mp3,.mp4,.aac,audio/mp4,audio/x-m4b,audio/x-m4a,audio/mpeg,audio/aac">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H6a2 2 0 0 1-2-2zM20 14h-3v6h1a2 2 0 0 0 2-2z"/></svg></span>
       <span class="picktext"><span class="pickname">Audiobook</span><span id="addAudioName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
     <label class="pick" id="pickText">
-      <input id="addText" type="file">
+      <input id="addText" type="file" accept=".epub,.md,.markdown,.mdown,.txt,.text,application/epub+zip,text/markdown,text/plain">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4M9 8h6"/></svg></span>
       <span class="picktext"><span class="pickname">Book text</span><span id="addTextName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
     <label class="pick" id="pickPdf">
-      <input id="addPdf" type="file">
+      <input id="addPdf" type="file" accept=".pdf,application/pdf">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg></span>
       <span class="picktext"><span class="pickname">Page scan</span><span id="addPdfName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
     <label class="pick" id="pickExtras">
-      <input id="addExtras" type="file">
+      <input id="addExtras" type="file" accept=".pdf,application/pdf">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4"/><path d="M8 8H4v12h12"/><path d="M11 16v-3M14 16v-5M17 16v-2"/></svg></span>
       <span class="picktext"><span class="pickname">Extras</span><span id="addExtrasName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
@@ -1265,7 +1265,7 @@
     <button class="tile" id="coverAct" data-piece="cover"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 16l5-5 5 5 2-2 4 4M15.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Cover</span></button>
     <button class="tile flat" id="marksAct" data-piece="marks"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21zM12 6.5v6.5M9.2 10.3L12 13l2.8-2.7"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Import bookmarks</span></button>
   </div>
-  <input id="textFile" type="file"><input id="pageFile" type="file"><input id="extrasFile" type="file"><input id="coverFile" type="file" accept="image/*"><input id="marksFile" type="file">
+  <input id="textFile" type="file" accept=".epub,.md,.markdown,.mdown,.txt,.text,application/epub+zip,text/markdown,text/plain"><input id="pageFile" type="file" accept=".pdf,application/pdf"><input id="extrasFile" type="file" accept=".pdf,application/pdf"><input id="coverFile" type="file" accept="image/*"><input id="marksFile" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain">
   <button id="removeBtn" class="danger"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Remove book</button>
 </dialog>
 
