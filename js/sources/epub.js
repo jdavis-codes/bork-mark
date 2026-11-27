@@ -97,12 +97,16 @@ export async function readEpub(file) {
   const opf = xml(read(opfPath));
   const dir = dirOf(opfPath);
   const items = {};
-  let navPath = null;
+  let navPath = null, coverPath = null;
   byTag(opf, 'item').forEach((it) => {
     const path = resolveHref(dir, it.getAttribute('href') || '')[0];
     items[it.getAttribute('id')] = path;
     if (/\bnav\b/.test(it.getAttribute('properties') || '')) navPath = path;
+    if (/\bcover-image\b/.test(it.getAttribute('properties') || '')) coverPath = path;   // EPUB 3
   });
+  // EPUB 2 names the cover's item in <meta name="cover" content="…">.
+  const coverMeta = byTag(opf, 'meta').find((m) => m.getAttribute('name') === 'cover');
+  if (!coverPath && coverMeta) coverPath = items[coverMeta.getAttribute('content')] || null;
   const spineEl = byTag(opf, 'spine')[0];
   const spine = byTag(opf, 'itemref').map((r) => items[r.getAttribute('idref')]).filter((path) => path && zip[path]);
   if (!spine.length) throw new Error('No readable chapters found in EPUB');
@@ -186,8 +190,10 @@ export async function readEpub(file) {
   for (const f of kept) if (/^image$|\.(jpe?g|png|gif|svg|webp)$/i.test(f.cap || '')) f.cap = '';   // a file name is not a caption
   figures.length = 0; figures.push(...kept);
   const meta = byTag(opf, 'metadata')[0] || opf;
+  const coverType = coverPath && TYPES[(coverPath.split('.').pop() || '').toLowerCase()];
+  const cover = coverType && coverType !== 'image/svg+xml' && zip[coverPath] ? new Blob([zip[coverPath]], { type: coverType }) : null;
   return {
-    text, toc: dedupe(toc).map((e) => ({ ...e, depth: depthOf.get(e.label) || 0 })), pages: dedupe(pages), figures, images,
+    text, cover, toc: dedupe(toc).map((e) => ({ ...e, depth: depthOf.get(e.label) || 0 })), pages: dedupe(pages), figures, images,
     title: clean((byTag(meta, 'title')[0] || {}).textContent),
     author: byTag(meta, 'creator').map((c) => clean(c.textContent)).filter(Boolean).join(', '),
     publisher: clean((byTag(meta, 'publisher')[0] || {}).textContent),

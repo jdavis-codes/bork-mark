@@ -1,7 +1,7 @@
 // The library screen: one row per book.
 
 import { cur, prepareBook } from './player.js';
-import { state } from './state.js';
+import { save, state } from './state.js';
 import { store, stored } from './storage.js';
 import { $, el, fmt, setFill, setText } from './ui/dom.js';
 import { detail } from './log.js';
@@ -54,6 +54,18 @@ function forgetCover(id) {
   const p = covers.get(id);
   covers.delete(id);
   if (p) p.then((u) => { if (u) URL.revokeObjectURL(u); });
+}
+
+// Stores a cover for a book that had none, and shows it in its library row. Resolves to its address.
+export async function giveCover(b, blob) {
+  await store('write', b.id, 'cover', blob);
+  b.hasCover = true;
+  save(true);
+  forgetCover(b.id);
+  const u = await coverUrl(b);
+  const r = libRows.get(b.id);
+  if (u && r) r.img.src = u;
+  return u;
 }
 
 const libRows = new Map();   // book id -> { li, img, name, meta, fill }

@@ -35,6 +35,12 @@ export async function renderPdfPage(file, number, width = 1400) {
   }
 }
 
+// Page 1 as a JPEG, for a book with no other cover: in a scan of the print edition it is the cover.
+export async function pdfCover(file) {
+  const canvas = await renderPdfPage(file, 1, 1024);
+  return await new Promise((done) => canvas.toBlob(done, 'image/jpeg', 0.88));
+}
+
 // A PDF kept open for looking through page after page, which is much quicker
 // than opening it again for each one. Call close() when done with it.
 export async function browsePdf(file) {

@@ -5,7 +5,7 @@ import { storeText } from './book-files.js';
 import { storeExtras } from './extras.js';
 import { openBook } from './player.js';
 import { readBook } from './sources/index.js';
-import { guessFirstNumbered, readPdfPages } from './sources/pdf.js';
+import { guessFirstNumbered, pdfCover, readPdfPages } from './sources/pdf.js';
 import { fromDoc, resolveMeta, save, state } from './state.js';
 import { store } from './storage.js';
 import { $, fmt, setFill, toast } from './ui/dom.js';
@@ -63,7 +63,6 @@ $('addGo').addEventListener('click', async () => {
     }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     await store('write', id, 'audio', af, (p) => addSay('Copying the audiobook… ' + Math.round(p * 100) + '%', 0.15 + p * 0.7));
-    if (src.tags.cover) await store('write', id, 'cover', src.tags.cover);
     detail('audio copied: ' + took());
     if (doc) { await storeText(id, doc); detail('text stored: ' + took()); }
     // A page scan that can't be used shouldn't stop the book being added.
@@ -76,11 +75,17 @@ $('addGo').addEventListener('click', async () => {
         detail('page scan read: ' + pdf.pages.length + ' pages, ' + took());
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
+    // The cover: the audio's, else the EPUB's, else the page scan's first page.
+    let cover = src.tags.cover || (doc && doc.cover) || null;
+    if (!cover && pdf) {
+      try { cover = await pdfCover(pf); detail('cover from the page scan: ' + mb(cover.size)); } catch (err) { /* no cover then */ }
+    }
+    if (cover) await store('write', id, 'cover', cover);
     const book = {
       id, fromAudio: { title: src.tags.title || '', author: src.tags.author || '' },
       fromText: fromDoc(doc),
       audioName: af.name, kind: src.kind, duration: src.duration, chapters: src.chapters,
-      hasCover: !!src.tags.cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
+      hasCover: !!cover, hasText: !!doc, textName: tf ? tf.name : '', pageCount: doc ? doc.pages.length : 0,
       position: 0, speed: 1, added: Date.now(), marks: [],
     };
     // Likewise the extras.

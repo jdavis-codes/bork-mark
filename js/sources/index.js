@@ -8,7 +8,8 @@
 //                                  `depth` how far it is nested (0 at the top; may be missing)
 //     pages: [{ label, at }],      print page numbers, when the file records them
 //     figures: [{ at, kind: 'image' | 'table', cap, img | rows }],   img indexes images
-//     images: [Blob] }
+//     images: [Blob],
+//     cover: Blob }                the book's cover picture; missing when the file has none
 //
 // A new kind of file (a PDF of the book, say) needs only a reader here.
 

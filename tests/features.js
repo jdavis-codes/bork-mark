@@ -158,5 +158,11 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await addBook(page, 'opus.m4b'); await page.waitForTimeout(1000);
   const opusTitle = await page.evaluate(() => document.getElementById('title').textContent);
   check('an Opus M4B is added with its title', /Opus Book/.test(opusTitle), opusTitle);
+  // A book whose audio has no cover takes the page scan's first page as one.
+  await page.goto(BASE); await page.click('#addBtn');
+  await page.setInputFiles('#addAudio', FIX + '/plain.m4a'); await page.setInputFiles('#addPdf', FIX + '/extras.pdf');
+  await page.click('#addGo'); await page.waitForSelector('#player:not([hidden])', { timeout: 60000 }); await page.waitForTimeout(500);
+  const pdfCover = await page.evaluate(() => document.getElementById('cover').getAttribute('src'));
+  check('a page scan gives a cover when the audio has none', !!pdfCover, String(pdfCover));
   done(page); await browser.close();
 })();

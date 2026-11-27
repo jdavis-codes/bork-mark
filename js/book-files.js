@@ -9,7 +9,8 @@ import { runQueue } from './queue.js';
 import { findPages, rematch, requote } from './quotes.js';
 import { isOrnament } from './sources/epub.js';
 import { readBook } from './sources/index.js';
-import { buildPageIndex, guessFirstNumbered, readPdfPages } from './sources/pdf.js';
+import { buildPageIndex, guessFirstNumbered, pdfCover, readPdfPages } from './sources/pdf.js';
+import { giveCover } from './library.js';
 import { fromDoc, resolveMeta, save } from './state.js';
 import { store, stored } from './storage.js';
 import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
@@ -101,6 +102,17 @@ export async function loadPageScan(mine) {
   } catch (e) { /* unreadable page source: carry on without it */ }
 }
 
+// A book added without a cover takes one from text or a page scan added later.
+async function coverIfNone(mine, get) {
+  if (mine.book.hasCover) return;
+  try {
+    const blob = await get();
+    if (!blob) return;
+    const u = await giveCover(mine.book, blob);
+    if (cur === mine && u) { mine.coverUrl = u; $('cover').src = u; }
+  } catch (e) { /* no cover then */ }
+}
+
 // Adding or replacing the text or page scan from About this book.
 $('textFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
@@ -117,6 +129,7 @@ $('textFile').addEventListener('change', async (e) => {
     for (const m of b.marks) { delete m.loc; delete m.figs; delete m.trim; }
     delete b.anchors; delete b.autoNaming;
     resolveMeta(b); save(true);
+    await coverIfNone(mine, () => doc.cover);
     if (cur !== mine) return;
     mine.meta = { toc: doc.toc, pages: doc.pages, figures: doc.figures, tablesDone: true, unwrapped: true, sized: true };
     renderFigTab();
@@ -142,6 +155,7 @@ $('pageFile').addEventListener('change', async (e) => {
     b.pageSrcName = f.name;
     b.pageFirst = guessFirstNumbered(pdf.pages) || 1;
     save(true);
+    await coverIfNone(mine, () => pdfCover(f));
     if (cur !== mine) return;
     mine.pageSrc = { labels: pdf.labels, count: pdf.pages.length, index: buildPageIndex(pdf.pages) };
     const quotes = b.marks.filter((m) => m.status === 'done').length, found = findPages();
