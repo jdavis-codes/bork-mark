@@ -6,25 +6,29 @@ Press a button while you listen and Bork Mark saves the place. It then finds the
 
 **Open it:** https://jdavis-codes.github.io/bork-mark/
 
-<p>
-  <img src="docs/img/library.png" width="24%" alt="Library with one book and its progress">
-  <img src="docs/img/player.png" width="24%" alt="Player with cover, chapter, progress and a large Bookmark button">
-  <img src="docs/img/bookmarks.png" width="24%" alt="Bookmarks grouped by chapter, each with its quote">
-  <img src="docs/img/trim.png" width="24%" alt="Trimming a quote by dragging handles over the text">
-</p>
+<table>
+  <tr>
+    <td width="25%"><img src="docs/img/player.png" alt="The player: cover, chapter, progress and one large Bookmark button"></td>
+    <td width="25%"><img src="docs/img/bookmarks.png" alt="Bookmarks grouped by chapter, each showing the passage from the book"></td>
+    <td width="25%"><img src="docs/img/trim.png" alt="Trimming a quote by dragging handles over the text"></td>
+    <td width="25%"><img src="docs/img/extras.png" alt="Extras: the figures that came with the audiobook, listed by chapter"></td>
+  </tr>
+  <tr>
+    <td><b>Listen.</b> One big button, or the one on your headphones.</td>
+    <td><b>Get the words back.</b> Each bookmark becomes the passage, in the book’s own wording.</td>
+    <td><b>Keep what matters.</b> Drag to the sentences you want, then copy or share with a citation.</td>
+    <td><b>See what you’re hearing.</b> The figures that came with the audiobook, by chapter.</td>
+  </tr>
+</table>
 
 ## Getting started
 
 1. Open the link above in Safari on your iPhone. Tap **•••**, then **Share**, then **Add to Home Screen** (it may be under View More). This matters: Safari clears a website's saved files after about a week without a visit, and only an app on the Home Screen is exempt. Without it, your books and bookmarks can disappear.
-2. Tap **Add a book** and pick the audio file (M4B or MP3). Add the EPUB too if you have it, and a PDF of the print edition if you want printed page numbers.
+2. Tap **Add a book** and pick the audio file (M4B, M4A or MP3). Add the EPUB too if you have it, a PDF of the print edition if you want printed page numbers, and the extras PDF if the audiobook came with one.
 3. Press play. To bookmark, double- or triple-press your headphone button, press next track on a watch, or tap **Bookmark**. It works with the phone locked.
 4. Open **Bookmarks** to read, trim, copy or share your quotes.
 
 Files must be free of copy protection, such as the downloads from Libro.fm. A short guide covers the same steps the first time you open the app; Settings can show it again.
-
-<p>
-  <img src="docs/img/intro.png" width="24%" alt="Intro guide step: why and how to add the app to the Home Screen">
-</p>
 
 ## What it does
 
@@ -33,15 +37,13 @@ Files must be free of copy protection, such as the downloads from Libro.fm. A sh
 | **Hands-free bookmarks** | The next and previous track buttons on headphones, watches and the lock screen can each bookmark, skip, or change chapter. |
 | **Exact quotes** | A small speech model (Whisper, running on the phone) listens to the seconds around a bookmark, and the app finds those words in the EPUB. Without an EPUB you get what the model heard. |
 | **Trimming** | Tap a sentence, drag the handles, or press and hold to cut a quote down. Ends can snap to whole sentences. |
+| **Markdown** | A Markdown file can be the book's text, with its headings as the contents. Bookmarks export as a Markdown file that reads well on its own, and another device can import that file for the same book. |
 | **Citations** | Quotes are copied and shared with a citation in a simple style, MLA, APA or Chicago, with or without the place in the audio. |
 | **Page numbers** | Taken from the EPUB when it records them, or found in a PDF of the print edition. |
-| **Figures** | Pictures and tables in the book text are listed, and the app can chime when the reading reaches one. |
-| **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, and your choice of accent colour. |
-
-<p>
-  <img src="docs/img/citations.png" width="24%" alt="Citation settings with style, audio time and a preview">
-  <img src="docs/img/info.png" width="24%" alt="About this book: title, author, publisher, year and file links">
-</p>
+| **Search** | Search the book's text: each result shows its chapter and two lines, opens to its paragraph, and can play from there or become a bookmark. Recent searches are kept per book. The bookmarks list can be searched too, and also shows bookmarks related by meaning: “boat” finds a quote about a canoe. |
+| **Figures** | Pictures and tables in the book text, listed by chapter or as a grid, and the app can chime when the reading reaches one. |
+| **Extras** | The PDF of figures, tables or notes that comes with many audiobooks sits under the same Figures button: by chapter, starting at the one you are listening to, or every page as a grid. |
+| **Player** | Chapters, speed, sleep timer, skip buttons, a mini player, your choice of accent colour, and confirmation sounds in four styles with their own loudness. |
 
 ### Citations
 
@@ -73,16 +75,24 @@ There is no build step: the app is plain HTML, CSS and JavaScript modules.
 python3 -m http.server 8765   # then open http://localhost:8765/
 ```
 
-| File | What it holds |
+| Where | What it holds |
 |---|---|
 | `index.html` | Markup and styles |
-| `app.js` | The interface: library, player, bookmarks, settings |
-| `align.js` | Reading M4B, MP3, EPUB and PDF files, and matching audio to text |
-| `cite.js` | Citation styles |
-| `align-worker.js` | The speech model, in a worker |
-| `store-worker.js` | Saving files to the browser's private storage |
-| `sw.js` | Service worker, so the app opens without signal |
-| `buttons.html`, `align.html` | Test pages for media buttons and for alignment |
+| `app.js` | Starts the app: loads the modules below, then what runs at launch |
+| `js/text/` | The book text, whatever file it came from: the word index used to find heard words (`book.js`), cutting quotes and sentences (`quote.js`), tidying tables and wrapped lines (`cleanup.js`) |
+| `js/sources/` | Readers that turn a file into the book text and its contents, pages and figures: EPUB, Markdown, plain text, PDF page scans, and the extras PDF. `index.js` describes the shape they all return |
+| `js/audio/` | Reading M4B and MP3 files and cutting clips (`container.js`), and decoding and transcribing a clip (`listen.js`) |
+| `js/ui/` | Shared interface pieces: DOM helpers, sheets and the swipe-down gesture, scrolling titles |
+| `js/*.js` | One module per part of the app: `library`, `add-book`, `player`, `screens` (moving between library and player), `marks`, `trim`, `queue` and `quotes` (finding quotes), `speech`, `figures`, `extras`, `viewer`, `info`, `book-files`, `settings-sheet`, `updates`, `intro` and so on. Each starts with a line saying what it holds |
+| `js/version.js` | The version and build number, written by `stamp.sh` |
+| `js/speech-worker.js` | The speech model, in a worker |
+| `js/store-worker.js` | Saving files to the browser's private storage |
+| `sw.js` | Service worker, so the app opens without signal. Its list of app files needs updating when a module is added |
+| `buttons.html`, `tests.html` | Test pages: media buttons; alignment and which audio formats the browser plays |
+
+### Tests
+
+`tests/run.sh quick` checks the everyday paths in headless Chromium in about a minute; `tests/run.sh` with `lint`, `full`, `speech` or `compare <git ref>` runs less or more. CLAUDE.md says which to run when. The test media is built into `tests/fixtures/` on the first run (needs ffmpeg and python3).
 
 ### Versions and deploying
 
@@ -95,8 +105,8 @@ Publishing is done by a GitHub Actions workflow, `.github/workflows/deploy.yml`.
 
 Pages serves one site per repository, so every run publishes both copies together: the latest release at the top and the head of `develop` under `dev/`. A push to `develop` republishes the latest release unchanged.
 
-The `VERSION` file holds the first two numbers, such as `0.1`. Every push to `main` gets the next free third number (`v0.1.0`, `v0.1.1`, …) as its tag and release. To start a new series, change `VERSION` to `0.2` or `1.0`. Development builds are named after their commit, such as `0.1-dev.4989d40`. Settings, App shows which version is running.
+The `VERSION` file holds the first two numbers, such as `0.2`. Every push to `main` gets the next free third number (`v0.2.0`, `v0.2.1`, …) as its tag and release. To start a new series, change `VERSION` to `0.2` or `1.0`. Development builds are named after the release they lead to, with a count of changes since the last release: after `v0.1.3`, the eighth change on `develop` is `0.1.4-dev.8`. Settings, App shows which version is running and the commit it was built from, linked to GitHub.
 
 The development copy keeps its own books and settings, separate from the released app, and installs as "Bork Mark (dev)".
 
-The workflow runs `./stamp.sh`, which writes the version and a build number into `app.js` and `version.json`; an installed copy compares build numbers to notice a newer version.
+The workflow runs `./stamp.sh`, which writes the version, a build number and the commit into `js/version.js` and `version.json`; an installed copy compares build numbers to notice a newer version.

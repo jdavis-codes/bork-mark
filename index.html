@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Bork Mark</title>
 <link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/borky.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Bork Mark">
@@ -19,16 +22,22 @@
     --bg: #f6f5f1; --fg: #1c1b19; --muted: #6b6860; --card: #ffffff;
     --line: #dddad2; --accent: var(--accent-light, #14532d); --accent-fg: var(--accent-fg-light, #ffffff); --warn: #9a3412;
     --mark: #fde68a; --soft: #eceae3;
+    --nocover: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 39.09 34.70'%3E%3Cg transform='translate(-61.633 -193.39)' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg opacity='.3'%3E%3Cpath fill='%23000' transform='translate(52.13 -1.405)' d='m 28.070869,201.24522 c -0.81683,-0.21687 -1.724581,-0.25094 -2.61527,-0.005 -0.09498,0.0262 -0.234451,0.10756 -0.263701,0.2001 -0.04268,0.13504 -0.03763,0.31408 -0.03777,0.45759 -1.84e-4,0.85092 0.718358,1.54078 1.60467,1.54061 0.886074,-1.5e-4 1.604244,-0.68991 1.60406,-1.54061 -8e-6,-0.13754 -0.03781,-0.31579 -0.07584,-0.44878 -0.02537,-0.0887 -0.126203,-0.18004 -0.216148,-0.20393 z'/%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.424' d='m 75.788707,198.51325 c 2.676437,-0.8875 3.667472,-0.87452 6.362162,0.28781'/%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.424' d='m 66.858991,207.32674 -1.909662,13.56333'/%3E%3Cpath fill='none' stroke='%23000' stroke-width='0.5705' transform='matrix(2.3102249,0,0,2.6970604,41.705315,120.659)' d='m 12.334532,27.252007 5.486021,0.0062 2.016653,1.799922 4.557208,-0.03269 a 7.4282586,7.4282586 104.79891 0 1 -0.895786,3.390674 l -0.03343,0.06474 -7.39825,-0.03714 5.488991,2.813165'/%3E%3Cpath fill='%23000' stroke='%23000' stroke-width='1.424' d='m 70.242577,194.12543 -7.897672,15.18399 11.997441,-1.945 z'/%3E%3Cpath fill='%23000' stroke='%23000' stroke-width='1.42' d='m 95.934295,208.02912 1.93889,-8.98702 -3.048725,3.27641 z'/%3E%3C/g%3E%3Cpath fill='%23f2a7d4' d='m 81.633966,208.98905 8.093751,2.55924 -0.0066,12.3837 -4.078854,-2.96862 -4.008325,2.96862 z'/%3E%3C/g%3E%3C/svg%3E");   /* Borky, faint, where a book has no cover */ --nocover-l: 0.89; --nocover-c: 0.045;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #151614; --fg: #ecebe6; --muted: #9c998f; --card: #1f201d;
       --line: #34352f; --accent: var(--accent-dark, #4ade80); --accent-fg: var(--accent-fg-dark, #0b2212); --warn: #fdba74;
       --mark: #854d0e; --soft: #292a26;
+      --nocover: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1 -1 39.09 34.70'%3E%3Cg transform='translate(-61.633 -193.39)' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg opacity='.3'%3E%3Cpath fill='%23fff' transform='translate(52.13 -1.405)' d='m 28.070869,201.24522 c -0.81683,-0.21687 -1.724581,-0.25094 -2.61527,-0.005 -0.09498,0.0262 -0.234451,0.10756 -0.263701,0.2001 -0.04268,0.13504 -0.03763,0.31408 -0.03777,0.45759 -1.84e-4,0.85092 0.718358,1.54078 1.60467,1.54061 0.886074,-1.5e-4 1.604244,-0.68991 1.60406,-1.54061 -8e-6,-0.13754 -0.03781,-0.31579 -0.07584,-0.44878 -0.02537,-0.0887 -0.126203,-0.18004 -0.216148,-0.20393 z'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='1.424' d='m 75.788707,198.51325 c 2.676437,-0.8875 3.667472,-0.87452 6.362162,0.28781'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='1.424' d='m 66.858991,207.32674 -1.909662,13.56333'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='0.5705' transform='matrix(2.3102249,0,0,2.6970604,41.705315,120.659)' d='m 12.334532,27.252007 5.486021,0.0062 2.016653,1.799922 4.557208,-0.03269 a 7.4282586,7.4282586 104.79891 0 1 -0.895786,3.390674 l -0.03343,0.06474 -7.39825,-0.03714 5.488991,2.813165'/%3E%3Cpath fill='%23fff' stroke='%23fff' stroke-width='1.424' d='m 70.242577,194.12543 -7.897672,15.18399 11.997441,-1.945 z'/%3E%3Cpath fill='%23fff' stroke='%23fff' stroke-width='1.42' d='m 95.934295,208.02912 1.93889,-8.98702 -3.048725,3.27641 z'/%3E%3C/g%3E%3Cpath fill='%23a86a90' d='m 81.633966,208.98905 8.093751,2.55924 -0.0066,12.3837 -4.078854,-2.96862 -4.008325,2.96862 z'/%3E%3C/g%3E%3C/svg%3E"); --nocover-l: 0.34; --nocover-c: 0.045;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   [hidden] { display: none !important; }
+  /* iOS Safari enlarges text in blocks it judges too small to read on a phone,
+     one block at a time, which blew up single search results. The sizes here
+     are already meant for a phone, so it's told not to. */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -36,6 +45,10 @@
   }
   main { max-width: 560px; margin: 0 auto; }
   h1 { font-size: 1.5rem; margin: 0; text-wrap: balance; }
+  /* the name sits on two lines, leaving the middle of the top row for notices */
+  .libhead h1 { line-height: 1.02; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  /* Borky, the app's icon, after the name and as tall as its two lines, looking back at it */
+  .borky { flex: none; height: 2.75rem; width: auto; aspect-ratio: 39.09 / 34.7; }
   h2 { font-size: 1rem; margin: 0; }
   p { margin: 0; }
   a { color: var(--accent); }
@@ -48,6 +61,11 @@
   button:disabled { opacity: 0.45; cursor: default; }
   button.primary { background: var(--accent); color: var(--accent-fg); border: none; font-weight: 600; }
   button.plain { border: none; padding: 8px 4px; color: var(--accent); }
+  /* the top row's icons are as tall as the notices that sit between them */
+  #backBtn, #infoBtn, #settingsBtn { padding: 6px; }
+  #backBtn svg, #infoBtn svg, #settingsBtn svg { width: 30px; height: 30px; }
+  #backBtn { margin-left: -6px; }
+  #backBtn svg { stroke-width: 2.2; stroke-linejoin: round; }
   button.small { padding: 6px 10px; font-size: 0.85rem; }
   input[type=file] { display: none; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -63,32 +81,109 @@
     aspect-ratio: 1; border-radius: 8px; background: var(--soft); object-fit: cover; display: block;
   }
   .book .thumb { width: 64px; }
+  /* No cover: Borky stands in, on the book's own colour, so the layout is the same as with one */
+  .book .thumb:not([src]), #cover:not([src]), #miniCover:not([src]) {
+    background: oklch(var(--nocover-l) var(--nocover-c) var(--hue, 90)) var(--nocover) center / 62% no-repeat;   /* --hue: the book's own, set by hueOf */
+    /* a see-through picture in place of none: Safari outlines an image that has none */
+    content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+  }
   .book .name { font-weight: 600; overflow-wrap: anywhere; }
+  /* holding a book (library.js): it lifts, a menu opens, and it can be dragged to a new place */
+  .book { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #books > li { position: relative; transition: transform 0.2s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  #books > li.lifted { z-index: 7; transition: none; }
+  #books > li .book { transition: transform 0.18s, box-shadow 0.18s; }
+  #books > li.lifted .book { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22); }
+  html.arranging, html.arranging * { cursor: grabbing; }
+  #menuShade { position: fixed; inset: 0; z-index: 6; background: rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fadein 0.18s; pointer-events: none; }
+  #menuShade.live { pointer-events: auto; }
+  #menu {
+    position: fixed; z-index: 8; min-width: 200px; padding: 6px; border-radius: 14px; background: var(--card);
+    border: 1px solid var(--line); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28); animation: menuin 0.2s cubic-bezier(0.2, 0.85, 0.25, 1);
+  }
+  #menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px; background: none; font: inherit; text-align: left; }
+  #menu button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* About this book: the book's pieces as a row of tiles; a dashed one is missing (+), a solid one is there (tick) */
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; gap: 8px; margin-top: 16px; }
+  .tile { display: grid; justify-items: center; gap: 6px; padding: 0; border: none; background: none; font: inherit; color: inherit; }
+  .tileicon { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; max-width: 60px; border-radius: 14px; background: var(--soft); border: 1.5px solid transparent; color: var(--fg); }
+  .tile:not(.has) .tileicon { background: none; border: 1.5px dashed var(--line); color: var(--muted); }
+  .tile.flat .tileicon { background: var(--soft); border-style: solid; border-color: transparent; color: var(--fg); }
+  .tileicon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tileicon .badge { position: absolute; right: -5px; top: -5px; width: 18px; height: 18px; border-radius: 50%; stroke-width: 2.4; background: var(--muted); color: var(--card); box-shadow: 0 0 0 2px var(--card); }
+  .tile.has .badge { background: var(--accent); color: var(--accent-fg); }
+  .tile.has .badge .plus, .tile:not(.has) .badge .tick, .tile.flat .badge { display: none; }
+  .tilename { font-size: 0.78rem; line-height: 1.15; text-align: center; color: var(--muted); }
+  .tile.has .tilename { color: var(--fg); }
+  #removeBtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 14px 0 0; padding: 10px; border: none; background: none; font: inherit; }
+  #removeBtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .trashlist { list-style: none; margin: 4px 0 0; padding: 0; }
+  .trashlist li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .trashlist li:first-child { border-top: none; }
+  .trashlist svg { width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .trashtext { display: grid; min-width: 0; }
+  .trashtext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .trashtext .muted { font-size: 0.82rem; }
+  .trashhead { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .trashhead h4 { margin: 0; font-size: 0.9rem; }
+  .trashhead h4 .muted { font-weight: 400; }
+  .trashlist li { grid-template-columns: 20px minmax(0, 1fr) auto auto; }
+  .trashlist .forgood { padding: 6px; border: none; background: none; color: var(--muted); }
+  .trashlist .forgood svg { stroke: currentColor; }
+  #removeBtn.danger, #menu .danger, #settingsDlg .trashhead .danger { color: #d92d20; }
+  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger, #settingsDlg .trashhead .danger { color: #ff6b5e; } }
+  @keyframes fadein { from { opacity: 0; } }
+  @keyframes menuin { from { opacity: 0; transform: scale(0.9); } }
+  @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #menu, #menuShade { animation: none; } }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   /* Fills are full width and scaled from the left (set from script), so moving
      one is a compositor-only change instead of a relayout. */
   .bar > div { height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); }
   #emptyLib { margin-top: 24px; }
-  #library .iconbtn { margin-right: -8px; }
+  #library .iconbtn { margin-right: -6px; }
   .note { margin-top: 14px; padding: 12px; border: 1px solid var(--warn); border-radius: 12px; font-size: 0.9rem; }
   #modelNote:empty { display: none; }
-  /* the two main buttons, Add a book and Bookmark, are the same size */
-  #addBtn, #markBtn { width: 100%; height: 58px; padding: 0 16px; font-size: 1.1rem; }
+  /* the Bookmark button */
+  #markBtn { width: 100%; height: 58px; padding: 0 16px; font-size: 1.1rem; }
   /* library: the title bar stays at the top, Add a book and the mini player at the bottom */
   /* Fixed, not sticky: a sticky bar is dragged along when the page is pulled
      down past its top, and the page is told not to bounce at all. */
-  html { overscroll-behavior-y: none; }
+  html { overscroll-behavior-y: none; touch-action: manipulation; }   /* no double-tap zoom (pinch: see app.js) */
+  /* A held press highlights nothing (button labels, times, icons), except the book's title and author
+     in the player, and whatever is being typed */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  input, textarea, [contenteditable], #title, #author { -webkit-user-select: text; user-select: text; }
+  #title, #author { -webkit-touch-callout: default; }
   .libhead {
     position: fixed; top: 0; left: 0; right: 0; z-index: 1; background: var(--bg);
-    padding: calc(14px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 10px;
+    /* 3.5px less than the player's, so the middle of the top row is at the same height on both */
+    padding: calc(10.5px + env(safe-area-inset-top)) max(16px, calc((100vw - 560px) / 2)) 6px;
   }
-  #library { padding-top: 48px; }
+  #library { padding-top: 96.5px; }
+  /* Room is always kept for it, so the books don't move when it appears. */
+  #modelFail { display: flex; align-items: center; justify-content: space-between; gap: 10px; height: 28px; margin-top: 6px; padding: 0 4px 0 10px; border: 1px solid var(--warn); border-radius: 9px; font-size: 0.82rem; }
+  #modelFail[hidden] { display: none; }
+  #modelNote { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #modelAgain { flex: none; border: none; padding: 2px 8px; font-size: 0.82rem; font-weight: 600; color: var(--accent); }
+  /* how much of this app's storage is used: a small pie and two numbers, under the title */
+  #storage { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  #storagePie { flex: none; width: 13px; height: 13px; border-radius: 50%; background: conic-gradient(var(--accent) var(--used, 0%), var(--line) 0); }
+  /* Add a book: a large plus in the middle of whatever room is left under the books. With a
+     long list it follows the last book and scrolls with it. */
+  #library:not([hidden]) { display: flex; flex-direction: column; min-height: calc(100dvh - 54px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  body.has-mini #library:not([hidden]) { min-height: calc(100dvh - 124px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  #addZone { flex: 1; min-height: 190px; display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; padding: 24px 0; }
+  #emptyLib { max-width: 30ch; margin: 0; }
+  #addBtn {
+    width: 104px; height: 104px; padding: 0; border: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--soft); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); color: var(--accent);
+  }
+  #addBtn svg { width: 50px; height: 50px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
   #libFoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 2; background: var(--bg); }
   /* whichever is lowest fills the strip under the home indicator with its own color */
-  body:not(.has-mini) #addBar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-  #addBar { max-width: 592px; margin: 0 auto; padding: 10px 16px; }
   #libFoot::before { content: ""; position: absolute; left: 0; right: 0; top: -16px; height: 16px; background: linear-gradient(to top, var(--bg), transparent); pointer-events: none; }
-  body:not(.has-bar) { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  body:not(.has-bar) { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
 
   /* long text slides back and forth instead of being cut off */
   .scroller { overflow: hidden; white-space: nowrap; min-width: 0; }
@@ -101,6 +196,9 @@
     mask-image: linear-gradient(90deg, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
   }
   .scroller.scrolls .mq { display: inline-block; vertical-align: bottom; overflow: visible; animation: marquee var(--dur, 9s) ease-in-out infinite; will-change: transform; }
+  /* held still, at the place the slide starts from (while the player is pulled down) */
+  .scroller.still .mq { animation: none; }
+  .scroller.still.scrolls .mq { transform: translateX(var(--pad)); }
   @keyframes marquee {
     0%, 16% { transform: translateX(var(--pad)); }
     50%, 66% { transform: translateX(calc(var(--shift, 0px) - var(--pad))); }
@@ -163,7 +261,7 @@
   /* The grab handle is drawn in the heading itself, so the heading sits in the
      same place whether or not the list is scrolled, and the list fades out
      under it instead of being cut off. */
-  #marksDlg::before { display: none; }
+  #marksDlg::before, #figsDlg::before { display: none; }
   .markshead::before { content: ""; position: absolute; left: 50%; top: 6px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
   .markshead::after {
     content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 18px; pointer-events: none;
@@ -171,6 +269,14 @@
   }
   .markshead h2 { flex: 1; min-width: 0; white-space: nowrap; }
   .markshead .iconbtn { margin: -8px -8px -8px 0; }
+  .markshead .iconbtn + .iconbtn { margin-left: 4px; }
+  /* the order menu: a sort icon over an invisible select, so tapping it opens the system's own menu */
+  .sortpick { position: relative; cursor: pointer; }
+  .sortpick select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; }
+  .sortpick.on { color: var(--accent); }   /* an order other than the book's */
+  #markSort[hidden] { display: none; }
+  /* ✕ to close a sheet, at the end of its heading */
+  .row > .iconbtn.close { flex: none; margin: -8px -8px -8px 0; }
   /* a bookmark that was just edited glows briefly */
   /* fills the bookmark's own strip, from the divider above it to the one below */
   .mark.flash { animation: justEdited 1.6s ease-out; }
@@ -298,7 +404,49 @@
   h2[tabindex] { outline: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* bottom bar in the player: speed, sleep, settings within thumb reach */
-  #player.lifted { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); will-change: transform; }   /* while being dragged down */
+  /* Pulling the player down: the big player turns into the mini player. Everything follows --p, from
+     0 (the player) to 1 (the mini player), which screens.js sets as the finger moves and lets go of to
+     0 or 1 (animated by the transition on .gliding). --end is how far down the mini player's top is.
+     The cover and title ride down with the sheet; in the sheet they only shrink (the cover about its
+     own middle) and slide left. That change (--e, p to the fourth power) barely starts until the end
+     of the pull, then comes quickly. Each stops when it reaches the mini player's line, the sheet
+     carrying on underneath: the title when its middle gets there (--title-stick), the cover when its
+     bottom edge reaches the mini cover's (--cover-floor), then it shrinks down onto its place. The play button
+     does the same, sliding right, while its circle fades away and its icon turns from light-on-dark to
+     the mini player's dark; the mini player's bookmark button then pops out from behind it (.pop). */
+  @property --p { syntax: '<number>'; inherits: true; initial-value: 0; }
+  html.gliding { transition: --p 0.26s cubic-bezier(0.3, 0.6, 0.35, 1); }
+  html.pulling { --e: calc(var(--p) * var(--p) * var(--p) * var(--p)); }
+  html.pulling #player {
+    transform: translateY(calc(var(--p) * var(--end))); will-change: transform;
+    border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25);
+  }
+  html.pulling #cover {
+    --sc: calc(1 + var(--e) * (var(--cover-s, 1) - 1));
+    transform: translate(calc(var(--e) * var(--cover-x, 0px)),
+        max(calc(var(--cover-hh, 0px) * var(--sc) + var(--cover-top, -9999px)),   /* top edge stays on the sheet */
+          min(0px, calc(var(--cover-floor, 9999px) - var(--p) * var(--end) - var(--cover-hh, 0px) * var(--sc)))))
+      scale(var(--sc));
+    will-change: transform;
+  }
+  html.pulling #title {
+    transform-origin: left center; will-change: transform;
+    transform: translate(calc(var(--e) * (var(--title-x, 0px) - var(--title-in, 0px))), min(0px, calc(var(--title-stick, 9999px) - var(--p) * var(--end))))
+      scale(calc(1 + var(--e) * (var(--title-s, 1) - 1)));
+  }
+  html.pulling #playBtn {
+    transition: none; will-change: transform;   /* no press transition: it follows the finger */
+    transform: translate(calc(var(--e) * var(--play-x, 0px)), min(0px, calc(var(--play-stick, 9999px) - var(--p) * var(--end))))
+      scale(calc(1 + var(--e) * (var(--play-s, 1) - 1)));
+    background: color-mix(in srgb, var(--fg) calc((1 - min(1, var(--e) * 1.6)) * 100%), transparent);
+    color: color-mix(in srgb, var(--fg) calc(min(1, var(--e) * 1.6) * 100%), var(--bg));
+  }
+  html.pulling #player > :not(.coverwrap):not(#title):not(.transport), html.pulling .transport > :not(#playBtn) { opacity: calc(1 - var(--p) * 1.8); }
+  html.pulling #library, html.pulling #libFoot { opacity: min(1, calc(var(--p) * 1.2)); }
+  html.pulling #miniCover, html.pulling #miniTitle, html.pulling #miniPlay, html.pulling #miniMark { visibility: hidden; }   /* the travelling ones take their places */
+  @keyframes pop-from-play { from { transform: translateX(var(--pop-x, 0px)) scale(0.4); opacity: 0; } 50% { opacity: 1; } }
+  #miniMark.pop { animation: pop-from-play 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both; }   /* overshoots a little, then settles */
+  @media (prefers-reduced-motion: reduce) { #miniMark.pop { animation: none; } }
   dialog.dragging { will-change: transform; }
   #tabbar { margin-top: 6px; }   /* no bar behind them: the buttons sit directly on the player */
   .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); height: var(--bar); max-width: 560px; margin: 0 auto; }
@@ -312,6 +460,7 @@
   .tabs button span { grid-row: 1; white-space: nowrap; }
   .tabs svg { grid-row: 2; width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .tabs button.on { color: var(--accent); }
+  .tabs button.off { opacity: 0.35; }   /* not usable yet, or not for this book: tapping says why */
   body.has-bar { padding-bottom: 0; }
   dialog.tall { height: 82dvh; max-height: 82dvh; }
   #marksDlg, #infoDlg { overflow-y: auto; }
@@ -325,7 +474,7 @@
   }
 
   /* add a book: one tappable row per file */
-  .picks { display: grid; gap: 10px; }
+  .picks { display: grid; gap: 8px; }
   .pick {
     display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; cursor: pointer;
     padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
@@ -353,6 +502,16 @@
   dialog.bottom::before {
     content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--line); margin: -6px auto 10px;
   }
+  /* A sheet's heading (and Search's field) stays at the top while the rest scrolls, with the grab
+     handle drawn in it and the content fading out underneath, as in the Bookmarks sheet. Its top
+     is measured from inside the sheet's 16px padding, which the negative margin cancels. */
+  dialog.pinhead::before { display: none; }
+  .sheethd { position: sticky; top: -16px; z-index: 3; margin: -16px -16px 0; padding: 20px 16px 10px; background: var(--card); }
+  .sheethd::before { content: ""; position: absolute; left: 50%; top: 6px; width: 38px; height: 4px; margin-left: -19px; border-radius: 2px; background: var(--line); }
+  .sheethd::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 14px; pointer-events: none;
+    background: linear-gradient(var(--card), color-mix(in srgb, var(--card) 0%, transparent));
+  }
   .sheethead::before {
     content: ""; position: absolute; left: 50%; top: calc(5px + env(safe-area-inset-top)); width: 38px; height: 4px;
     margin-left: -19px; border-radius: 2px; background: var(--line);
@@ -364,26 +523,58 @@
     html.has-bar, body.has-bar { overflow: hidden; overscroll-behavior: none; }
   }
 
-  /* moving between library and player: the cover and the bottom bar glide
-     between their two positions while the rest cross-fades */
-  #cover, #miniCover { view-transition-name: cover; }
-  /* The mini player and the player are one surface: opening a book, the mini
-     player's box grows to fill the screen; going back, the player shrinks into
-     it. Their contents keep their own size and cross-fade, pinned to the top
-     of the moving box, so nothing is stretched. */
-  #mini, #player { view-transition-name: playerbox; }
-  ::view-transition-old(playerbox), ::view-transition-new(playerbox) { width: 100%; height: 100%; object-fit: none; object-position: top center; }
-  /* with no mini player to grow from, the player rises from the bottom edge */
-  ::view-transition-new(playerbox):only-child { animation: 0.36s cubic-bezier(0.2, 0.85, 0.25, 1) both sheet-up; }
-  ::view-transition-old(playerbox):only-child { animation: 0.26s ease-in both sheet-down; }
-  ::view-transition-group(*) { animation-duration: 0.36s; animation-timing-function: cubic-bezier(0.2, 0.85, 0.25, 1); }
-  ::view-transition-old(cover), ::view-transition-new(cover) { height: 100%; object-fit: cover; border-radius: 8px; }
-  @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+  /* Opening the player (openPlayer in screens.js): it rises from the bottom, or from the mini player,
+     with the real cover flying from the picture that was tapped. Plain transitions on transform: no
+     view transition, whose pictures of the screen WebKit drew with the cover missing. */
+  #player.rising { border-radius: 18px 18px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); will-change: transform; }
+  #player.rising #cover { will-change: transform; }
+
+  /* search: a rounded field, in the Search sheet and (swapped for the title) in the Bookmarks heading */
+  .searchfield { display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 12px; background: var(--soft); min-width: 0; }
+  .searchfield svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .searchfield input { flex: 1; min-width: 0; border: none; background: none; color: var(--fg); font: inherit; font-size: 16px; padding: 10px 0; outline: none; -webkit-appearance: none; appearance: none; }
+  .searchfield input::-webkit-search-decoration { -webkit-appearance: none; }
+  .searchfield.wide { margin-top: 12px; }
+  #marksSearch, #marksSearchCancel { display: none; }
+  #marksDlg.searching .markshead > h2, #marksDlg.searching #markSort, #marksDlg.searching #marksSearchBtn, #marksDlg.searching #marksExport, #marksDlg.searching #marksClose { display: none; }
+  #marksDlg.searching #marksSearch { display: flex; flex: 1; }
+  #marksDlg.searching #marksSearchCancel { display: block; flex: none; }
+  /* search matches: find-in-page yellow, a different colour from the accent tint that marks a bookmarked sentence */
+  .relatednote { padding: 14px 0 6px; }
+  #marks mark, #searchResults b { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  #searchResults b { font-weight: 700; }
+  #searchStatus { margin-top: 10px; }
+  #searchStatus:empty { display: none; }
+  #searchRecent { margin-top: 18px; }
+  #searchRecent h3 { margin: 0; font-size: 1.05rem; font-family: Georgia, "Iowan Old Style", serif; }
+  #searchHistory, #searchResults { list-style: none; margin: 6px 0 0; padding: 0; }
+  .recent { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; border: none; border-top: 1px solid var(--line); border-radius: 0; padding: 12px 2px; }
+  .recent svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+  .recent span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* a result: chapter and page over two lines of text, with play and bookmark beside */
+  .hit { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--line); }
+  /* one column that can't grow past the result's width: a long chapter title, kept to one line, would
+     otherwise stretch it, cutting off the text and (on iOS) setting off Safari's text enlarging */
+  .hitmain { flex: 1; min-width: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; text-align: left; border: none; border-radius: 0; padding: 14px 2px; }
+  .hithead { display: flex; justify-content: space-between; gap: 10px; min-width: 0; font-size: 0.85rem; font-weight: 650; }
+  .hithead span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hithead .muted { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .hittext { font-family: Georgia, "Iowan Old Style", serif; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .hit.open .hittext { display: block; -webkit-line-clamp: none; }
+  .hit .acts { flex-direction: column; margin-right: -6px; }
+  .hit .acts svg { width: 22px; height: 22px; }
+  .hit .acts button:first-child svg { fill: currentColor; stroke: none; }
+  .hit .acts button { color: var(--accent); }
+  #searchDlg.finding .hit .acts button { opacity: 0.4; pointer-events: none; }
+  #searchMore { display: block; margin: 14px auto 4px; }
+  #searchMore[hidden] { display: none; }
 
   /* figures tab */
   #figsDlg { overflow-y: auto; }
-  #figList { list-style: none; margin: 8px 0 0; padding: 0; }
-  #figList li { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); }
+  #figList ol { list-style: none; margin: 0; padding: 0; }
+  #figList li + li { border-top: 1px solid var(--line); }
+  #figList li { display: flex; align-items: center; gap: 6px; }
   #figList li.upnext { border-left: 3px solid var(--accent); padding-left: 8px; margin-left: -11px; }
   .figrow { flex: 1; min-width: 0; border: none; border-radius: 0; padding: 12px 2px; text-align: left; }
   .figtext { display: grid; min-width: 0; }
@@ -394,6 +585,52 @@
   #figStatus:empty, #viewStatus:empty, #viewTools:empty { display: none; }
   #viewTools { margin-top: 10px; }
   #viewStatus { margin-top: 8px; }
+
+  /* extras: what was found in the PDF, chapter by chapter, or every page */
+  .exgroup + .exgroup { margin-top: 14px; }
+  .exhead {
+    position: sticky; top: 48px; z-index: 2; width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    border: none; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 0 8px; background: var(--card);
+    text-align: left; font-size: 0.98rem; font-weight: 650;
+  }
+  /* long chapter names wrap onto more lines rather than being cut off */
+  .exhead span:first-child { min-width: 0; overflow-wrap: anywhere; }
+  /* chapters inside a part: set in, and lighter than the part */
+  .exgroup.sub { margin-left: 18px; }
+  .exgroup.sub + .exgroup.sub, .exgroup.partonly + .exgroup.sub, .group.sub + .group.sub, .group.partonly + .group.sub { margin-top: 4px; }
+  .exgroup.sub .exhead { font-size: 0.92rem; font-weight: 550; }
+  .group.sub { margin-left: 18px; }
+  .group.sub .grouphead { font-size: 0.92rem; font-weight: 550; }
+  .picklist.nested li:not(.sub) button { font-weight: 650; }
+  .picklist li.sub button { padding-left: 22px; }
+  /* a part the audio has no chapter of its own for: its name, above its chapters */
+  .picklist li.parthead { padding: 14px 2px 10px; border-top: 1px solid var(--line); font-weight: 650; }
+  .chapbox li.parthead { display: block; font-weight: 650; padding-top: 4px; }
+  .chapbox ol.nested li:not(.sub) .editable { font-weight: 650; }
+  .chapbox li.sub { padding-left: 18px; }
+  .exgroup.now .exhead span:first-child { color: var(--accent); font-weight: 800; }
+  .exgroup.now .exhead { border-bottom-color: var(--accent); }
+  .exnow { flex: none; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: var(--tint); border-radius: 999px; padding: 2px 8px; }
+  .exrow { width: 100%; display: flex; align-items: center; gap: 10px; border: none; border-radius: 0; padding: 11px 2px; text-align: left; }
+  .exrow + .exrow { border-top: 1px solid var(--line); }
+  .exrow .figtext { flex: 1; }
+  .exrow .muted:empty { display: none; }
+  .exrow .figtext .muted { white-space: normal; overflow-wrap: anywhere; }
+  .expage { flex: none; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .exgrid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+  .exgrid[hidden], #extrasList[hidden], #figList[hidden], #figsView[hidden], #figBook[hidden], #exGrid[hidden] { display: none; }
+  #exGrid[aria-pressed="true"] { color: var(--accent); background: var(--tint); }
+  #figsDlg .markshead .iconbtn + .iconbtn { margin-left: 0; }
+  .excell { border: none; padding: 0; border-radius: 6px; display: grid; gap: 4px; justify-items: center; font-variant-numeric: tabular-nums; }
+  .exthumb { display: block; width: 100%; border-radius: 6px; overflow: hidden; background: var(--soft); border: 1px solid var(--line); }
+  .exthumb img { display: block; width: 100%; height: 100%; object-fit: cover; background: #fff; }
+  #figGrid .exthumb { aspect-ratio: 1; display: grid; place-items: center; color: var(--muted); font-size: 0.8rem; }
+  #figGrid .exthumb img { object-fit: contain; }
+  div.exhead { cursor: default; }
+  #viewTools.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; }
+  .pagezoom { overflow: auto; border-radius: 8px; cursor: zoom-in; }
+  .pagezoom.big { cursor: zoom-out; }
+  .pagezoom.big canvas { width: 240%; max-width: none; }
 
   /* pictures, tables and scanned pages */
   #viewDlg { overflow-y: auto; }
@@ -427,6 +664,9 @@
   .subnote { color: var(--muted); font-size: 0.8rem; margin: 2px 0 0; }
   .subnote:empty { display: none; }
   .filerow { display: grid; gap: 2px; min-width: 0; }
+  .filename { border: none; border-radius: 4px; padding: 0; min-width: 0; text-align: left; font: inherit; color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .filename.open { white-space: normal; overflow-wrap: anywhere; }
+  .filename:active { transform: none; }
   .filerow .editable { font-size: 0.9rem; }
   .filerow a { color: var(--accent); }
   .textfield { width: 100%; font: inherit; font-size: 16px; color: inherit; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 44px; }
@@ -490,12 +730,12 @@
   }
 
   /* mini player */
-  body.has-mini:not(.has-bar) { padding-bottom: calc(166px + env(safe-area-inset-bottom)); }
+  body.has-mini:not(.has-bar) { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
   #mini { position: relative; background: var(--card); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
   #mini .bar { margin: 0; border-radius: 0; height: 3px; }
   .minirow { display: flex; align-items: center; gap: 6px; max-width: 560px; margin: 0 auto; padding: 8px 10px 8px 12px; }
   #miniOpen {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: none; padding: 0; text-align: left; border-radius: 8px;
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; border: none; padding: 0; text-align: left; border-radius: 8px;
   }
   #miniCover { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--soft); flex: none; }
   .minitext { min-width: 0; display: grid; }
@@ -503,6 +743,12 @@
   #miniTime { flex: none; white-space: pre; font-variant-numeric: tabular-nums; }
   #miniChap { flex: 1 1 0; }
   #miniTitle { font-weight: 600; }
+  /* A title that slides rests a fade's width in; reaching back by as much lines it up with the time
+     below. A shorter fade here keeps the sliding text 6px clear of the cover. */
+  #miniTitle.scrolls { --fade: 8px; --pad: 10px; }
+  #miniChap { padding-left: 0.3em; }
+  #miniChap.scrolls { --fade: 6px; --pad: 4px; padding-left: 0; margin-left: 5px; }   /* clear of the dot while it slides */
+  #miniTitle.scrolls { margin-left: calc(-1 * var(--pad)); }   /* the chapter follows the time, so it stays put */
   .round { border: none; border-radius: 50%; padding: 10px; line-height: 0; flex: none; }
   .round svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
   /* form controls: drawn by us so they follow the theme in every browser */
@@ -546,17 +792,49 @@
     border: none; border-radius: 0; padding: 0; background: var(--bg); overflow-y: auto;
   }
   .sheethead {
-    position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 3; display: flex; justify-content: space-between; align-items: center;   /* above the section titles, which slide up under it as their section leaves */
     padding: calc(12px + env(safe-area-inset-top)) 16px 12px; background: var(--bg); border-bottom: 1px solid var(--line);
   }
   .sheethead h2 { font-size: 1.15rem; }
-  .sheet { padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
-  .sheet section, .stack { display: grid; gap: 18px; }
-  .sheet section { margin-top: 28px; }
-  .sheet h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 -4px; }
+  .sheethead { min-height: calc(57px + env(safe-area-inset-top)); }   /* the section titles pin just under it */
+  .sheethead .iconbtn { margin: -8px -8px -8px 0; }
+  .sheet { padding: 0 0 calc(40px + env(safe-area-inset-bottom)); }
+  /* Sections run the full width, with a band of shade between one and the next. A section's
+     title leads: the largest and heaviest thing in it, and it stays under the sheet's heading
+     while its settings scroll by. Settings' names are medium weight, their values and the
+     notes under them quieter and smaller. */
+  .sheet section, .stack { display: grid; gap: 0; }
+  .sheet section { padding: 0 16px 6px; border-top: 10px solid var(--soft); }
+  .sheet section:first-child { border-top: none; }
+  .sheet h3 {
+    position: sticky; top: calc(57px + env(safe-area-inset-top)); z-index: 1; margin: 0 -16px; padding: 16px 16px 8px;
+    background: var(--bg); font-size: 1.12rem; font-weight: 750; color: var(--fg);
+  }
+  /* No rules between settings: space does the grouping. A setting's name, its control and
+     the note about it sit close together, with a wider gap before the next setting. A note
+     about a whole section sits directly under the section's title. */
+  .sheet section { row-gap: 26px; padding-bottom: 26px; }
+  .stack { row-gap: 26px; }
+  .sheet h3 { margin-bottom: -16px; }
   .field { display: grid; gap: 8px; min-width: 0; }
+  .field > .muted { margin-top: -2px; }
+  /* A setting chosen from a short list: its name and note on the left, the list beside them, no wider than it needs. */
+  .field.beside { grid-template-columns: minmax(0, 1fr) fit-content(54%); column-gap: 14px; row-gap: 0; align-items: center; }
+  .field.beside > .fieldhead { grid-column: 1; }
+  /* with no note under it, the name is centred on the list */
+  .field.beside > .fieldhead:nth-last-child(2) { grid-row: 1 / span 2; align-self: center; }
+  .field.beside > .select { grid-column: 2; grid-row: 1 / span 2; align-self: center; min-width: 0; }
+  .field.beside > .muted { grid-column: 1; margin-top: 3px; }
+  .field.beside select { width: 100%; padding: 9px 34px 9px 12px; font-size: 0.95rem; }
+  .field.beside .select::after { right: 13px; }
+  .sheet .muted { font-size: 0.82rem; line-height: 1.4; margin: 0; }
+  .sheet section > p, .sheet section > button, .sheet section > .row { margin: 0; }
+  .sheet section > h3 + p.muted, .stack > p.muted:first-child { margin-bottom: -12px; }
+  .sheet section > button { margin-top: -12px; }
+  /* A field brought into view above the keyboard keeps a little room around it, clear of the heading that stays in place. */
+  dialog input, dialog textarea { scroll-margin: 112px 0 16px; }
   .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  .fieldhead label, .fieldname, .switchrow span { font-weight: 600; }
+  .fieldhead label, .fieldname, .switchrow span { font-weight: 500; }
   .swatches { display: flex; flex-wrap: wrap; gap: 12px; }
   .swatch {
     width: 40px; height: 40px; border-radius: 50%; padding: 0; border: 3px solid var(--bg); cursor: pointer;
@@ -572,24 +850,66 @@
   .channelswitch .muted:empty { display: none; }
   /* Notifications drop in at the top, under the status bar, where they don't
      cover the controls. */
+  /* background work: a notice with a spinner, in the same place and shape as the notifications */
+  /* Notices and notifications line up with the middle of the icons in the top row: the settings
+     icon in the library, the back and info buttons over the player. */
+  html { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
+  html {
+    --toast-warn: #f6c444;
+    --warn-sign: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M8 1.2c.5 0 .9.3 1.2.7l6.1 10.9c.5.9-.1 2-1.2 2H1.9c-1 0-1.7-1.1-1.2-2L6.8 1.9c.3-.4.7-.7 1.2-.7zM7.1 5.6l.3 4.4h1.2l.3-4.4zM8 11a.95.95 0 1 0 0 1.9A.95.95 0 0 0 8 11z'/%3E%3C/svg%3E");
+  }
+  /* In the library they sit in the space between Borky and the settings icon (--notice-x). They
+     move between their places with the player: following the pull and the collapse (--p), and
+     the player's rise when it opens (html.rising, in openPlayer). */
+  @property --notice-x { syntax: '<length>'; inherits: true; initial-value: 0px; }
+  #busy, #toast { --notice-x: 39px; }   /* the middle of the gap between Borky and the settings button */
+  html.has-bar #busy, html.has-bar #toast { --notice-x: 0px; }
+  html.pulling #busy, html.pulling #toast { --notice-x: calc(var(--p) * 39px); }
+  #busy {
+    position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(calc(-50% + var(--notice-x)));
+    max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
+    background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
+  }
+  #busy[hidden] { display: none; }
+  html:not(.has-bar) #busy { max-width: calc(min(100vw, 560px) - 197px); }   /* that gap, less a margin */
+  html.has-bar #busy { max-width: calc(100vw - 120px); }   /* over the player only the two icons flank it */
+  @media (max-width: 350px) { #busy { font-size: 0.8rem; gap: 7px; padding: 10px 12px 10px 10px; } }
+  #busyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spin { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--bg) 30%, transparent); border-top-color: var(--bg); animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+  /* a notification that arrives meanwhile sits just under it */
+  html.is-busy #toast { top: calc(var(--notice-top) + 48px); }
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
-    max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis;
-    position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translate(-50%, -12px);
+    max-width: calc(100vw - 104px - var(--notice-x) * 93 / 39);   /* between the two icons over the player, the gap in the library */
+    position: fixed; left: 50%; top: var(--notice-top); transform: translate(calc(-50% + var(--notice-x)), -12px);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; width: max-content; text-wrap: balance;
   }
-  #toast.show { opacity: 1; transform: translate(-50%, 0); }
-  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(-50%, 0); } }
+  /* a message too long for one line wraps rather than being cut short */
+  #toast { border-radius: 21px; text-align: center; }
+  #toast.warn { display: flex; align-items: center; gap: 8px; padding-left: 13px; text-align: left; background: var(--toast-warn); color: #1c1b19; }
+  #toast.warn::before {
+    content: ''; flex: none; width: 16px; height: 16px; background: currentColor;
+    -webkit-mask: var(--warn-sign) center / contain no-repeat; mask: var(--warn-sign) center / contain no-repeat;
+  }
+  #toast.show { opacity: 1; transform: translate(calc(-50% + var(--notice-x)), 0); }
+  html.rising #busy { transition: --notice-x 0.38s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  html.rising #toast { transition: opacity 0.2s, transform 0.2s, --notice-x 0.38s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: opacity 0.2s; transform: translate(calc(-50% + var(--notice-x)), 0); } }
 </style>
 </head>
 <body>
 
 <main id="library">
-  <div class="libhead row spread"><h1>Bork Mark</h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
-  <p class="muted">Bookmark audiobooks from your headphones or watch.</p>
+  <div class="libhead">
+    <div class="row spread"><h1 aria-label="Bork Mark"><span>Bork<br>Mark</span><svg class="borky" viewBox="-1 -1 39.09 34.70" aria-hidden="true"><g transform="translate(-61.633 -193.39)" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" transform="translate(52.13 -1.405)" d="m 28.070869,201.24522 c -0.81683,-0.21687 -1.724581,-0.25094 -2.61527,-0.005 -0.09498,0.0262 -0.234451,0.10756 -0.263701,0.2001 -0.04268,0.13504 -0.03763,0.31408 -0.03777,0.45759 -1.84e-4,0.85092 0.718358,1.54078 1.60467,1.54061 0.886074,-1.5e-4 1.604244,-0.68991 1.60406,-1.54061 -8e-6,-0.13754 -0.03781,-0.31579 -0.07584,-0.44878 -0.02537,-0.0887 -0.126203,-0.18004 -0.216148,-0.20393 z"/><path fill="none" stroke="currentColor" stroke-width="1.424" d="m 75.788707,198.51325 c 2.676437,-0.8875 3.667472,-0.87452 6.362162,0.28781"/><path fill="none" stroke="currentColor" stroke-width="1.424" d="m 66.858991,207.32674 -1.909662,13.56333"/><path fill="none" stroke="currentColor" stroke-width="0.5705" transform="matrix(2.3102249,0,0,2.6970604,41.705315,120.659)" d="m 12.334532,27.252007 5.486021,0.0062 2.016653,1.799922 4.557208,-0.03269 a 7.4282586,7.4282586 104.79891 0 1 -0.895786,3.390674 l -0.03343,0.06474 -7.39825,-0.03714 5.488991,2.813165"/><path fill="#ff96dd" d="m 81.633966,208.98905 8.093751,2.55924 -0.0066,12.3837 -4.078854,-2.96862 -4.008325,2.96862 z"/><path fill="currentColor" stroke="currentColor" stroke-width="1.424" d="m 70.242577,194.12543 -7.897672,15.18399 11.997441,-1.945 z"/><path fill="currentColor" stroke="currentColor" stroke-width="1.42" d="m 95.934295,208.02912 1.93889,-8.98702 -3.048725,3.27641 z"/></g></svg></h1><button id="settingsBtn" class="iconbtn" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg></button></div>
+    <p id="storage" hidden><span id="storagePie" aria-hidden="true"></span><span id="storageText"></span></p>
+    <div id="modelFail" hidden><span id="modelNote"></span><button id="modelAgain">Try again</button></div>
+  </div>
   <div id="crashNote" class="note" hidden>
     <p id="crashText"></p>
     <div class="row" style="margin-top:8px">
@@ -598,20 +918,20 @@
     </div>
   </div>
   <ul id="books"></ul>
-  <p id="emptyLib" class="muted" hidden>No books yet. Add an M4B or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
-  <p id="modelNote" class="muted" style="margin-top:18px"></p>
-  <button id="modelAgain" class="small" hidden>Try again</button>
-  <p id="storage" class="muted" style="margin-top:4px"></p>
+  <div id="addZone">
+    <button id="addBtn" aria-label="Add a book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <p id="emptyLib" class="muted" hidden>No books yet. Add an M4B, M4A or MP3, and the EPUB if you have it, so bookmarks can quote the text.</p>
+  </div>
 </main>
 
 <main id="player" hidden>
   <div class="row spread">
-    <button id="backBtn" class="plain">‹ Library</button>
+    <button id="backBtn" class="iconbtn" aria-label="Back to the library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <button id="infoBtn" class="iconbtn" aria-label="About this book">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.6" r="0.6" fill="currentColor"/></svg>
     </button>
   </div>
-  <div class="coverwrap"><img id="cover" alt=""></div>
+  <div class="coverwrap"><img id="cover" alt="" decoding="sync"></div>
   <h1 id="title" class="scroller"></h1>
   <p id="author" class="muted"></p>
 
@@ -638,7 +958,11 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v16l-5-4-5 4z"/></svg>
         <span id="marksLabel"></span>
       </button>
-      <button id="figsBtn" aria-label="Figures" hidden>
+      <button id="searchBtn" aria-label="Search the book">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+        <span></span>
+      </button>
+      <button id="figsBtn" aria-label="Figures">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 16l4.5-4.5 4 4 3-3 5.5 5"/><circle cx="15.5" cy="9.5" r="1.3"/></svg>
         <span id="figsLabel"></span>
       </button>
@@ -658,26 +982,38 @@
   </nav>
 </main>
 
-<dialog id="addDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Add a book</h2><button id="addCancel" class="small">Cancel</button></div>
+<dialog id="addDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Add a book</h2><button id="addCancel" class="small">Cancel</button></div>
   <p class="muted" style="margin:6px 0 14px">Files are copied into this app on your device. Nothing is uploaded.</p>
   <div class="picks">
     <label class="pick" id="pickAudio">
-      <input id="addAudio" type="file">
+      <input id="addAudio" type="file" accept=".m4b,.m4a,.mp3,.aac,audio/x-m4b,audio/x-m4a,audio/mpeg,audio/aac">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H6a2 2 0 0 1-2-2zM20 14h-3v6h1a2 2 0 0 0 2-2z"/></svg></span>
       <span class="picktext"><span class="pickname">Audiobook</span><span id="addAudioName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
     <label class="pick" id="pickText">
-      <input id="addText" type="file">
+      <input id="addText" type="file" accept=".epub,.md,.markdown,.mdown,.txt,.text,application/epub+zip,text/markdown,text/plain">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4M9 8h6"/></svg></span>
       <span class="picktext"><span class="pickname">Book text</span><span id="addTextName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
     <label class="pick" id="pickPdf">
-      <input id="addPdf" type="file">
+      <input id="addPdf" type="file" accept=".pdf,application/pdf">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg></span>
       <span class="picktext"><span class="pickname">Page scan</span><span id="addPdfName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
+    <label class="pick" id="pickExtras">
+      <input id="addExtras" type="file" accept=".pdf,application/pdf">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4"/><path d="M8 8H4v12h12"/><path d="M11 16v-3M14 16v-5M17 16v-2"/></svg></span>
+      <span class="picktext"><span class="pickname">Extras</span><span id="addExtrasName" class="pickdesc"></span></span>
+      <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+    </label>
+    <label class="pick" id="pickCover">
+      <input id="addCover" type="file" accept="image/*">
+      <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 16l5-5 5 5 2-2 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg></span>
+      <span class="picktext"><span class="pickname">Cover</span><span id="addCoverName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
     </label>
   </div>
@@ -687,23 +1023,23 @@
 </dialog>
 
 <dialog id="settingsDlg">
-  <div class="sheethead"><h2 tabindex="-1" autofocus>Settings</h2><button id="settingsClose" class="small">Done</button></div>
+  <div class="sheethead"><h2 tabindex="-1" autofocus>Settings</h2><button id="settingsClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="sheet">
     <section>
       <h3>Headphone and watch buttons</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="nextAction">Next track</label></div>
         <div class="select"><select id="nextAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
-        <p class="muted">Usually a double-press on headphones.</p>
+        <p class="muted">Often a double-press</p>
       </div>
       <div class="field" id="nextSecsField">
         <div class="fieldhead"><label for="nextSecs">Skip by</label><output id="nextSecsOut" for="nextSecs"></output></div>
         <input id="nextSecs" type="range" min="5" max="120" step="5">
       </div>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="prevAction">Previous track</label></div>
         <div class="select"><select id="prevAction"><option value="mark">Bookmark</option><option value="fwd">Skip forward</option><option value="back">Skip back</option><option value="nextChapter">Next chapter</option><option value="prevChapter">Previous chapter</option><option value="none">Nothing</option></select></div>
-        <p class="muted">Usually a triple-press on headphones.</p>
+        <p class="muted">Often a triple-press</p>
       </div>
       <div class="field" id="prevSecsField">
         <div class="fieldhead"><label for="prevSecs">Skip by</label><output id="prevSecsOut" for="prevSecs"></output></div>
@@ -713,6 +1049,7 @@
 
     <section>
       <h3>Skip buttons</h3>
+      <p class="muted">The round buttons in the player, and the lock screen when it shows skip buttons.</p>
       <div class="field">
         <div class="fieldhead"><label for="skipBack">Back</label><output id="skipBackOut" for="skipBack"></output></div>
         <input id="skipBack" type="range" min="5" max="120" step="5">
@@ -721,16 +1058,16 @@
         <div class="fieldhead"><label for="skipFwd">Forward</label><output id="skipFwdOut" for="skipFwd"></output></div>
         <input id="skipFwd" type="range" min="5" max="120" step="5">
       </div>
-      <p class="muted">The round buttons in the player, and the lock screen when it shows skip buttons.</p>
     </section>
 
     <section>
       <h3>What a bookmark captures</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="capMode">Measure by</label></div>
         <div class="select"><select id="capMode"><option value="time">Time</option><option value="paras">Paragraphs</option></select></div>
       </div>
       <div id="capTime" class="stack">
+        <p class="muted">Longer captures take longer to turn into quotes. Applies to new bookmarks.</p>
         <div class="field">
         <div class="fieldhead"><label for="capBefore">Before the bookmark</label><output id="capBeforeOut" for="capBefore"></output></div>
         <input id="capBefore" type="range" min="10" max="180" step="5">
@@ -739,9 +1076,9 @@
         <div class="fieldhead"><label for="capAfter">After the bookmark</label><output id="capAfterOut" for="capAfter"></output></div>
         <input id="capAfter" type="range" min="0" max="60" step="5">
       </div>
-        <p class="muted">Longer captures take longer to turn into quotes. Applies to new bookmarks.</p>
       </div>
       <div id="capParas" class="stack">
+        <p class="muted">The paragraph you bookmarked is always included. Needs the book text; existing quotes update too.</p>
         <div class="field">
         <div class="fieldhead"><label for="parasBefore">Extra paragraphs before</label><output id="parasBeforeOut" for="parasBefore"></output></div>
         <input id="parasBefore" type="range" min="0" max="5" step="1">
@@ -750,7 +1087,6 @@
         <div class="fieldhead"><label for="parasAfter">Extra paragraphs after</label><output id="parasAfterOut" for="parasAfter"></output></div>
         <input id="parasAfter" type="range" min="0" max="5" step="1">
       </div>
-        <p class="muted">The paragraph you bookmarked is always included. Needs the book text; existing quotes update too.</p>
       </div>
     </section>
 
@@ -764,7 +1100,7 @@
 
     <section>
       <h3>Citations</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="citeStyle">Style</label></div>
         <div class="select"><select id="citeStyle"><option value="simple">Simple</option><option value="mla">MLA</option><option value="apa">APA</option><option value="chicago">Chicago</option></select></div>
       </div>
@@ -787,7 +1123,27 @@
       <h3>Sounds and figures</h3>
       <div class="field">
         <label class="switchrow" for="sounds"><span>Sounds</span><input id="sounds" type="checkbox" class="switch"></label>
-        <p class="muted">A short tone when you bookmark, skip from your headphones or watch, or reach a picture.</p>
+        <p class="muted">Short tones that confirm what happened when the phone is out of sight.</p>
+      </div>
+      <div id="soundOptions" class="stack">
+        <div class="field">
+          <div class="fieldhead"><label for="soundVolume">Loudness</label><output id="soundVolumeOut" for="soundVolume"></output></div>
+          <input id="soundVolume" type="range" min="10" max="100" step="5">
+        </div>
+        <div class="field beside">
+          <div class="fieldhead"><label for="soundMark">A bookmark</label></div>
+          <div class="select"><select id="soundMark"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
+        </div>
+        <div class="field beside">
+          <div class="fieldhead"><label for="soundSkip">A skip</label></div>
+          <div class="select"><select id="soundSkip"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
+          <p class="muted">Headphones / lock screen</p>
+        </div>
+        <div class="field beside">
+          <div class="fieldhead"><label for="soundFigure">A picture or table</label></div>
+          <div class="select"><select id="soundFigure"><option value="chime">Chime</option><option value="soft">Soft</option><option value="bell">Bell</option><option value="click">Click</option><option value="none">None</option></select></div>
+          <p class="muted">Choosing a sound plays it.</p>
+        </div>
       </div>
       <div class="field">
         <label class="switchrow" for="figAlert"><span>Notice pictures and tables</span><input id="figAlert" type="checkbox" class="switch"></label>
@@ -800,9 +1156,9 @@
 
     <section>
       <h3>Lock screen</h3>
-      <div class="field">
+      <div class="field beside">
         <div class="fieldhead"><label for="lockSeek">Buttons shown</label></div>
-        <div class="select"><select id="lockSeek"><option value="skip">Skip back / forward</option><option value="track">Previous / next track (same as headphones)</option></select></div>
+        <div class="select"><select id="lockSeek"><option value="skip">Skip back / forward</option><option value="track">Previous / next track</option></select></div>
       </div>
       <div class="field">
         <label class="switchrow" for="bgQuotes"><span>Find quotes while locked</span><input id="bgQuotes" type="checkbox" class="switch"></label>
@@ -822,6 +1178,23 @@
     </section>
 
     <section>
+      <h3>Recently deleted</h3>
+      <div class="field beside">
+        <div class="fieldhead"><label for="trashDays">Keep for</label></div>
+        <div class="select"><select id="trashDays"><option value="1">1 day</option><option value="7">7 days</option><option value="10">10 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="0">Until emptied</option></select></div>
+      </div>
+      <p id="trashNote" class="muted" hidden>Nothing deleted lately.</p>
+      <div id="trashBooks" class="trashgroup" hidden>
+        <div class="trashhead"><h4>Books <span id="trashBooksSize" class="muted"></span></h4><button id="trashBooksEmpty" class="plain danger">Empty</button></div>
+        <ul id="trashBookList" class="trashlist"></ul>
+      </div>
+      <div id="trashMarks" class="trashgroup" hidden>
+        <div class="trashhead"><h4>Bookmarks</h4><button id="trashMarksEmpty" class="plain danger">Empty</button></div>
+        <ul id="trashMarkList" class="trashlist"></ul>
+      </div>
+    </section>
+
+    <section>
       <h3>Diagnostics</h3>
       <p class="muted">A record of recent button presses and player events, kept on this device.</p>
       <button id="logCopy">Copy log</button>
@@ -835,7 +1208,7 @@
         <button id="channelSwitch" class="channelswitch"><span id="channelName"></span><span id="channelVersion" class="muted"></span></button>
         <p id="channelNote" class="muted"></p>
       </div>
-      <p class="muted">Test pages: <a href="buttons.html">buttons</a> · <a href="align.html">alignment</a></p>
+      <p class="muted">Test pages: <a href="buttons.html">buttons</a> · <a href="tests.html">alignment and formats</a></p>
     </section>
   </div>
 </dialog>
@@ -858,69 +1231,116 @@
   <p id="introArrow" hidden><span><b class="dots">•••</b> is down here</span><svg viewBox="0 0 48 40" aria-hidden="true"><path d="M3 5c20-3 34 5 37 26"/><path d="M31 23l9.5 9 6-11.500"/></svg></p>
 </dialog>
 
-<dialog id="chapDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="small">Close</button></div>
+<dialog id="chapDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Chapters</h2><button id="chapClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="chapList" class="picklist"></ol>
 </dialog>
 
 <dialog id="marksDlg" class="bottom tall">
   <div class="markshead">
     <h2 tabindex="-1" autofocus>Bookmarks <span id="markCount" class="muted"></span></h2>
-    <div id="markOrder" class="seg" role="group" aria-label="Order of bookmarks">
-      <button id="orderBook" aria-pressed="true">Book order</button>
-      <button id="orderNew" aria-pressed="false">Newest</button>
-    </div>
+    <label id="markSort" class="iconbtn sortpick">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5L7 20l3.5-3.5M17 20V4M13.5 7.5L17 4l3.5 3.5"/></svg>
+      <select id="markOrder" aria-label="Order of bookmarks">
+        <option value="book">Book order</option>
+        <option value="new">Newest first</option>
+        <option value="old">Oldest first</option>
+        <option value="long">Longest quote</option>
+        <option value="short">Shortest quote</option>
+        <option value="attention">Needs attention</option>
+      </select>
+    </label>
+    <button id="marksExport" class="iconbtn" aria-label="Export bookmarks as a Markdown file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg></button>
+    <button id="marksSearchBtn" class="iconbtn" aria-label="Search bookmarks"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg></button>
     <button id="marksClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <div id="marksSearch" class="searchfield">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <input id="marksSearchInput" type="search" placeholder="Search bookmarks" aria-label="Search bookmarks" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+    </div>
+    <button id="marksSearchCancel" class="plain">Cancel</button>
   </div>
   <p id="queueStatus" class="muted"></p>
   <div id="marks"></div>
 </dialog>
 
-<dialog id="infoDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="small">Close</button></div>
+<dialog id="infoDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <dl id="infoList"></dl>
   <p id="playerError" class="warn" hidden></p>
-  <p id="textStatus" class="muted"></p>
-  <div class="row">
-    <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
-    <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
-    <button id="removeBtn">Remove book</button>
+  <p id="textStatus" class="muted" hidden></p>
+  <!-- The book's pieces: a missing one is added with a tap, one that is there opens Replace / Remove (book-files.js) -->
+  <div class="tiles" id="infoActs">
+    <button class="tile" id="textAct" data-piece="text"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4M9 8h6"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Text</span></button>
+    <button class="tile" id="pageAct" data-piece="page"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Pages</span></button>
+    <button class="tile" id="extrasAct" data-piece="extras"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4M8 8H4v12h12M11 16v-3M14 16v-5M17 16v-2"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Extras</span></button>
+    <button class="tile" id="coverAct" data-piece="cover"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 16l5-5 5 5 2-2 4 4M15.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Cover</span></button>
+    <button class="tile flat" id="marksAct" data-piece="marks"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21zM12 6.5v6.5M9.2 10.3L12 13l2.8-2.7"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Import bookmarks</span></button>
   </div>
+  <input id="textFile" type="file" accept=".epub,.md,.markdown,.mdown,.txt,.text,application/epub+zip,text/markdown,text/plain"><input id="pageFile" type="file" accept=".pdf,application/pdf"><input id="extrasFile" type="file" accept=".pdf,application/pdf"><input id="coverFile" type="file" accept="image/*"><input id="marksFile" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain">
+  <button id="removeBtn" class="danger"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Remove book</button>
 </dialog>
 
 
 
 <dialog id="figsDlg" class="bottom tall">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Figures <span id="figCount" class="muted"></span></h2><button id="figsClose" class="small">Close</button></div>
-  <p class="muted" style="margin-top:6px">Tap one to see it, or the arrow to move the audio there.</p>
-  <p id="figStatus" class="muted"></p>
-  <ol id="figList"></ol>
+  <div class="markshead">
+    <h2 tabindex="-1" autofocus>Figures</h2>
+    <div id="figsView" class="seg" role="group" aria-label="Where the figures come from">
+      <button id="exBook" aria-pressed="true">Book</button>
+      <button id="exExtras" aria-pressed="false">Extras</button>
+    </div>
+    <button id="exGrid" class="iconbtn" aria-pressed="false" aria-label="Show every page" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.500" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.500" width="6.5" height="6.5" rx="1.2"/><rect x="13.500" y="13.500" width="6.5" height="6.5" rx="1.2"/></svg></button>
+    <button id="figsClose" class="iconbtn" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div id="figBook">
+    <p id="figStatus" class="muted"></p>
+    <div id="figList"></div>
+    <ol id="figGrid" class="exgrid" hidden></ol>
+  </div>
+  <div id="extrasList" hidden></div>
+  <ol id="extrasGrid" class="exgrid" hidden></ol>
 </dialog>
 
-<dialog id="viewDlg" class="bottom tall">
-  <div class="row spread" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="small">Close</button></div>
+<dialog id="viewDlg" class="bottom tall pinhead">
+  <div class="row spread sheethd" style="flex-wrap:nowrap; align-items:flex-start"><h2 id="viewTitle" tabindex="-1" autofocus></h2><button id="viewClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div id="viewTools" class="row"></div>
   <p id="viewStatus" class="muted"></p>
   <div id="viewBody"></div>
 </dialog>
 
-<dialog id="speedDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="small">Close</button></div>
+<dialog id="searchDlg" class="bottom tall pinhead">
+  <div class="sheethd">
+  <div class="row spread"><h2 tabindex="-1">Search book</h2><button id="searchClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="searchfield wide">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+    <input id="searchInput" type="search" placeholder="In this book" aria-label="Search the book" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+  </div>
+  </div>
+  <p id="searchStatus" class="muted"></p>
+  <div id="searchRecent" hidden>
+    <div class="row spread"><h3>Recent searches</h3><button id="searchClear" class="plain">Clear</button></div>
+    <ol id="searchHistory"></ol>
+  </div>
+  <ol id="searchResults"></ol>
+  <button id="searchMore" class="small" hidden>Show more</button>
+</dialog>
+
+<dialog id="speedDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Speed</h2><button id="speedClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="speedList" class="picklist"></ol>
 </dialog>
 
-<dialog id="sleepDlg" class="bottom">
-  <div class="row spread"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="small">Close</button></div>
+<dialog id="sleepDlg" class="bottom pinhead">
+  <div class="row spread sheethd"><h2 tabindex="-1" autofocus>Sleep timer</h2><button id="sleepClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <ol id="sleepList" class="picklist"></ol>
 </dialog>
 
 <div id="libFoot">
-  <div id="addBar"><button id="addBtn" class="primary">Add a book</button></div>
 <div id="mini" hidden>
   <div class="bar"><div id="miniFill"></div></div>
   <div class="minirow">
     <button id="miniOpen" aria-label="Open player">
-      <img id="miniCover" alt="">
+      <img id="miniCover" alt="" decoding="sync">
       <span class="minitext"><span id="miniTitle" class="scroller"></span><span id="miniSub" class="muted"><span id="miniTime"></span><span id="miniChap" class="scroller"></span></span></span>
     </button>
     <button id="miniMark" class="round" aria-label="Bookmark">
@@ -934,6 +1354,7 @@
 </div>
 
 <audio id="audio" preload="metadata"></audio>
+<div id="busy" role="status" hidden><span class="spin" aria-hidden="true"></span><span id="busyText"></span></div>
 <div id="toast" role="status" popover="manual"></div>
 
 <script type="module" src="app.js"></script>

@@ -1,4 +1,9 @@
-// Runs Whisper off the main thread so the page stays responsive.
+// Runs the app's two models off the main thread so the page stays responsive:
+// Whisper, which turns audio into words, and a small sentence model, which
+// turns a quote into a list of numbers standing for its meaning (an
+// "embedding"), for finding bookmarks related by meaning. They share one copy
+// of the model runtime, and take turns: each request finishes before the next.
+
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2';
 
 let asr = null;
@@ -31,6 +36,8 @@ async function ensure(model, device, alt) {
     progress_callback: (p) => {
       if (p.status === 'progress') {
         self.postMessage({ type: 'progress', file: p.file, loaded: p.loaded, total: p.total });
+      } else if (p.file && (p.status === 'download' || p.status === 'done')) {
+        self.postMessage({ type: 'file', file: p.file, status: p.status });   // 'download' only when not already saved
       }
     },
   });
@@ -38,7 +45,31 @@ async function ensure(model, device, alt) {
   return performance.now() - t0;
 }
 
-self.onmessage = async (e) => {
+// The sentence model loads the first time it's asked for, not with Whisper.
+const EMBED_MODEL = 'Xenova/all-MiniLM-L6-v2';
+let embedder = null;
+async function embed(texts) {
+  const t0 = performance.now();
+  if (!embedder) embedder = await pipeline('feature-extraction', EMBED_MODEL, { dtype: 'q8' });
+  const loadMs = performance.now() - t0;
+  const out = await embedder(texts, { pooling: 'mean', normalize: true });
+  return { vectors: out.data, size: out.dims[out.dims.length - 1], loadMs, runMs: performance.now() - t0 - loadMs };
+}
+
+// One request at a time, in the order they came.
+let turn = Promise.resolve();
+self.onmessage = (e) => { turn = turn.then(() => handle(e)); };
+async function handle(e) {
+  if (e.data.type === 'embed') {
+    const { id, texts } = e.data;
+    try {
+      const r = await embed(texts);
+      self.postMessage({ type: 'done', id, ...r }, [r.vectors.buffer]);
+    } catch (err) {
+      self.postMessage({ type: 'error', id, message: String((err && err.message) || err) });
+    }
+    return;
+  }
   const { id, audio, model, device, alt } = e.data;
   try {
     const loadMs = await ensure(model, device, alt);
@@ -57,4 +88,4 @@ self.onmessage = async (e) => {
   } catch (err) {
     self.postMessage({ type: 'error', id, message: String((err && err.message) || err) });
   }
-};
+}

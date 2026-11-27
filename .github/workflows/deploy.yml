@@ -74,6 +74,7 @@ jobs:
           RELEASE_REF: ${{ steps.pick.outputs.release_ref }}
           RELEASE_VERSION: ${{ steps.pick.outputs.release_version }}
           DEV_REF: ${{ steps.pick.outputs.dev_ref }}
+          RELEASING: ${{ steps.pick.outputs.releasing }}
         run: |
           site="$RUNNER_TEMP/site"
           mkdir -p "$site"
@@ -83,13 +84,30 @@ jobs:
             git worktree add --detach "$src" "$1"
             # The build number is the commit's time, so publishing the same
             # commit again does not look like a new version to installed copies.
-            ( cd "$src" && BUILD=$(git log -1 --format=%ct) ./stamp.sh "$2" "$3" )
+            ( cd "$src" && BUILD=$(git log -1 --format=%ct) COMMIT=$(git rev-parse HEAD) ./stamp.sh "$2" "$3" )
             mkdir -p "$4"
             cp "$src"/*.html "$src"/*.js "$src"/*.json "$src"/manifest.webmanifest "$4/"
+            if [ -d "$src/js" ]; then cp -r "$src/js" "$4/"; fi
+            if [ -d "$src/icons" ]; then mkdir -p "$4/icons" && cp "$src"/icons/*.svg "$src"/icons/*.png "$4/icons/"; fi
           }
           build "$RELEASE_REF" "$RELEASE_VERSION" release "$site"
           if [ -n "$DEV_REF" ]; then
-            dev_version=$(git show "$DEV_REF:VERSION" | tr -d ' \n')-dev.$(git rev-parse --short "$DEV_REF")
+            # The development copy is named after the release it leads to, and
+            # counts the commits on develop since the last release: with v0.1.3
+            # out, the eighth change after it is 0.1.4-dev.8.
+            base=$(git show "$DEV_REF:VERSION" | tr -d ' \n')
+            last=-1; last_ref=
+            for t in $(git tag -l "v$base.*"); do
+              n=${t#"v$base."}
+              case "$n" in ''|*[!0-9]*) continue ;; esac
+              if [ "$n" -gt "$last" ]; then last=$n; last_ref=$t; fi
+            done
+            # A release being made in this run counts as the last one already.
+            if [ "$RELEASING" = yes ] && [ "${RELEASE_VERSION%.*}" = "$base" ]; then
+              last=${RELEASE_VERSION##*.}; last_ref=$RELEASE_REF
+            fi
+            count=$(git rev-list --count ${last_ref:+"$last_ref"..}"$DEV_REF")
+            dev_version=$base.$((last + 1))-dev.$count
             build "$DEV_REF" "$dev_version" dev "$site/dev"
           fi
           touch "$site/.nojekyll"
