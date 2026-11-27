@@ -10,13 +10,15 @@ import { findPages, rematch, requote } from './quotes.js';
 import { isOrnament } from './sources/epub.js';
 import { readBook } from './sources/index.js';
 import { buildPageIndex, guessFirstNumbered, pdfCover, readPdfPages } from './sources/pdf.js';
-import { setCover } from './library.js';
+import { removeExtras } from './extras.js';
+import { clearCover, setCover, TRASH } from './library.js';
 import { fromDoc, resolveMeta, save } from './state.js';
 import { store, stored } from './storage.js';
 import { buildBook, findInBook, pageNumber, tokenize } from './text/book.js';
 import { findTextTables, unwrapLines } from './text/cleanup.js';
 import { busy } from './ui/busy.js';
 import { $, toast } from './ui/dom.js';
+import { showMenu } from './ui/menu.js';
 import { detail, log, mb } from './log.js';
 import { renderSearchTab } from './search.js';
 
@@ -184,3 +186,66 @@ $('pageFile').addEventListener('change', async (e) => {
     if (cur === mine) { renderInfo(); toast('Page scan not added: ' + ((err && err.message) || err), 'warn'); }
   } finally { done(); }
 });
+
+// ---------- The pieces of a book in About this book ----------
+// Each tile is one piece. A missing one is added with a tap; one that is there
+// offers Replace (the same file picker) and Remove.
+async function removeText(mine) {
+  const b = mine.book, id = b.id;
+  await store('remove', id, 'text');
+  await store('remove', id, 'meta');
+  for (let i = 0; await stored(id, 'img-' + i); i++) await store('remove', id, 'img-' + i);
+  b.hasText = false; b.textName = ''; b.pageCount = 0; b.fromText = fromDoc(null);
+  if (b.links) delete b.links.text;
+  // Places in the text and the figures found there go with it; the quotes themselves stay.
+  for (const m of b.marks) { delete m.loc; delete m.figs; delete m.trim; }
+  delete b.anchors; delete b.autoNaming;
+  resolveMeta(b); save(true);
+  if (cur !== mine) return;
+  mine.text = null;
+  mine.meta = { toc: [], pages: [], figures: [] };
+  metaChanged(); renderFigTab(); renderSearchTab(); renderMarks();
+}
+async function removePageScan(mine) {
+  const b = mine.book;
+  await store('remove', b.id, 'pagesrc');
+  await store('remove', b.id, 'pagepdf');
+  b.hasPagePdf = false; b.pageSrcName = ''; delete b.pageFirst;
+  if (b.links) delete b.links.pdf;
+  // Page numbers that came from the scan go with it.
+  for (const m of b.marks) if (m.pdfPage != null) { delete m.pdfPage; m.page = ''; }
+  save(true);
+  if (cur !== mine) return;
+  mine.pageSrc = null;
+  renderMarks(); renderInfo();
+}
+async function removeCover(mine) {
+  await clearCover(mine.book);
+  if (cur !== mine) return;
+  mine.coverUrl = null;
+  $('cover').removeAttribute('src');
+  renderInfo();
+}
+const PIECES = {
+  text: { name: 'book text', input: 'textFile', has: (b) => b.hasText, remove: removeText },
+  page: { name: 'page scan', input: 'pageFile', has: (b) => !!b.pageSrcName, remove: removePageScan },
+  extras: { name: 'extras', input: 'extrasFile', has: (b) => b.hasExtras, remove: removeExtras },
+  cover: { name: 'cover', input: 'coverFile', has: (b) => b.hasCover, remove: removeCover },
+  marks: { input: 'marksFile', has: () => false },
+};
+const REPLACE = 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4';
+for (const [key, piece] of Object.entries(PIECES)) {
+  const tile = $(key + 'Act');
+  tile.addEventListener('click', () => {
+    if (!cur) return;
+    if (!piece.has(cur.book)) { $(piece.input).click(); return; }
+    const mine = cur;
+    showMenu(tile.getBoundingClientRect(), [
+      { label: 'Replace', icon: REPLACE, run: () => $(piece.input).click() },
+      { label: 'Remove', icon: TRASH, danger: true, run: async () => {
+        try { await piece.remove(mine); log(piece.name + ' removed'); toast(piece.name[0].toUpperCase() + piece.name.slice(1) + ' removed'); }
+        catch (err) { log(piece.name + ' not removed: ' + ((err && err.message) || err)); toast('Couldn’t remove the ' + piece.name, 'warn'); }
+      } },
+    ], { inside: $('infoDlg') });
+  });
+}

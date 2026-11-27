@@ -100,7 +100,7 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   // Extras: add the PDF from About this book, then the sheet, a page and the page grid.
   await page.click('#infoBtn'); await page.waitForTimeout(300);
   await page.setInputFiles('#extrasFile', FIX + '/extras.pdf'); await page.waitForFunction(() => /Extras/.test(document.getElementById('infoList').innerText));
-  say('extras row', (await text('#infoList')).match(/Extras.*?pages\)/)[0], '| tab', await page.textContent('#figsLabel'), '| button', await page.textContent('#extrasBtnLabel'));
+  say('extras row', (await text('#infoList')).match(/Extras.*?pages\)/)[0], '| tab', await page.textContent('#figsLabel'), '| extras tile', await page.$eval('#extrasAct', (t) => (t.classList.contains('has') ? 'has' : 'missing')));
   await page.click('#infoClose'); await page.waitForTimeout(300); await page.click('#figsBtn'); await page.waitForTimeout(400);
   say('figures sheet switch', (await page.$$eval('#figsView button', (l) => l.map((x) => x.textContent + (x.getAttribute('aria-pressed') === 'true' ? '*' : '')))).join(' '), '| grid button hidden', await page.$eval('#exGrid', (n) => n.hidden));
   await page.click('#exBook'); await page.waitForTimeout(200); say('book groups', (await page.$$eval('#figList .exhead', (l) => l.map((x) => x.innerText.replace(/\s+/g, ' ')))).join(' / '));
@@ -171,7 +171,7 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   const picked = await page.evaluate(() => { const c = document.getElementById('cover'); return c.getAttribute('src') && c.naturalWidth; });
   check('a cover picked when adding is shown', picked > 0, String(picked));
   await page.click('#infoBtn'); await page.waitForTimeout(300);
-  const label = await page.textContent('#coverBtnLabel');
+  const label = await page.$eval('#coverAct', (t) => (t.classList.contains('has') ? 'has' : 'missing'));
   await page.setInputFiles('#coverFile', FIX + '/../../icons/icon-180.png'); await page.waitForTimeout(1500);
   const w = await page.evaluate(() => document.getElementById('cover').naturalWidth);
   // Changing the cover touches only the cover: the book's audio is still stored.
@@ -183,21 +183,30 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   check('changing the cover keeps the book’s audio', kept > 1000, kept + ' bytes');
   await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
   const row = await page.evaluate(() => { const i = document.querySelector('#books .thumb'); return i.getAttribute('src') && i.naturalWidth; });
-  check('About this book changes the cover', label === 'Change cover' && w === 180 && row === 180, label + ', player ' + w + ', library ' + row);
+  check('About this book changes the cover', label === 'has' && w === 180 && row === 180, label + ', player ' + w + ', library ' + row);
+  // A piece that is there opens Replace / Remove; Remove takes the cover away everywhere.
+  await page.click('#books .book'); await page.waitForTimeout(800);
+  await page.click('#infoBtn'); await page.waitForTimeout(400);
+  await page.click('#coverAct'); await page.waitForTimeout(300);
+  await page.click('#menu button.danger'); await page.waitForTimeout(800);
+  const gone = await page.evaluate(() => ({ tile: document.getElementById('coverAct').classList.contains('has'), player: document.getElementById('cover').hasAttribute('src') }));
+  await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
+  const rowGone = await page.evaluate(() => document.querySelector('#books .thumb').hasAttribute('src'));
+  check('a piece’s menu removes it (the cover, from player and library)', !gone.tile && !gone.player && !rowGone, JSON.stringify(gone) + ' library ' + rowGone);
   // Holding a book in the library: it can be dragged to a new place, and its menu takes it off the device.
   const hues = () => page.evaluate(() => [...document.querySelectorAll('#books .thumb')].map((i) => i.style.getPropertyValue('--hue')).join(' '));
   const rowBox = async (i) => (await page.$$('#books .book'))[i].boundingBox();
   const before = await hues(), a = await rowBox(0), b = await rowBox(1);
   await page.mouse.move(a.x + 150, a.y + 40); await page.mouse.down(); await page.waitForTimeout(650);
-  const menu = !!(await page.$('#bookMenu'));
+  const menu = !!(await page.$('#menu'));
   for (let k = 1; k <= 10; k++) { await page.mouse.move(a.x + 150, a.y + 40 + (b.y + b.height * 0.8 - a.y) * k / 10); await page.waitForTimeout(16); }
   await page.mouse.up(); await page.waitForTimeout(500);
   const after = await hues();
   check('holding a book and dragging it reorders the library', menu && after.split(' ')[1] === before.split(' ')[0] && after.split(' ')[0] === before.split(' ')[1], before + ' -> ' + after);
   const n =(await page.$$('#books .book')).length, c = await rowBox(0);
   await page.mouse.move(c.x + 150, c.y + 40); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); await page.waitForTimeout(250);
-  await page.click('#bookMenu button'); await page.waitForTimeout(600);
+  await page.click('#menu button'); await page.waitForTimeout(600);
   const left = (await page.$$('#books .book')).length;
-  check('the hold menu takes a book off the device', left === n - 1 && !(await page.$('#bookMenu')), n + ' -> ' + left);
+  check('the hold menu takes a book off the device', left === n - 1 && !(await page.$('#menu')), n + ' -> ' + left);
   done(page); await browser.close();
 })();

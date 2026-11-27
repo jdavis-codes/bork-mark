@@ -12,7 +12,7 @@ const SHELL = [
   'js/sources/plain-text.js', 'js/speech-worker.js', 'js/speech.js', 'js/state.js',
   'js/storage.js', 'js/store-worker.js', 'js/text/book.js', 'js/text/cleanup.js',
   'js/text/quote.js', 'js/text/search.js', 'js/theme.js', 'js/trim.js', 'js/ui/busy.js', 'js/ui/dom.js',
-  'js/ui/marquee.js', 'js/ui/sheets.js', 'js/updates.js', 'js/version.js',
+  'js/ui/marquee.js', 'js/ui/menu.js', 'js/ui/sheets.js', 'js/updates.js', 'js/version.js',
   'js/viewer.js', 'manifest.webmanifest', 'icons/borky.svg', 'icons/icon-180.png', 'icons/icon-192.png',
 ];
 

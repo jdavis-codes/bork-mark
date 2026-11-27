@@ -95,19 +95,34 @@
   #books > li .book { transition: transform 0.18s, box-shadow 0.18s; }
   #books > li.lifted .book { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22); }
   html.arranging, html.arranging * { cursor: grabbing; }
-  #bookShade { position: fixed; inset: 0; z-index: 6; background: rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fadein 0.18s; pointer-events: none; }
-  #bookShade.live { pointer-events: auto; }   /* only once the finger has let go, so it can't catch that release */
-  #bookMenu {
+  #menuShade { position: fixed; inset: 0; z-index: 6; background: rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fadein 0.18s; pointer-events: none; }
+  #menuShade.live { pointer-events: auto; }
+  #menu {
     position: fixed; z-index: 8; min-width: 200px; padding: 6px; border-radius: 14px; background: var(--card);
     border: 1px solid var(--line); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28); animation: menuin 0.2s cubic-bezier(0.2, 0.85, 0.25, 1);
   }
-  #bookMenu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px; background: none; font: inherit; text-align: left; }
-  #bookMenu button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  #bookMenu .danger { color: #d92d20; }
-  @media (prefers-color-scheme: dark) { #bookMenu .danger { color: #ff6b5e; } }
+  #menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px; background: none; font: inherit; text-align: left; }
+  #menu button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* About this book: the book's pieces as a row of tiles; a dashed one is missing (+), a solid one is there (tick) */
+  .tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; gap: 8px; margin-top: 16px; }
+  .tile { display: grid; justify-items: center; gap: 6px; padding: 0; border: none; background: none; font: inherit; color: inherit; }
+  .tileicon { position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; max-width: 60px; border-radius: 14px; background: var(--soft); border: 1.5px solid transparent; color: var(--fg); }
+  .tile:not(.has) .tileicon { background: none; border: 1.5px dashed var(--line); color: var(--muted); }
+  .tile.flat .tileicon { background: var(--soft); border-style: solid; border-color: transparent; color: var(--fg); }
+  .tileicon svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tileicon .badge { position: absolute; right: -5px; top: -5px; width: 18px; height: 18px; border-radius: 50%; stroke-width: 2.4; background: var(--muted); color: var(--card); box-shadow: 0 0 0 2px var(--card); }
+  .tile.has .badge { background: var(--accent); color: var(--accent-fg); }
+  .tile.has .badge .plus, .tile:not(.has) .badge .tick, .tile.flat .badge { display: none; }
+  .tilename { font-size: 0.78rem; line-height: 1.15; text-align: center; color: var(--muted); }
+  .tile.has .tilename { color: var(--fg); }
+  #removeBtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 14px 0 0; padding: 10px; border: none; background: none; font: inherit; }
+  #removeBtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #removeBtn.danger, #menu .danger { color: #d92d20; }
+  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger { color: #ff6b5e; } }
   @keyframes fadein { from { opacity: 0; } }
   @keyframes menuin { from { opacity: 0; transform: scale(0.9); } }
-  @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #bookMenu, #bookShade { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #menu, #menuShade { animation: none; } }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   /* Fills are full width and scaled from the left (set from script), so moving
      one is a compositor-only change instead of a relayout. */
@@ -1217,15 +1232,17 @@
   <div class="row spread sheethd"><h2 tabindex="-1" autofocus>About this book</h2><button id="infoClose" class="iconbtn close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <dl id="infoList"></dl>
   <p id="playerError" class="warn" hidden></p>
-  <p id="textStatus" class="muted"></p>
-  <div class="row">
-    <label class="filebtn"><span id="textBtnLabel">Add book text</span><input id="textFile" type="file"></label>
-    <label class="filebtn"><span id="pageBtnLabel">Add page PDF</span><input id="pageFile" type="file"></label>
-    <label class="filebtn"><span id="extrasBtnLabel">Add extras</span><input id="extrasFile" type="file"></label>
-    <label class="filebtn"><span id="coverBtnLabel">Add cover</span><input id="coverFile" type="file" accept="image/*"></label>
-    <label class="filebtn"><span>Import bookmarks</span><input id="marksFile" type="file"></label>
-    <button id="removeBtn">Remove book</button>
+  <p id="textStatus" class="muted" hidden></p>
+  <!-- The book's pieces: a missing one is added with a tap, one that is there opens Replace / Remove (book-files.js) -->
+  <div class="tiles" id="infoActs">
+    <button class="tile" id="textAct" data-piece="text"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zM5 20a2 2 0 0 0 2 2h12v-4M9 8h6"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Text</span></button>
+    <button class="tile" id="pageAct" data-piece="page"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Pages</span></button>
+    <button class="tile" id="extrasAct" data-piece="extras"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 4v12H8zM16 4v4h4M8 8H4v12h12M11 16v-3M14 16v-5M17 16v-2"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Extras</span></button>
+    <button class="tile" id="coverAct" data-piece="cover"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 16l5-5 5 5 2-2 4 4M15.5 7a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Cover</span></button>
+    <button class="tile flat" id="marksAct" data-piece="marks"><span class="tileicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4.5L6 21zM12 6.5v6.5M9.2 10.3L12 13l2.8-2.7"/></svg><svg class="badge" viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 7v10M7 12h10"/><path class="tick" d="M7 12.5l3.5 3.5L17 9"/></svg></span><span class="tilename">Import bookmarks</span></button>
   </div>
+  <input id="textFile" type="file"><input id="pageFile" type="file"><input id="extrasFile" type="file"><input id="coverFile" type="file" accept="image/*"><input id="marksFile" type="file">
+  <button id="removeBtn" class="danger"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>Remove book</button>
 </dialog>
 
 

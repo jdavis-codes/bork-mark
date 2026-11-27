@@ -28,6 +28,18 @@ export async function storeExtras(book, file, onProgress) {
     return info;
   } finally { crumb(null); }
 }
+// Takes the open book's extras away.
+export async function removeExtras(mine) {
+  const b = mine.book;
+  await store('remove', b.id, 'extras');
+  await store('remove', b.id, 'extraspdf');
+  b.hasExtras = false; delete b.extrasName; delete b.extrasPages;
+  if (b.links) delete b.links.extras;
+  save(true);
+  if (cur !== mine) return;
+  delete mine.extras;
+  renderFigTab(); renderInfo();
+}
 // Loads the open book's extras list once the player is up.
 export async function loadExtras(mine) {
   const f = await stored(mine.book.id, 'extras');

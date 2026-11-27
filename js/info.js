@@ -145,13 +145,11 @@ export function renderInfo() {
   }
   if (b.hasExtras) fileRow('Extras', b.extrasName + ' (' + b.extrasPages + ' pages)', 'extras');
   row('Added', new Date(b.added).toLocaleDateString());
-  $('pageBtnLabel').textContent = b.pageSrcName ? 'Replace page PDF' : 'Add page PDF';
-  $('extrasBtnLabel').textContent = b.hasExtras ? 'Replace extras' : 'Add extras';
-  $('coverBtnLabel').textContent = b.hasCover ? 'Change cover' : 'Add cover';
-  $('textStatus').textContent = b.hasText
-    ? 'Bookmarks quote the book’s own wording.'
-    : 'No book text yet. Bookmarks show what the app heard; add the EPUB for exact quotes.';
-  $('textBtnLabel').textContent = b.hasText ? 'Replace book text' : 'Add book text';
+  // Which of the book's pieces it has: those tiles are solid, the rest dashed.
+  $('textAct').classList.toggle('has', !!b.hasText);
+  $('pageAct').classList.toggle('has', !!b.pageSrcName);
+  $('extrasAct').classList.toggle('has', !!b.hasExtras);
+  $('coverAct').classList.toggle('has', !!b.hasCover);
 }
 // Title and author changed: update everywhere they show.
 export function metaChanged() {

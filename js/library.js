@@ -3,7 +3,8 @@
 import { closeBook, cur, prepareBook } from './player.js';
 import { save, state } from './state.js';
 import { store, stored } from './storage.js';
-import { $, el, fmt, icon, setFill, setText } from './ui/dom.js';
+import { $, el, fmt, setFill, setText } from './ui/dom.js';
+import { closeMenu, menuOpen, showMenu } from './ui/menu.js';
 import { detail } from './log.js';
 import { openPlayer } from './screens.js';
 
@@ -86,6 +87,17 @@ export async function setCover(b, blob) {
   const r = libRows.get(b.id);
   if (u && r) r.img.src = u;
   return u;
+}
+
+// Takes a book's cover away: Borky stands in again.
+export async function clearCover(b) {
+  await store('remove', b.id, 'cover');
+  await store('remove', b.id, 'cover-display');
+  b.hasCover = false;
+  save(true);
+  forgetCover(b.id);
+  const r = libRows.get(b.id);
+  if (r) r.img.removeAttribute('src');
 }
 
 const libRows = new Map();   // book id -> { li, img, name, meta, fill }
@@ -174,7 +186,7 @@ function armHold(r, b, btn) {
   // A right click (or a long press where the system offers one) opens the menu too.
   btn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    if (!drag && !$('bookMenu')) { stop(); lift(r, b, e.clientY, null); drop(); }
+    if (!drag && !menuOpen()) { stop(); lift(r, b, e.clientY, null); drop(); }
   });
 }
 
@@ -206,7 +218,7 @@ function onDrag(e) {
   drag.y = e.clientY + scrollY;
   if (!drag.moved && Math.abs(drag.y - drag.y0) > SLOP) {
     drag.moved = true;
-    closeMenu();
+    closeMenu(true);
     drag.raf = requestAnimationFrame(edgeScroll);
   }
   if (drag.moved) place();
@@ -243,7 +255,7 @@ function drop() {
   cancelAnimationFrame(drag.raf);
   if (!moved) {
     // Let go without moving: the menu stays open, the book stays lifted.
-    setTimeout(() => { const s = $('bookShade'); if (s) s.classList.add('live'); }, 0);
+    setTimeout(() => { if (menuCtl) menuCtl.live(); }, 0);
     drag = null;
     return;
   }
@@ -267,33 +279,14 @@ function drop() {
 }
 
 // The menu under (or, near the bottom, over) the held book.
+let menuCtl = null;
 function openMenu(r, b) {
-  closeMenu();
-  const shade = el('div'), menu = el('div');
-  shade.id = 'bookShade'; menu.id = 'bookMenu';
-  menu.setAttribute('role', 'menu');
-  const remove = el('button', 'danger', 'Remove');
-  remove.setAttribute('role', 'menuitem');
-  remove.prepend(icon(TRASH));
-  remove.addEventListener('click', async () => { endHold(); await removeBook(b); });
-  menu.append(remove);
-  shade.addEventListener('click', endHold);
-  document.body.append(shade, menu);
-  const box = r.li.getBoundingClientRect(), h = menu.offsetHeight;
-  const below = box.bottom + 8 + h < innerHeight - 16;
-  menu.style.top = (below ? box.bottom + 8 : box.top - 8 - h) + 'px';
-  menu.style.left = box.left + 'px';
-  menu.style.transformOrigin = below ? 'top left' : 'bottom left';
-  addEventListener('keydown', escape);
+  menuCtl = showMenu(r.li.getBoundingClientRect(), [
+    { label: 'Remove', icon: TRASH, danger: true, run: () => removeBook(b) },
+  ], { live: false, onClose: endHold });
 }
-const TRASH = 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3';
-function escape(e) { if (e.key === 'Escape') endHold(); }
-function closeMenu() {
-  for (const id of ['bookMenu', 'bookShade']) { const n = $(id); if (n) n.remove(); }
-  removeEventListener('keydown', escape);
-}
+export const TRASH = 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3';
 function endHold() {
-  closeMenu();
   document.documentElement.classList.remove('arranging');
   for (const r of libRows.values()) r.li.classList.remove('lifted');
   held = false;
