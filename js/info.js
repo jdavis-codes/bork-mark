@@ -125,7 +125,7 @@ export function renderInfo() {
       const link = typed && !/^https?:\/\//i.test(typed) ? 'https://' + typed : typed;
       let ok = false;
       try { ok = !!link && /^https?:$/.test(new URL(link).protocol) && !/\s/.test(link); } catch (e) { /* not an address */ }
-      if (ok) b.links[key] = link; else { delete b.links[key]; if (typed) toast('That doesn’t look like a web address'); }
+      if (ok) b.links[key] = link; else { delete b.links[key]; if (typed) toast('That isn’t a web address', 'warn'); }
       save(true); renderInfo();
     }, shown));
     row(label, box);

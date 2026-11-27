@@ -120,7 +120,7 @@ $('textFile').addEventListener('change', async (e) => {
   if (!f || !cur) return;
   const mine = cur, b = mine.book, done = busy('Adding text');
   try {
-    toast('Reading ' + f.name + '…');
+    toast('Reading the text…');
     const doc = await readBook(f);
     await storeText(b.id, doc);
     b.hasText = true; b.textName = f.name; b.pageCount = doc.pages.length;
@@ -138,7 +138,7 @@ $('textFile').addEventListener('change', async (e) => {
     metaChanged(); rematch(); runQueue();
     toast('Book text added');
   } catch (err) {
-    if (cur === mine) { renderInfo(); toast('Could not read that file'); }
+    if (cur === mine) { renderInfo(); toast('Could not read that file', 'warn'); }
   } finally { done(); }
 });
 $('pageFile').addEventListener('change', async (e) => {
@@ -160,8 +160,8 @@ $('pageFile').addEventListener('change', async (e) => {
     mine.pageSrc = { labels: pdf.labels, count: pdf.pages.length, index: buildPageIndex(pdf.pages) };
     const quotes = b.marks.filter((m) => m.status === 'done').length, found = findPages();
     renderInfo();
-    toast(quotes ? 'Pages found for ' + found + ' of ' + quotes + (quotes === 1 ? ' quote' : ' quotes') : 'Page PDF added');
+    toast(quotes ? 'Pages found for ' + found + ' of ' + quotes + (quotes === 1 ? ' quote' : ' quotes') : 'Page scan added');
   } catch (err) {
-    if (cur === mine) { renderInfo(); toast('Could not use that PDF: ' + ((err && err.message) || err)); }
+    if (cur === mine) { renderInfo(); toast('Page scan not added: ' + ((err && err.message) || err), 'warn'); }
   } finally { done(); }
 });

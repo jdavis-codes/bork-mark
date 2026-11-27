@@ -20,8 +20,8 @@ let hits = [], shown = 0, timer = null, busy = false, searched = null;   // sear
 // The tab button shows once the open book has its text.
 export function renderSearchTab() {
   const b = cur && cur.book;
-  tabState($('searchBtn'), !b || !b.hasText ? 'Add the book text (EPUB or TXT) in About this book to search it.'
-    : !cur.text ? 'The book text is still loading.' : '');
+  tabState($('searchBtn'), !b || !b.hasText ? 'Add the book text to search it'
+    : !cur.text ? 'Book text still loading' : '');
 }
 
 const history = () => cur.book.searches || (cur.book.searches = []);
@@ -123,7 +123,7 @@ async function act(h, what) {
     if (!found) t = estimateTime(h.at);
     addTextMark(h.at, h.end, t);
     say('');
-    toast(found ? 'Bookmarked ' + fmt(t) : 'Bookmarked; the time ' + fmt(t) + ' is an estimate');
+    toast(found ? 'Bookmarked ' + fmt(t) : 'Bookmarked ~' + fmt(t) + ' (estimated)');
   }
 }
 

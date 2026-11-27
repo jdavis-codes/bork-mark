@@ -28,7 +28,7 @@ export function showViewer(title, node, figure, tools = []) {
       scan.addEventListener('click', () => {
         const f = cur.meta.figures[figure], t = cur.text.text;
         const i = pageOf(cur.pageSrc.index, t.slice(Math.max(0, f.at - 500), f.at), t.slice(f.at, f.at + 400));
-        if (i == null) toast('Could not find this in the page scan'); else showPdfPage(i);
+        if (i == null) toast('Not found in the page scan', 'warn'); else showPdfPage(i);
       });
       bar.append(scan);
     }
@@ -58,7 +58,7 @@ export async function openFigure(i) {
     return;
   }
   const file = await stored(cur.book.id, 'img-' + f.img);
-  if (!file) { toast('That picture is not stored on this device'); return; }
+  if (!file) { toast('Picture not on this device', 'warn'); return; }
   const img = el('img', 'figimg');
   img.alt = f.cap || '';
   showViewer(figureName(f, i), img, i);
@@ -68,7 +68,7 @@ export async function openFigure(i) {
 // Shows one page of the scan (counting from 0).
 export async function showPdfPage(index) {
   const mine = cur, file = await stored(mine.book.id, 'pagepdf');
-  if (!file) { toast('The page scan is not stored on this device'); return; }
+  if (!file) { toast('Page scan not on this device', 'warn'); return; }
   const label = pageLabel(mine.book, mine.pageSrc, index);
   showViewer((label ? 'Page ' + label : 'Scanned page') + ' · ' + mine.book.pageSrcName, el('p', 'muted', 'Drawing the page…'));
   try {

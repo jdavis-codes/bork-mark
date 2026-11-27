@@ -68,7 +68,7 @@ let saveTimer = null;
 export function save(now) {
   const write = () => {
     saveTimer = null;
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { toast('Could not save: storage is full'); }
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { toast('Not saved: storage is full', 'warn'); }
   };
   if (now) { clearTimeout(saveTimer); write(); } else if (!saveTimer) saveTimer = setTimeout(write, 4000);
 }

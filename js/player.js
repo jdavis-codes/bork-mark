@@ -72,7 +72,7 @@ export async function prepareBook(id) {
   if (!book) return null;
   if (cur && cur.book === book) return showPlayer;   // already loaded, maybe playing
   const file = await stored(id, 'audio');
-  if (!file) { toast('The audio for this book is missing from this device'); return null; }
+  if (!file) { toast('Audio not on this device', 'warn'); return null; }
   const blob = await playable(file);
   // The cover, at the same address the library shows it at (see coverUrl),
   // decoded now so the player has it drawn from its first frame.
@@ -146,7 +146,7 @@ audio.addEventListener('error', () => {
   const e = audio.error;
   $('playerError').hidden = false;
   $('playerError').textContent = 'This file cannot be played here (code ' + (e ? e.code : '?') + (e && e.message ? ': ' + e.message : '') + ').';
-  toast('This file cannot be played here');
+  toast('Can’t play this file here', 'warn');
 });
 const PLAY = 'M8 5v14l11-7z', PAUSE = 'M7 5h4v14H7zM13 5h4v14h-4z';
 function syncPlayState() {
@@ -225,7 +225,7 @@ export function play(isRetry) {
   primeSounds();
   const from = audio.currentTime;
   const p = audio.play();
-  if (p) p.catch((e) => { log('play() refused: ' + e.name + ': ' + e.message); if (!isRetry) toast('Cannot play: ' + e.message); });
+  if (p) p.catch((e) => { log('play() refused: ' + e.name + ': ' + e.message); if (!isRetry) toast('Couldn’t start playing', 'warn'); });
   clearTimeout(playCheck);
   playCheck = setTimeout(() => {
     if (!cur || !wantPlaying) return;

@@ -95,5 +95,5 @@ for (const id of ['settingsBtn', 'settingsBtn2']) $(id).addEventListener('click'
 $('settingsClose').addEventListener('click', () => closeSheet($('settingsDlg')));
 $('logCopy').addEventListener('click', async () => {
   const text = logLines.join('\n') + '\n' + navigator.userAgent;
-  try { await navigator.clipboard.writeText(text); toast('Log copied'); } catch (e) { toast('Copy failed'); }
+  try { await navigator.clipboard.writeText(text); toast('Log copied'); } catch (e) { toast('Copy failed', 'warn'); }
 });

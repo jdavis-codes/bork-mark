@@ -39,9 +39,12 @@ export const el = (tag, cls, text) => {
 export const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 let toastTimer = null;
-export function toast(msg) {
+// A short notice at the top. kind 'warn' is for something that went wrong or
+// couldn't be done: amber, with a warning sign. Keep messages to one short line.
+export function toast(msg, kind) {
   const t = $('toast');
   t.textContent = msg;
+  t.classList.toggle('warn', kind === 'warn');
   // Shown as a popover so it sits above any open sheet rather than behind it.
   if (t.showPopover) { try { t.hidePopover(); } catch (e) {} try { t.showPopover(); } catch (e) {} }
   t.classList.add('show');

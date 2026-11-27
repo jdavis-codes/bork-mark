@@ -332,11 +332,11 @@ function markCard(b, m, showChapter) {
   }
   const copy = iconButton('copy', 'Copy quote');
   copy.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(shareText(b, m)); toast('Copied'); } catch (e) { toast('Copy failed'); }
+    try { await navigator.clipboard.writeText(shareText(b, m)); toast('Copied'); } catch (e) { toast('Copy failed', 'warn'); }
   });
   const share = navigator.share ? iconButton('share', 'Share quote') : null;   // the system share sheet: Are.na, Notes, Messages…
   if (share) share.addEventListener('click', () => {
-    navigator.share({ text: shareText(b, m) }).catch((e) => { if (e.name !== 'AbortError') toast('Could not share'); });
+    navigator.share({ text: shareText(b, m) }).catch((e) => { if (e.name !== 'AbortError') toast('Could not share', 'warn'); });
   });
 
   if (m.status !== 'done') {   // heard, but not matched to book text
@@ -369,7 +369,7 @@ function markCard(b, m, showChapter) {
   if (m.page) {
     const canShow = m.pdfPage != null && b.hasPagePdf;
     const page = el(canShow ? 'button' : 'span', 'chip', 'p. ' + m.page);
-    if (canShow) { page.setAttribute('aria-label', 'Show scanned page ' + m.page); page.addEventListener('click', () => { if (cur.pageSrc) showPdfPage(m.pdfPage); else toast('The page scan is still loading'); }); }
+    if (canShow) { page.setAttribute('aria-label', 'Show scanned page ' + m.page); page.addEventListener('click', () => { if (cur.pageSrc) showPdfPage(m.pdfPage); else toast('Page scan still loading'); }); }
     chips.append(page);
   }
   for (const i of m.figs || []) {

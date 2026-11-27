@@ -32,7 +32,7 @@ export function startTrim(m) {
   const text = cur.text;
   if (!m.loc) {   // an older bookmark: find its quote in the book text first
     const before = tokenize(m.before).words, loc = findInBook(text, before.concat(tokenize(m.after).words), before.length);
-    if (!loc) { toast('Could not find this quote in the book text'); return; }
+    if (!loc) { toast('Quote not found in the text', 'warn'); return; }
     m.loc = [loc.start, loc.split, loc.end];
   }
   const at = pointOf(m);

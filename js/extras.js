@@ -242,9 +242,9 @@ $('extrasFile').addEventListener('change', async (e) => {
     if (cur !== mine) return;
     mine.extras = info;
     renderFigTab(); renderInfo();
-    toast(info.entries.length ? 'Extras added: ' + info.entries.length + ' things found in ' + info.count + ' pages' : 'Extras added: ' + info.count + ' pages');
+    toast('Extras added: ' + (info.entries.length ? info.entries.length + ' items' : info.count + ' pages'));
   } catch (err) {
     log('extras failed: ' + ((err && err.message) || err));
-    if (cur === mine) { renderInfo(); toast('Could not use that PDF: ' + ((err && err.message) || err)); }
+    if (cur === mine) { renderInfo(); toast('Extras not added: ' + ((err && err.message) || err), 'warn'); }
   } finally { done(); }
 });

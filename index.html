@@ -797,20 +797,24 @@
   /* Notices and notifications line up with the middle of the icons in the top row: the settings
      icon in the library, the back and info buttons over the player. */
   html { --notice-top: calc(14.5px + env(safe-area-inset-top)); }
+  html {
+    --toast-warn: #f6c444;
+    --warn-sign: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M8 1.2c.5 0 .9.3 1.2.7l6.1 10.9c.5.9-.1 2-1.2 2H1.9c-1 0-1.7-1.1-1.2-2L6.8 1.9c.3-.4.7-.7 1.2-.7zM7.1 5.6l.3 4.4h1.2l.3-4.4zM8 11a.95.95 0 1 0 0 1.9A.95.95 0 0 0 8 11z'/%3E%3C/svg%3E");
+  }
   /* In the library they sit in the space between Borky and the settings icon (--notice-x). They
      move between their places with the player: following the pull and the collapse (--p), and
      the player's rise when it opens (html.rising, in openPlayer). */
   @property --notice-x { syntax: '<length>'; inherits: true; initial-value: 0px; }
-  #busy, #toast { --notice-x: 36px; }
+  #busy, #toast { --notice-x: 39px; }   /* the middle of the gap between Borky and the settings button */
   html.has-bar #busy, html.has-bar #toast { --notice-x: 0px; }
-  html.pulling #busy, html.pulling #toast { --notice-x: calc(var(--p) * 36px); }
+  html.pulling #busy, html.pulling #toast { --notice-x: calc(var(--p) * 39px); }
   #busy {
     position: fixed; z-index: 6; left: 50%; top: var(--notice-top); transform: translateX(calc(-50% + var(--notice-x)));
     max-width: calc(100vw - 172px); display: flex; align-items: center; gap: 9px; padding: 10px 16px 10px 13px; border-radius: 999px;
     background: var(--fg); color: var(--bg); font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); pointer-events: none;
   }
   #busy[hidden] { display: none; }
-  html:not(.has-bar) #busy { max-width: calc(min(100vw, 560px) - 210px); }
+  html:not(.has-bar) #busy { max-width: calc(min(100vw, 560px) - 197px); }   /* that gap, less a margin */
   html.has-bar #busy { max-width: calc(100vw - 120px); }   /* over the player only the two icons flank it */
   @media (max-width: 350px) { #busy { font-size: 0.8rem; gap: 7px; padding: 10px 12px 10px 10px; } }
   #busyText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -822,11 +826,18 @@
   #toast[popover] { bottom: auto; right: auto; margin: 0; border: none; overflow: visible; }
   #toast[popover]:not(:popover-open) { display: none; }
   #toast {
-    max-width: calc(100vw - 32px - 2 * var(--notice-x)); overflow: hidden; text-overflow: ellipsis;
+    max-width: calc(100vw - 104px - var(--notice-x) * 93 / 39);   /* between the two icons over the player, the gap in the library */
     position: fixed; left: 50%; top: var(--notice-top); transform: translate(calc(-50% + var(--notice-x)), -12px);
     background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 0.9rem;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; width: max-content; text-wrap: balance;
+  }
+  /* a message too long for one line wraps rather than being cut short */
+  #toast { border-radius: 21px; text-align: center; }
+  #toast.warn { display: flex; align-items: center; gap: 8px; padding-left: 13px; text-align: left; background: var(--toast-warn); color: #1c1b19; }
+  #toast.warn::before {
+    content: ''; flex: none; width: 16px; height: 16px; background: currentColor;
+    -webkit-mask: var(--warn-sign) center / contain no-repeat; mask: var(--warn-sign) center / contain no-repeat;
   }
   #toast.show { opacity: 1; transform: translate(calc(-50% + var(--notice-x)), 0); }
   html.rising #busy { transition: --notice-x 0.38s cubic-bezier(0.2, 0.85, 0.25, 1); }

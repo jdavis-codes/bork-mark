@@ -97,7 +97,7 @@ async function findInAudio(at, say) {
 // findInAudio): the time, or null when it can't be found or other listening
 // is under way. `say` reports progress. Used for figures and search results.
 export async function placeInAudio(at, say) {
-  if (!cur || !cur.text || !cur.source || probing || queueBusy || naming) { toast('Busy with something else; try again in a moment'); return null; }
+  if (!cur || !cur.text || !cur.source || probing || queueBusy || naming) { toast('Busy, try again in a moment', 'warn'); return null; }
   const mine = cur;
   probing = true;
   try {
@@ -142,9 +142,9 @@ export function renderFigTab() {
   if (loaded && b.figureCount !== cur.meta.figures.length) { b.figureCount = cur.meta.figures.length; save(); }
   const n = loaded ? cur.meta.figures.length : (b && b.figureCount) || 0;
   tabState($('figsBtn'), (n && loaded) || pages ? ''
-    : b && b.hasText && !loaded ? 'The book text is still loading.'
-    : b && b.hasText ? 'This book has no pictures or tables in its text.'
-    : 'Add the book text (EPUB) to see its pictures and tables, or a PDF of extras.');
+    : b && b.hasText && !loaded ? 'Book text still loading'
+    : b && b.hasText ? 'No pictures or tables in this book'
+    : 'Add the book text or extras first');
   $('figsLabel').textContent = String(n || pages || '');
   $('figsBtn').setAttribute('aria-label', 'Figures' + (n ? ', ' + n + ' in the book' : '') + (pages ? ', ' + pages + ' pages of extras' : ''));
 }
@@ -288,7 +288,7 @@ function reachFigure(i) {
   if (settings.figPause) pause();
   pendingFigure = i;
   showPendingFigure();
-  toast(what.length > 60 ? what.slice(0, 58) + '…' : what);
+  toast(what.length > 34 ? what.slice(0, 32) + '…' : what);
 }
 // Opens the figure straight away if the app is on screen, otherwise the next time it is.
 export function showPendingFigure() {

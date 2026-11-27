@@ -77,7 +77,7 @@ export async function readPdfPages(file, onProgress = () => {}) {
       page.cleanup();
       onProgress(i / doc.numPages);
     }
-    if (pages.join('').length < pages.length * 20) throw new Error('this PDF has no text layer (it is images only)');
+    if (pages.join('').length < pages.length * 20) throw new Error('no text layer');
     // Labels that just count 1, 2, 3… add nothing over the page's position.
     if (labels && labels.every((l, i) => l === String(i + 1))) labels = null;
     return { pages, labels };

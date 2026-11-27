@@ -75,10 +75,9 @@ $('addGo').addEventListener('click', async () => {
         detail('page scan read: ' + pdf.pages.length + ' pages, ' + took());
       } catch (err) { pdf = null; pdfProblem = (err && err.message) || String(err); }
     }
-    // The cover: the audio's, else the EPUB's, else the page scan's first page
-    // (even from a scan that can't give page numbers, having no text layer).
+    // The cover: the audio's, else the EPUB's, else the page scan's first page.
     let cover = src.tags.cover || (doc && doc.cover) || null;
-    if (!cover && pf) {
+    if (!cover && pdf) {
       try { cover = await pdfCover(pf); detail('cover from the page scan: ' + mb(cover.size)); } catch (err) { /* no cover then */ }
     }
     if (cover) await store('write', id, 'cover', cover);
@@ -104,8 +103,8 @@ $('addGo').addEventListener('click', async () => {
     // The speech model is not loaded here: it loads once the book's text is
     // ready and something needs it, so the two heavy steps don't overlap.
     await openBook(id);
-    if (pdfProblem) toast('Book added, but not the page scan: ' + pdfProblem);
-    else if (extrasProblem) toast('Book added, but not the extras: ' + extrasProblem);
+    if (pdfProblem) toast('Page scan not added: ' + pdfProblem, 'warn');
+    else if (extrasProblem) toast('Extras not added: ' + extrasProblem, 'warn');
   } catch (err) {
     log('adding failed: ' + ((err && err.message) || err));
     await store('remove', id).catch(() => {});

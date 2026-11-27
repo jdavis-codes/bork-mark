@@ -52,7 +52,7 @@ export function bookmarksMarkdown(b) {
 // Hands the file to the share sheet where there is one, and saves it otherwise.
 async function exportBookmarks() {
   const b = cur && cur.book;
-  if (!b || !b.marks.length) { toast('No bookmarks to export'); return; }
+  if (!b || !b.marks.length) { toast('No bookmarks to export', 'warn'); return; }
   const name = (b.title || 'bookmarks').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/ /g, '-').slice(0, 60) + '-bookmarks.md';
   const file = new File([bookmarksMarkdown(b)], name, { type: 'text/markdown' });
   log('exporting ' + b.marks.length + ' bookmarks as ' + name);
@@ -62,7 +62,7 @@ async function exportBookmarks() {
   const a = document.createElement('a'), url = URL.createObjectURL(file);
   a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
-  toast('Saved ' + name);
+  toast('Bookmarks saved');
 }
 
 // Whether an exported file is for this book. The length of the audio decides
@@ -85,9 +85,10 @@ export function readBookmarks(source) {
 // Adds a file's bookmarks to the open book, leaving out any it already has.
 function importBookmarks(source) {
   const b = cur.book, { meta, marks } = readBookmarks(source);
-  if (!marks.length) { toast('No Bork Mark bookmarks in that file'); return; }
+  if (!marks.length) { toast('No bookmarks in that file', 'warn'); return; }
   if (!sameBook(meta, b)) {
-    toast('Those are for another book: ' + (meta.title || 'untitled') + (Number(meta.duration) ? ', ' + fmt(Number(meta.duration)) : ''));
+    log('bookmarks are for another book: ' + (meta.title || 'untitled') + (Number(meta.duration) ? ', ' + fmt(Number(meta.duration)) : ''));
+      toast('Those are for another book', 'warn');
     log('bookmarks not imported: file is for "' + meta.title + '" ' + meta.duration + ' s, this book is "' + b.title + '" ' + Math.round(b.duration) + ' s');
     return;
   }
@@ -119,5 +120,5 @@ $('marksFile').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
   if (!f || !cur) return;
-  try { importBookmarks(await f.text()); } catch (err) { log('bookmark import failed: ' + ((err && err.message) || err)); toast('Could not read that file'); }
+  try { importBookmarks(await f.text()); } catch (err) { log('bookmark import failed: ' + ((err && err.message) || err)); toast('Could not read that file', 'warn'); }
 });
