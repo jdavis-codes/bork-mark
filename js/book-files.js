@@ -234,18 +234,37 @@ const PIECES = {
   marks: { input: 'marksFile', has: () => false },
 };
 const REPLACE = 'M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4';
-for (const [key, piece] of Object.entries(PIECES)) {
-  const tile = $(key + 'Act');
-  tile.addEventListener('click', () => {
-    if (!cur) return;
-    if (!piece.has(cur.book)) { $(piece.input).click(); return; }
-    const mine = cur;
-    showMenu(tile.getBoundingClientRect(), [
+// A tap opens the menu; so does a hold, without waiting for the finger to lift
+// (as in the library). A missing piece's file picker only opens on a tap: iOS
+// lets a picker open only straight from one.
+function pieceMenu(tile, piece, live) {
+  const mine = cur;
+  return showMenu(tile.getBoundingClientRect(), [
       { label: 'Replace', icon: REPLACE, run: () => $(piece.input).click() },
       { label: 'Remove', icon: TRASH, danger: true, run: async () => {
         try { await piece.remove(mine); log(piece.name + ' removed'); toast(piece.name[0].toUpperCase() + piece.name.slice(1) + ' removed'); }
         catch (err) { log(piece.name + ' not removed: ' + ((err && err.message) || err)); toast('Couldn’t remove the ' + piece.name, 'warn'); }
       } },
-    ], { inside: $('infoDlg') });
+  ], { inside: $('infoDlg'), live });
+}
+for (const [key, piece] of Object.entries(PIECES)) {
+  const tile = $(key + 'Act');
+  let timer = 0, held = null, x0 = 0, y0 = 0;
+  const stop = () => { clearTimeout(timer); timer = 0; };
+  tile.addEventListener('pointerdown', (e) => {
+    if (e.button || !cur || !piece.has(cur.book)) return;
+    x0 = e.clientX; y0 = e.clientY;
+    timer = setTimeout(() => { timer = 0; held = pieceMenu(tile, piece, false); }, 450);
+  });
+  tile.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) stop(); });
+  tile.addEventListener('pointercancel', stop);
+  // Lifting the finger after a hold leaves the menu open: only then may a tap outside close it.
+  // The click that follows the lift comes first and is ignored; then held is cleared either way.
+  addEventListener('pointerup', () => { stop(); if (held) { const h = held; setTimeout(() => { h.live(); if (held === h) held = null; }, 0); } });
+  tile.addEventListener('click', () => {
+    if (held) { held = null; return; }   // the end of a hold, not a tap
+    if (!cur) return;
+    if (!piece.has(cur.book)) { $(piece.input).click(); return; }
+    pieceMenu(tile, piece, true);
   });
 }

@@ -4,12 +4,12 @@
 // device until then. Only a launch deletes for good: whatever is past its
 // time then goes, so a shorter setting never takes things away on the spot.
 
-import { renderLibrary } from './library.js';
-import { log } from './log.js';
+import { renderLibrary, TRASH } from './library.js';
+import { log, mb } from './log.js';
 import { renderMarks } from './marks.js';
 import { cur } from './player.js';
 import { save, settings, state } from './state.js';
-import { store } from './storage.js';
+import { store, stored } from './storage.js';
 import { $, el, fmt, icon, toast } from './ui/dom.js';
 
 const DAY = 86400000;
@@ -70,30 +70,52 @@ const titleOf = (id) => {
   return b ? b.title : 'a deleted book';
 };
 
-// The Settings section: one list for both, newest first.
-export function renderTrash() {
-  const list = $('trashList');
-  list.textContent = '';
-  for (const x of state.trash) {
-    const li = el('li'), text = el('div', 'trashtext');
-    const m = x.mark;
-    const name = x.kind === 'book' ? x.book.title : '“' + (m.status === 'done' ? (m.before + m.after) : (m.transcript || '')).trim().slice(0, 90) + '”';
-    const sub = (x.kind === 'book' ? 'Book' : titleOf(x.bookId) + ' · ' + fmt(m.t)) + ' · ' + timeLeft(x);
-    text.append(el('span', 'trashname', name), el('span', 'muted', sub));
-    const back = el('button', 'plain', 'Restore');
-    back.addEventListener('click', () => restore(x));
-    li.append(icon(x.kind === 'book' ? BOOK : MARK), text, back);
-    list.append(li);
-  }
-  $('trashNote').hidden = state.trash.length > 0;
-  $('trashEmpty').hidden = !state.trash.length;
-}
-$('trashEmpty').addEventListener('click', () => {
-  const n = state.trash.length;
-  if (!n || !confirm('Delete ' + (n === 1 ? 'this' : 'these ' + n) + ' for good? They can’t be brought back.')) return;
-  for (const x of state.trash) if (x.kind === 'book') store('remove', x.book.id).catch(() => {});
-  state.trash.length = 0;
+// Deletes items for good: a book's files go with it.
+function forGood(items) {
+  for (const x of items) if (x.kind === 'book') store('remove', x.book.id).catch(() => {});
+  state.trash = state.trash.filter((x) => !items.includes(x));
   save(true);
   renderTrash();
-  log('recently deleted: emptied (' + n + ')');
+  log('recently deleted: ' + items.length + ' deleted for good');
+}
+const quote = (m) => '“' + (m.status === 'done' ? (m.before + m.after) : (m.transcript || '')).trim().slice(0, 90) + '”';
+
+// The Settings section: books and bookmarks apart, newest first, each with Restore and a bin.
+export function renderTrash() {
+  const books = state.trash.filter((x) => x.kind === 'book'), marks = state.trash.filter((x) => x.kind === 'mark');
+  for (const [list, items] of [[$('trashBookList'), books], [$('trashMarkList'), marks]]) {
+    list.textContent = '';
+    for (const x of items) {
+      const li = el('li'), text = el('div', 'trashtext');
+      const name = x.kind === 'book' ? x.book.title : quote(x.mark);
+      // the time left first: a long book title is what gets cut short
+      const sub = timeLeft(x) + (x.kind === 'book' ? '' : ' · ' + fmt(x.mark.t) + ' · ' + titleOf(x.bookId));
+      text.append(el('span', 'trashname', name), el('span', 'muted', sub));
+      const back = el('button', 'plain restore', 'Restore');
+      back.addEventListener('click', () => restore(x));
+      const bin = el('button', 'forgood');
+      bin.setAttribute('aria-label', 'Delete for good');
+      bin.append(icon(TRASH));
+      bin.addEventListener('click', () => {
+        if (x.kind === 'book' && !confirm('Delete “' + x.book.title + '” for good? It can’t be brought back.')) return;
+        forGood([x]);
+      });
+      li.append(icon(x.kind === 'book' ? BOOK : MARK), text, back, bin);
+      list.append(li);
+    }
+  }
+  $('trashBooks').hidden = !books.length;
+  $('trashMarks').hidden = !marks.length;
+  $('trashNote').hidden = state.trash.length > 0;
+  // How much room the deleted books still take on the device.
+  $('trashBooksSize').textContent = '';
+  if (books.length) {
+    Promise.all(books.flatMap((x) => ['audio', 'pagepdf', 'extraspdf'].map((k) => stored(x.book.id, k))))
+      .then((files) => { $('trashBooksSize').textContent = '· ' + mb(files.reduce((n, f) => n + (f ? f.size : 0), 0)); });
+  }
+}
+$('trashBooksEmpty').addEventListener('click', () => {
+  const items = state.trash.filter((x) => x.kind === 'book');
+  if (items.length && confirm('Delete ' + (items.length === 1 ? 'this book' : 'these ' + items.length + ' books') + ' for good? They can’t be brought back.')) forGood(items);
 });
+$('trashMarksEmpty').addEventListener('click', () => forGood(state.trash.filter((x) => x.kind === 'mark')));

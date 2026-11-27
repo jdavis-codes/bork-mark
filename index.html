@@ -118,16 +118,21 @@
   .tile.has .tilename { color: var(--fg); }
   #removeBtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 14px 0 0; padding: 10px; border: none; background: none; font: inherit; }
   #removeBtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  #trashList { list-style: none; margin: 4px 0 0; padding: 0; }
-  #trashList li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
-  #trashList li:first-child { border-top: none; }
-  #trashList svg { width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .trashlist { list-style: none; margin: 4px 0 0; padding: 0; }
+  .trashlist li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .trashlist li:first-child { border-top: none; }
+  .trashlist svg { width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .trashtext { display: grid; min-width: 0; }
   .trashtext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .trashtext .muted { font-size: 0.82rem; }
-  #trashEmpty { margin-top: 4px; }
-  #removeBtn.danger, #menu .danger, #trashEmpty.danger { color: #d92d20; }
-  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger, #trashEmpty.danger { color: #ff6b5e; } }
+  .trashhead { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+  .trashhead h4 { margin: 0; font-size: 0.9rem; }
+  .trashhead h4 .muted { font-weight: 400; }
+  .trashlist li { grid-template-columns: 20px minmax(0, 1fr) auto auto; }
+  .trashlist .forgood { padding: 6px; border: none; background: none; color: var(--muted); }
+  .trashlist .forgood svg { stroke: currentColor; }
+  #removeBtn.danger, #menu .danger, #settingsDlg .trashhead .danger { color: #d92d20; }
+  @media (prefers-color-scheme: dark) { #menu .danger, #removeBtn.danger, #settingsDlg .trashhead .danger { color: #ff6b5e; } }
   @keyframes fadein { from { opacity: 0; } }
   @keyframes menuin { from { opacity: 0; transform: scale(0.9); } }
   @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #menu, #menuShade { animation: none; } }
@@ -982,7 +987,7 @@
   <p class="muted" style="margin:6px 0 14px">Files are copied into this app on your device. Nothing is uploaded.</p>
   <div class="picks">
     <label class="pick" id="pickAudio">
-      <input id="addAudio" type="file" accept=".m4b,.m4a,.mp3,.mp4,.aac,audio/mp4,audio/x-m4b,audio/x-m4a,audio/mpeg,audio/aac">
+      <input id="addAudio" type="file" accept=".m4b,.m4a,.mp3,.aac,audio/x-m4b,audio/x-m4a,audio/mpeg,audio/aac">
       <span class="pickicon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H6a2 2 0 0 1-2-2zM20 14h-3v6h1a2 2 0 0 0 2-2z"/></svg></span>
       <span class="picktext"><span class="pickname">Audiobook</span><span id="addAudioName" class="pickdesc"></span></span>
       <span class="pickstate"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="plus" d="M12 6v12M6 12h12"/><path class="tick" d="M5 12.5l4.5 4.5L19 7"/></svg></span>
@@ -1179,8 +1184,14 @@
         <div class="select"><select id="trashDays"><option value="1">1 day</option><option value="7">7 days</option><option value="10">10 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="0">Until emptied</option></select></div>
       </div>
       <p id="trashNote" class="muted" hidden>Nothing deleted lately.</p>
-      <ul id="trashList"></ul>
-      <button id="trashEmpty" class="plain danger" hidden>Empty now</button>
+      <div id="trashBooks" class="trashgroup" hidden>
+        <div class="trashhead"><h4>Books <span id="trashBooksSize" class="muted"></span></h4><button id="trashBooksEmpty" class="plain danger">Empty</button></div>
+        <ul id="trashBookList" class="trashlist"></ul>
+      </div>
+      <div id="trashMarks" class="trashgroup" hidden>
+        <div class="trashhead"><h4>Bookmarks</h4><button id="trashMarksEmpty" class="plain danger">Empty</button></div>
+        <ul id="trashMarkList" class="trashlist"></ul>
+      </div>
     </section>
 
     <section>

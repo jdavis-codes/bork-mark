@@ -187,7 +187,13 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   // A piece that is there opens Replace / Remove; Remove takes the cover away everywhere.
   await page.click('#books .book'); await page.waitForTimeout(800);
   await page.click('#infoBtn'); await page.waitForTimeout(400);
-  await page.click('#coverAct'); await page.waitForTimeout(300);
+  // Held: the menu opens before the finger lifts, and stays once it does.
+  const ct = await (await page.$('#coverAct')).boundingBox();
+  await page.mouse.move(ct.x + ct.width / 2, ct.y + ct.height / 2); await page.mouse.down(); await page.waitForTimeout(650);
+  const whileHeld = !!(await page.$('#menu'));
+  await page.mouse.up(); await page.waitForTimeout(250);
+  const afterLift = !!(await page.$('#menu'));
+  check('holding a piece’s tile opens its menu before letting go', whileHeld && afterLift, 'held ' + whileHeld + ', after ' + afterLift);
   await page.click('#menu button.danger'); await page.waitForTimeout(800);
   const gone = await page.evaluate(() => ({ tile: document.getElementById('coverAct').classList.contains('has'), player: document.getElementById('cover').hasAttribute('src') }));
   await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
@@ -210,8 +216,8 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   check('the hold menu takes a book off the device', left === n - 1 && !(await page.$('#menu')), n + ' -> ' + left);
   // Recently deleted: the book is there, and Restore brings it back with its audio.
   await page.click('#settingsBtn'); await page.waitForTimeout(400);
-  const listed = await page.$$eval('#trashList li', (li) => li.length);
-  await page.click('#trashList li button'); await page.waitForTimeout(400);
+  const listed = await page.$$eval('.trashlist li', (li) => li.length);
+  await page.click('#trashBookList li button.restore'); await page.waitForTimeout(400);
   const back = await page.evaluate(async () => {
     const { state } = await import('./js/state.js'), { stored } = await import('./js/storage.js');
     const a = await stored(state.books[0].id, 'audio');
@@ -224,7 +230,7 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
     const b = state.books.find((x) => x.marks.length) || state.books[0];
     if (!b.marks.length) b.marks.push({ id: 'm-test', t: 12, status: 'heard', transcript: 'a test bookmark', created: Date.now() });
     const m = b.marks.pop(); trashMark(b, m); renderTrash();
-    document.querySelector('#trashList li button').click();
+    document.querySelector('#trashMarkList li button.restore').click();
     const restored = b.marks.includes(m);
     // ten days on: a deleted book and its files go for good
     const old = state.books[state.books.length - 1];
@@ -242,8 +248,8 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
     const fake = { kind: 'mark', bookId: state.books[0].id, mark: { id: 'm-old', t: 5, status: 'heard', transcript: 'old one', created: 0 }, at: Date.now() - 40 * 86400000 };
     state.trash.unshift(fake);
     settings.trashDays = 0; purgeTrash(); const forever = state.trash.includes(fake);
-    renderTrash(); const foreverText = document.querySelector('#trashList li .muted').textContent;
-    settings.trashDays = 30; renderTrash(); const shortText = document.querySelector('#trashList li .muted').textContent;
+    renderTrash(); const foreverText = document.querySelector('#trashMarkList li .muted').textContent;
+    settings.trashDays = 30; renderTrash(); const shortText = document.querySelector('#trashMarkList li .muted').textContent;
     const stillThere = state.trash.includes(fake);
     purgeTrash(); const gone = !state.trash.includes(fake);
     settings.trashDays = 10;
