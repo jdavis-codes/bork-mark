@@ -9,6 +9,9 @@
 const { BASE, open, addBook, saved, logLines, check, done } = require('./lib');
 
 const settled = (page) => page.waitForFunction(() => !JSON.parse(localStorage.getItem('borkmark.v1')).books[0].marks.some((m) => m.status === 'pending' || m.status === 'working'), null, { timeout: 120000 });
+// Waits for the speech model. Leaving the page while it loads cuts the load short, which in
+// WebKit shows up as page errors or a navigation that never finishes.
+const modelReady = (page) => page.evaluate(() => import(new URL('js/speech.js', location.href).href).then((m) => m.warmModel()));
 const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStorage.getItem('borkmark.v1')).books[0].autoNaming === v, value, { timeout: 240000 });
 
 (async () => {
@@ -74,6 +77,7 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   // 4. Searching bookmarks finds the ones related by meaning, sharing no words.
   ({ browser, page } = await open({ model: true }));
   await addBook(page, 'book.m4b', 'book.txt');
+  await modelReady(page);
   await page.goto(BASE + 'buttons.html');
   await page.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('borkmark.v1'));
@@ -101,6 +105,7 @@ const named = (page, value) => page.waitForFunction((v) => JSON.parse(localStora
   //    are listened to, and the quote is the book's text between them.
   ({ browser, page } = await open({ model: true }));
   await addBook(page, 'long.m4b', 'long.txt');
+  await modelReady(page);
   await page.goto(BASE + 'buttons.html');
   await page.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('borkmark.v1'));

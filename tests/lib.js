@@ -29,9 +29,6 @@ async function open({ model = false, touch = true, sw = false } = {}) {
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) page.errors.push(m.text()); });
   // With the model blocked, WebKit reports the speech worker's library failing to import: expected.
   if (!model) page.on('pageerror', () => { page.errors = page.errors.filter((e) => e !== 'Importing a module script failed.'); });
-  // With the model on, a test that leaves the page while it loads cuts the load short. WebKit
-  // reports each piece of the library that was on its way ("blob:… due to access control checks").
-  if (model) page.on('console', () => { page.errors = page.errors.filter((e) => !/blob:\S+ due to access control checks/.test(e)); });
   if (!model) await page.route(/transformers|onnxruntime|huggingface/, (r) => r.abort());   // no speech model unless asked
   page.on('dialog', (d) => d.accept());
   return { browser, ctx, page };
