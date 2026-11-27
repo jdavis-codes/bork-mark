@@ -88,6 +88,26 @@
     content: url("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
   }
   .book .name { font-weight: 600; overflow-wrap: anywhere; }
+  /* holding a book (library.js): it lifts, a menu opens, and it can be dragged to a new place */
+  .book { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #books > li { position: relative; transition: transform 0.2s cubic-bezier(0.2, 0.85, 0.25, 1); }
+  #books > li.lifted { z-index: 7; transition: none; }
+  #books > li .book { transition: transform 0.18s, box-shadow 0.18s; }
+  #books > li.lifted .book { transform: scale(1.03); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22); }
+  html.arranging, html.arranging * { cursor: grabbing; }
+  #bookShade { position: fixed; inset: 0; z-index: 6; background: rgba(0, 0, 0, 0.18); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fadein 0.18s; pointer-events: none; }
+  #bookShade.live { pointer-events: auto; }   /* only once the finger has let go, so it can't catch that release */
+  #bookMenu {
+    position: fixed; z-index: 8; min-width: 200px; padding: 6px; border-radius: 14px; background: var(--card);
+    border: 1px solid var(--line); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28); animation: menuin 0.2s cubic-bezier(0.2, 0.85, 0.25, 1);
+  }
+  #bookMenu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: none; border-radius: 9px; background: none; font: inherit; text-align: left; }
+  #bookMenu button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #bookMenu .danger { color: #d92d20; }
+  @media (prefers-color-scheme: dark) { #bookMenu .danger { color: #ff6b5e; } }
+  @keyframes fadein { from { opacity: 0; } }
+  @keyframes menuin { from { opacity: 0; transform: scale(0.9); } }
+  @media (prefers-reduced-motion: reduce) { #books > li, #books > li .book { transition: none; } #bookMenu, #bookShade { animation: none; } }
   .bar { height: 4px; border-radius: 2px; background: var(--soft); margin-top: 6px; overflow: hidden; }
   /* Fills are full width and scaled from the left (set from script), so moving
      one is a compositor-only change instead of a relayout. */

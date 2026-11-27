@@ -1,9 +1,9 @@
 // The library screen: one row per book.
 
-import { cur, prepareBook } from './player.js';
+import { closeBook, cur, prepareBook } from './player.js';
 import { save, state } from './state.js';
 import { store, stored } from './storage.js';
-import { $, el, fmt, setFill, setText } from './ui/dom.js';
+import { $, el, fmt, icon, setFill, setText } from './ui/dom.js';
 import { detail } from './log.js';
 import { openPlayer } from './screens.js';
 
@@ -99,10 +99,12 @@ function libRow(b) {
   // The tapped cover grows into the player's cover. If this book is the
   // one in the mini player, that cover is the one that grows instead.
   btn.addEventListener('click', async () => {
+    if (held) { held = false; return; }   // a hold, not a tap
     const show = await prepareBook(b.id);   // ready first, then the screen changes at once
     if (show) openPlayer(show, cur && cur.book === b && !$('mini').hidden ? $('miniCover') : r.img);
   });
   coverUrl(b).then((u) => { if (u && libRows.get(b.id) === r) r.img.src = u; });
+  armHold(r, b, btn);
   return r;
 }
 export async function renderLibrary() {
@@ -132,4 +134,167 @@ export async function renderLibrary() {
       $('storage').hidden = false;
     }
   }
+}
+
+// Removes a book and everything stored with it, once the reader agrees. Resolves to whether it went.
+export async function removeBook(b) {
+  const n = b.marks.length;
+  if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return false;
+  if (cur && cur.book === b) closeBook();
+  const i = state.books.indexOf(b);
+  if (i >= 0) state.books.splice(i, 1);
+  save(true);
+  await store('remove', b.id).catch(() => {});
+  renderLibrary();
+  return true;
+}
+
+// ---------- Holding a book, as on the iOS Home Screen ----------
+// Hold a book: it lifts and a menu opens. Let go and the menu stays; drag
+// instead and the menu goes, and the book moves through the list, the others
+// sliding out of its way, until it is dropped in its new place.
+const HOLD = 450, SLOP = 8, EDGE = 70;
+let held = false;   // the click that ends a hold must not open the book
+let drag = null;
+// Once a book is lifted the page must not scroll under the finger.
+document.addEventListener('touchmove', (e) => { if (drag) e.preventDefault(); }, { passive: false });
+
+function armHold(r, b, btn) {
+  let timer = 0, sx = 0, sy = 0;
+  const stop = () => { clearTimeout(timer); timer = 0; };
+  btn.addEventListener('pointerdown', (e) => {
+    if (e.button || drag) return;
+    sx = e.clientX; sy = e.clientY;
+    const id = e.pointerId;
+    timer = setTimeout(() => { timer = 0; lift(r, b, sy, id); }, HOLD);
+  });
+  btn.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > SLOP) stop(); });
+  btn.addEventListener('pointerup', stop);
+  btn.addEventListener('pointercancel', stop);
+  // A right click (or a long press where the system offers one) opens the menu too.
+  btn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (!drag && !$('bookMenu')) { stop(); lift(r, b, e.clientY, null); drop(); }
+  });
+}
+
+function lift(r, b, y, pointerId) {
+  const rows = [...$('books').children];
+  const from = rows.indexOf(r.li);
+  if (from < 0) return;
+  held = true;
+  const top = (li) => li.getBoundingClientRect().top + scrollY;
+  drag = {
+    r, b, from, to: from, pointerId, rows, moved: false,
+    tops: rows.map(top), height: r.li.getBoundingClientRect().height,
+    gap: rows.length > 1 ? top(rows[1]) - top(rows[0]) - rows[0].getBoundingClientRect().height : 0,
+    y0: y + scrollY, y: y + scrollY, clientY: y, raf: 0,
+  };
+  r.li.classList.add('lifted');
+  document.documentElement.classList.add('arranging');
+  openMenu(r, b);
+  if (pointerId != null) {
+    addEventListener('pointermove', onDrag);
+    addEventListener('pointerup', drop);
+    addEventListener('pointercancel', drop);
+  }
+}
+
+function onDrag(e) {
+  if (!drag || e.pointerId !== drag.pointerId) return;
+  drag.clientY = e.clientY;
+  drag.y = e.clientY + scrollY;
+  if (!drag.moved && Math.abs(drag.y - drag.y0) > SLOP) {
+    drag.moved = true;
+    closeMenu();
+    drag.raf = requestAnimationFrame(edgeScroll);
+  }
+  if (drag.moved) place();
+}
+// Near the top or bottom of the screen the list scrolls on by itself.
+function edgeScroll() {
+  if (!drag || !drag.moved) return;
+  const c = drag.clientY, speed = c < EDGE ? -(EDGE - c) / 5 : c > innerHeight - EDGE ? (c - innerHeight + EDGE) / 5 : 0;
+  if (speed) { scrollBy(0, speed); drag.y = drag.clientY + scrollY; place(); }
+  drag.raf = requestAnimationFrame(edgeScroll);
+}
+// The lifted book follows the finger; the books it passes step aside.
+function place() {
+  const { rows, from, tops, height, gap } = drag, dy = drag.y - drag.y0;
+  rows[from].style.transform = 'translateY(' + dy + 'px)';
+  const middle = tops[from] + dy + height / 2;
+  let to = 0;
+  rows.forEach((li, i) => { if (i !== from && tops[i] + li.offsetHeight / 2 < middle) to++; });
+  drag.to = to;
+  const step = height + gap;
+  rows.forEach((li, i) => {
+    if (i === from) return;
+    const shift = from < to && i > from && i <= to ? -step : to < from && i >= to && i < from ? step : 0;
+    li.style.transform = shift ? 'translateY(' + shift + 'px)' : '';
+  });
+}
+
+function drop() {
+  removeEventListener('pointermove', onDrag);
+  removeEventListener('pointerup', drop);
+  removeEventListener('pointercancel', drop);
+  if (!drag) return;
+  const { r, b, rows, from, to, moved } = drag;
+  cancelAnimationFrame(drag.raf);
+  if (!moved) {
+    // Let go without moving: the menu stays open, the book stays lifted.
+    setTimeout(() => { const s = $('bookShade'); if (s) s.classList.add('live'); }, 0);
+    drag = null;
+    return;
+  }
+  drag = null;
+  document.documentElement.classList.remove('arranging');
+  const before = r.li.getBoundingClientRect().top;
+  for (const li of rows) { li.style.transition = 'none'; li.style.transform = ''; }
+  if (to !== from) {
+    state.books.splice(state.books.indexOf(b), 1);
+    state.books.splice(to, 0, b);
+    save(true);
+    renderLibrary();
+  }
+  // From where it was let go to its place in the list.
+  const after = r.li.getBoundingClientRect().top;
+  r.li.style.transform = 'translateY(' + (before - after) + 'px)';
+  r.li.getBoundingClientRect();
+  r.li.style.transition = ''; r.li.style.transform = '';
+  for (const li of rows) if (li !== r.li) li.style.transition = '';
+  setTimeout(() => { r.li.classList.remove('lifted'); held = false; }, 220);
+}
+
+// The menu under (or, near the bottom, over) the held book.
+function openMenu(r, b) {
+  closeMenu();
+  const shade = el('div'), menu = el('div');
+  shade.id = 'bookShade'; menu.id = 'bookMenu';
+  menu.setAttribute('role', 'menu');
+  const remove = el('button', 'danger', 'Remove');
+  remove.setAttribute('role', 'menuitem');
+  remove.prepend(icon(TRASH));
+  remove.addEventListener('click', async () => { endHold(); await removeBook(b); });
+  menu.append(remove);
+  shade.addEventListener('click', endHold);
+  document.body.append(shade, menu);
+  const box = r.li.getBoundingClientRect(), h = menu.offsetHeight;
+  const below = box.bottom + 8 + h < innerHeight - 16;
+  menu.style.top = (below ? box.bottom + 8 : box.top - 8 - h) + 'px';
+  menu.style.left = box.left + 'px';
+  menu.style.transformOrigin = below ? 'top left' : 'bottom left';
+  addEventListener('keydown', escape);
+}
+const TRASH = 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3';
+function escape(e) { if (e.key === 'Escape') endHold(); }
+function closeMenu() {
+  for (const id of ['bookMenu', 'bookShade']) { const n = $(id); if (n) n.remove(); }
+  removeEventListener('keydown', escape);
+}
+function endHold() {
+  closeMenu();
+  document.documentElement.classList.remove('arranging');
+  for (const r of libRows.values()) r.li.classList.remove('lifted');
+  held = false;
 }

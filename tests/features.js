@@ -184,5 +184,20 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
   await page.click('#infoClose'); await page.waitForTimeout(400); await page.click('#backBtn'); await page.waitForTimeout(900);
   const row = await page.evaluate(() => { const i = document.querySelector('#books .thumb'); return i.getAttribute('src') && i.naturalWidth; });
   check('About this book changes the cover', label === 'Change cover' && w === 180 && row === 180, label + ', player ' + w + ', library ' + row);
+  // Holding a book in the library: it can be dragged to a new place, and its menu takes it off the device.
+  const hues = () => page.evaluate(() => [...document.querySelectorAll('#books .thumb')].map((i) => i.style.getPropertyValue('--hue')).join(' '));
+  const rowBox = async (i) => (await page.$$('#books .book'))[i].boundingBox();
+  const before = await hues(), a = await rowBox(0), b = await rowBox(1);
+  await page.mouse.move(a.x + 150, a.y + 40); await page.mouse.down(); await page.waitForTimeout(650);
+  const menu = !!(await page.$('#bookMenu'));
+  for (let k = 1; k <= 10; k++) { await page.mouse.move(a.x + 150, a.y + 40 + (b.y + b.height * 0.8 - a.y) * k / 10); await page.waitForTimeout(16); }
+  await page.mouse.up(); await page.waitForTimeout(500);
+  const after = await hues();
+  check('holding a book and dragging it reorders the library', menu && after.split(' ')[1] === before.split(' ')[0] && after.split(' ')[0] === before.split(' ')[1], before + ' -> ' + after);
+  const n =(await page.$$('#books .book')).length, c = await rowBox(0);
+  await page.mouse.move(c.x + 150, c.y + 40); await page.mouse.down(); await page.waitForTimeout(650); await page.mouse.up(); await page.waitForTimeout(250);
+  await page.click('#bookMenu button'); await page.waitForTimeout(600);
+  const left = (await page.$$('#books .book')).length;
+  check('the hold menu takes a book off the device', left === n - 1 && !(await page.$('#bookMenu')), n + ' -> ' + left);
   done(page); await browser.close();
 })();

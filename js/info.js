@@ -1,11 +1,11 @@
 // The About this book sheet: editable details, the chapter list, file links, removing the book.
 
 import { chaptersChanged, keepAudioChapters, nameChapters, namingChapters } from './chapter-names.js';
-import { chapterOutline, closeBook, cur, setMediaSession } from './player.js';
+import { chapterOutline, cur, setMediaSession } from './player.js';
+import { removeBook } from './library.js';
 import { findPages } from './quotes.js';
 import { showLibrary } from './screens.js';
-import { META, resolveMeta, save, state } from './state.js';
-import { store } from './storage.js';
+import { META, resolveMeta, save } from './state.js';
 import { $, el, fmt, icon, toast } from './ui/dom.js';
 import { setScroll } from './ui/marquee.js';
 import { closeSheet } from './ui/sheets.js';
@@ -163,13 +163,7 @@ export function metaChanged() {
 $('infoBtn').addEventListener('click', () => { chaptersOpen = false; chapStatusText = ''; openNames.clear(); renderInfo(); $('infoDlg').showModal(); $('infoDlg').scrollTop = 0; });
 $('infoClose').addEventListener('click', () => closeSheet($('infoDlg')));
 $('removeBtn').addEventListener('click', async () => {
-  if (!cur) return;
-  const b = cur.book, n = b.marks.length;
-  if (!confirm('Remove “' + b.title + '” from this device?' + (n ? ' Its ' + n + (n === 1 ? ' bookmark' : ' bookmarks') + ' will be deleted too.' : ''))) return;
+  if (!cur || !(await removeBook(cur.book))) return;
   closeSheet($('infoDlg'));
-  closeBook();
-  state.books = state.books.filter((x) => x !== b);
-  save(true);
-  await store('remove', b.id).catch(() => {});
   showLibrary();
 });
