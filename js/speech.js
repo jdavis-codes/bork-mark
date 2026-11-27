@@ -1,10 +1,10 @@
-// Speech to text: the Whisper worker, loading its model (with retries), and the status line
-// that reports on it.
+// Speech to text: the Whisper worker, loading its model (with retries), letting go of it
+// while the app is in the background, and the status line that reports on it.
 
 import { busy } from './ui/busy.js';
 import { crumb, detail, log } from './log.js';
 import { runQueue } from './queue.js';
-import { state } from './state.js';
+import { settings, state } from './state.js';
 import { $ } from './ui/dom.js';
 
 const MODEL = 'onnx-community/whisper-tiny.en_timestamped';
@@ -26,10 +26,11 @@ function ask(message, transfer = []) {
         if (modelNotice) modelNotice.say('Model ' + Math.round(100 * m.loaded / m.total) + '%');   // the one-time download
         return;
       }
-      if (m.type === 'file') { detail('model file ' + m.status + ': ' + m.file); return; }
+      if (m.type === 'file') { detail('model file downloaded: ' + m.file); return; }
       const job = asrJobs.get(m.id);
       if (!job) return;
       asrJobs.delete(m.id);
+      if (document.visibilityState === 'hidden') letGoLater(LET_GO_AFTER);
       if (m.type === 'done') job.resolve(m); else job.reject(new Error(m.message));
     };
     asrWorker.onerror = (e) => {
@@ -58,6 +59,7 @@ export async function embed(texts) {
   return texts.map((_, i) => r.vectors.subarray(i * r.size, (i + 1) * r.size));
 }
 export async function transcribe(pcm) {
+  if (modelState !== 'ready') await warmModel();   // let go in the background, or never loaded
   const secs = Math.round(pcm.length / 16000);   // read now: sending the audio to the worker empties it here
   const r = await asrRequest(pcm);
   log('transcribed ' + secs + ' s of audio in ' + (r.runMs / 1000).toFixed(1) + ' s');
@@ -81,7 +83,7 @@ async function loadModel() {
   for (let attempt = 0; ; attempt++) {
     try {
       const r = await asrRequest(null);
-      log('speech model ready in ' + (r.loadMs / 1000).toFixed(1) + ' s' + (attempt ? ', on try ' + (attempt + 1) : '') + (altRuntime ? ', from the second host' : ''));
+      log('speech model ready in ' + (r.loadMs / 1000).toFixed(1) + ' s' + (r.saved ? ', from the copy on this device' : ', downloaded') + (attempt ? ', on try ' + (attempt + 1) : '') + (altRuntime ? ', from the second host' : ''));
       return;
     } catch (err) {
       log('speech model failed, try ' + (attempt + 1) + ': ' + err.message + ' | online ' + navigator.onLine
@@ -128,6 +130,34 @@ export function warmModel() {
   });
   return warming;
 }
+
+// ---------- letting go of the model in the background ----------
+// The model is most of the app's memory, and iOS ends the background apps that
+// hold the most first: with it loaded, the app was gone within seconds of
+// leaving the screen, and every return was a fresh start. So when the app is
+// hidden and the worker has nothing to do, the worker is ended, which gives
+// the memory back. The model is read again from the copy on the device (a few
+// seconds) when the next quote needs it, not on coming back: most returns are
+// to pause or skip, and loading is the heaviest step there is.
+//
+// With "Find quotes while locked" on, work can carry on while hidden, so the
+// worker is given a moment after each job in case another follows.
+const LET_GO_AFTER = 4000;
+let letGoTimer = null;
+function letGo() {
+  if (document.visibilityState !== 'hidden' || !asrWorker || asrJobs.size || warming) return;
+  asrWorker.terminate(); asrWorker = null; modelState = 'idle';
+  detail('speech model let go while in the background');
+}
+function letGoLater(ms) {
+  clearTimeout(letGoTimer);
+  letGoTimer = setTimeout(letGo, ms);
+}
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(letGoTimer);
+  if (document.visibilityState !== 'hidden') return;
+  if (settings.bgQuotes) letGoLater(LET_GO_AFTER); else letGo();
+});
 
 export function setQueueStatus(msg) {
   $('queueStatus').textContent = msg;

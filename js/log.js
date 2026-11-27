@@ -31,6 +31,24 @@ export const detail = CHANNEL === 'release' ? () => {} : (msg) => log('· ' + ms
 export const mb = (bytes) => (bytes / 1048576).toFixed(1) + ' MB';
 log('--- app opened' + ((window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) ? ' (home screen)' : ' (browser)'));
 
+// ---------- how the last session ended ----------
+// A page that closes normally says goodbye (pagehide). One that iOS ends does
+// not, and from the log alone those launches all look alike. So each session
+// keeps a note of whether it is on screen, and the next launch reads it: ended
+// in the background is iOS making room (or the app being swiped away), which
+// is ordinary; ended while on screen is a crash.
+const OPEN = 'borkmark.' + NS + 'open';
+try {
+  const was = localStorage.getItem(OPEN);
+  if (was) log('the last session was ended ' + (was === 'hidden' ? 'in the background (by iOS, or swiped away)' : 'while on screen: a crash'));
+  const note = () => localStorage.setItem(OPEN, document.visibilityState === 'hidden' ? 'hidden' : 'shown');
+  note();
+  document.addEventListener('visibilitychange', note);
+  // A page kept whole while away (back/forward) carries on when it returns.
+  window.addEventListener('pageshow', note);
+  window.addEventListener('pagehide', () => localStorage.removeItem(OPEN));
+} catch (e) { /* storage unavailable */ }
+
 // ---------- crash breadcrumbs ----------
 // iOS kills a page that uses too much memory without any error we can catch.
 // Noting the current heavy step lets the next launch say what was going on,

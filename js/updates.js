@@ -11,6 +11,7 @@ import { BUILD, CHANNEL, COMMIT, SOURCE, VERSION } from './version.js';
 // the service worker to look for new files first, then reloads the page.
 $('appReload').addEventListener('click', async () => {
   $('appReload').disabled = true;
+  log('reloading (Reload app)');
   if (cur) { cur.book.position = audio.currentTime || cur.book.position; save(true); }
   try {
     const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();

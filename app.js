@@ -66,7 +66,10 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 purgeTrash();   // what was deleted over ten days ago goes for good
 renderLibrary();
 if (navigator.storage && navigator.storage.estimate) {
-  navigator.storage.estimate().then(({ usage, quota }) => detail('launch: ' + state.books.length + ' books, storage ' + mb(usage || 0) + ' of ' + mb(quota || 0)
+  // Asked again at each launch (adding a book asks too): storage the browser
+  // has agreed to keep is not cleared to make room, books and model alike.
+  const kept = state.books.length && navigator.storage.persist ? navigator.storage.persist().catch(() => false) : Promise.resolve(false);
+  Promise.all([navigator.storage.estimate(), kept]).then(([{ usage, quota }, kept]) => detail('launch: ' + state.books.length + ' books, storage ' + mb(usage || 0) + ' of ' + mb(quota || 0) + (kept ? ' (kept)' : ' (may be cleared)')
     + ', ' + (navigator.hardwareConcurrency || '?') + ' cores, screen ' + screen.width + '×' + screen.height + ' @' + devicePixelRatio)).catch(() => {});
 }
 if (!state.books.length && !state.introSeen && !lastCrash) showIntro();

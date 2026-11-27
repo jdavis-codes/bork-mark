@@ -22,10 +22,22 @@ function useAltRuntime() {
   env.useWasmCache = false;
 }
 
+// Whether the model's files are already saved on this device (by the library,
+// in the browser's cache storage), so loading needs no network.
+async function isSaved(model) {
+  try {
+    const keys = await (await caches.open(env.cacheKey)).keys();
+    return keys.some((k) => k.url.includes(model + '/') && k.url.includes('.onnx'));
+  } catch (e) { return false; }
+}
+
+// Loads Whisper if it isn't loaded. Returns how long that took and whether it
+// came from the saved copy, or null when it was already loaded.
 async function ensure(model, device, alt) {
   const key = model + '|' + device;
-  if (key === loadedKey) return 0;
+  if (key === loadedKey) return null;
   if (alt) useAltRuntime();
+  const saved = await isSaved(model);
   const t0 = performance.now();
   asr = null; loadedKey = '';
   asr = await pipeline('automatic-speech-recognition', model, {
@@ -36,13 +48,13 @@ async function ensure(model, device, alt) {
     progress_callback: (p) => {
       if (p.status === 'progress') {
         self.postMessage({ type: 'progress', file: p.file, loaded: p.loaded, total: p.total });
-      } else if (p.file && (p.status === 'download' || p.status === 'done')) {
-        self.postMessage({ type: 'file', file: p.file, status: p.status });   // 'download' only when not already saved
+      } else if (p.file && p.status === 'done' && !saved) {   // the library reports saved files the same way
+        self.postMessage({ type: 'file', file: p.file });
       }
     },
   });
   loadedKey = key;
-  return performance.now() - t0;
+  return { loadMs: performance.now() - t0, saved };
 }
 
 // The sentence model loads the first time it's asked for, not with Whisper.
@@ -72,9 +84,9 @@ async function handle(e) {
   }
   const { id, audio, model, device, alt } = e.data;
   try {
-    const loadMs = await ensure(model, device, alt);
+    const loaded = await ensure(model, device, alt), loadMs = loaded ? loaded.loadMs : 0;
     if (!audio) {   // warm-up request: load the model and report back
-      self.postMessage({ type: 'done', id, loadMs });
+      self.postMessage({ type: 'done', id, loadMs, saved: !loaded || loaded.saved });
       return;
     }
     self.postMessage({ type: 'stage', stage: 'transcribing' });
