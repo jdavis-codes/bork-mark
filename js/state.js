@@ -57,6 +57,7 @@ export const DEFAULTS = {
   citeTimeText: 'audiobook, {time}',
   markOrder: 'book',             // bookmarks list: book | new | old | long | short | attention (see ORDERS in marks.js)
   accent: null,                  // custom accent color as #rrggbb, or null for the default green
+  trashDays: 10,                 // days deleted books and bookmarks are kept (trash.js); 0: until emptied
 };
 export const settings = state.settings = {
   ...DEFAULTS, ...(state.settings || {}),

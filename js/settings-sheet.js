@@ -44,6 +44,7 @@ export function renderSettings() {
   $('capParas').hidden = settings.capture.mode !== 'paras';
   $('lockSeek').value = settings.lockSeek ? 'skip' : 'track';
   $('bgQuotes').checked = settings.bgQuotes; $('trimSnap').checked = settings.trimSnap;
+  $('trashDays').value = String(settings.trashDays);
   $('citeStyle').value = settings.citeStyle; $('citeTime').checked = settings.citeTime;
   if (document.activeElement !== $('citeTimeText')) $('citeTimeText').value = settings.citeTimeText;
   $('citeTimeField').hidden = !settings.citeTime;
@@ -75,6 +76,7 @@ function readSettings() {
   settings.lockSeek = $('lockSeek').value === 'skip';
   settings.bgQuotes = $('bgQuotes').checked; settings.trimSnap = $('trimSnap').checked;
   settings.citeStyle = STYLES[$('citeStyle').value] ? $('citeStyle').value : 'simple';
+  settings.trashDays = Number($('trashDays').value) || 0;
   settings.citeTime = $('citeTime').checked;
   settings.citeTimeText = $('citeTimeText').value.trim() || DEFAULTS.citeTimeText;
   settings.sounds = $('sounds').checked; settings.figAlert = $('figAlert').checked; settings.figPause = $('figPause').checked;

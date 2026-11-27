@@ -235,6 +235,21 @@ const { BASE, FIX, open, addBook, check, done } = require('./lib');
     return { restored, purged: !state.trash.some((x) => x.book === old), files: !!(await stored(old.id, 'audio')) };
   });
   check('a deleted bookmark is restored; after ten days a book goes for good', marks.restored && marks.purged && !marks.files, JSON.stringify(marks));
+  // How long they're kept: "Until emptied" keeps an old one through a launch; a shorter time
+  // shows what goes at the next launch rather than deleting it there and then.
+  const keepFor = await page.evaluate(async () => {
+    const { state, settings } = await import('./js/state.js'), { purgeTrash, renderTrash } = await import('./js/trash.js');
+    const fake = { kind: 'mark', bookId: state.books[0].id, mark: { id: 'm-old', t: 5, status: 'heard', transcript: 'old one', created: 0 }, at: Date.now() - 40 * 86400000 };
+    state.trash.unshift(fake);
+    settings.trashDays = 0; purgeTrash(); const forever = state.trash.includes(fake);
+    renderTrash(); const foreverText = document.querySelector('#trashList li .muted').textContent;
+    settings.trashDays = 30; renderTrash(); const shortText = document.querySelector('#trashList li .muted').textContent;
+    const stillThere = state.trash.includes(fake);
+    purgeTrash(); const gone = !state.trash.includes(fake);
+    settings.trashDays = 10;
+    return { forever, foreverText, shortText, stillThere, gone };
+  });
+  check('“Keep for” is honoured: until emptied keeps, a shorter time waits for the next launch', keepFor.forever && /until emptied/.test(keepFor.foreverText) && /next opens/.test(keepFor.shortText) && keepFor.stillThere && keepFor.gone, JSON.stringify(keepFor));
   await page.click('#settingsClose');
   done(page); await browser.close();
 })();
